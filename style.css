@@ -155,74 +155,40 @@ body {
   color: rgba(255, 255, 255, 0.65);
 }
 
-.phones {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.screenshots-zone {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 18px;
+  padding: 26px;
+}
+
+.screenshots-zone h3 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.screenshots-zone p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.screenshots-grid {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
   gap: 12px;
 }
 
-.phone {
-  width: 190px;
-  min-height: 360px;
-  background: #fff;
-  color: var(--poksol-navy);
-  border-radius: 34px;
-  padding: 28px 18px;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
-  border: 8px solid #111827;
-}
-
-.phone.main {
-  width: 250px;
-  min-height: 460px;
-  z-index: 2;
-}
-
-.phone.side {
-  transform: scale(0.92);
-  opacity: 0.95;
-}
-
-.phone h4 {
-  margin: 0 0 18px;
-}
-
-.phone strong {
-  display: block;
-  font-size: 24px;
-  margin-bottom: 6px;
-}
-
-.phone small {
-  color: var(--poksol-green);
-  font-weight: bold;
-}
-
-.phone p {
-  background: var(--surface);
-  padding: 10px;
-  border-radius: 10px;
-  font-size: 12px;
-}
-
-.phone p span {
-  float: right;
-  color: var(--poksol-green);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 22px;
-}
-
-.grid div {
-  background: var(--surface);
-  border-radius: 12px;
-  padding: 14px;
-  font-weight: 800;
+.screenshot-slot {
+  min-height: 230px;
+  border-radius: 14px;
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 700;
 }
 
 .products,
@@ -356,6 +322,43 @@ body {
   font-size: 14px;
 }
 
+.upcoming {
+  padding: 10px 8% 70px;
+  text-align: center;
+}
+
+.upcoming h2 {
+  font-size: 36px;
+  margin-bottom: 22px;
+}
+
+.upcoming-cards {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.upcoming-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 14px 35px rgba(10, 37, 64, 0.1);
+  border-top: 4px solid var(--poksol-blue);
+}
+
+.upcoming-card h3 {
+  margin: 0 0 10px;
+  font-size: 24px;
+}
+
+.upcoming-card p {
+  margin: 0;
+  color: var(--poksol-green);
+  font-weight: 800;
+}
+
 @media (max-width: 900px) {
   .navbar,
   .actions,
@@ -372,9 +375,13 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .phones {
+  .screenshots-grid,
+  .upcoming-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .screenshots-zone {
     margin-top: 30px;
-    transform: scale(0.9);
   }
 
   .hero-text,
