@@ -1,94 +1,126 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Poksol — Votre entreprise dans votre poche</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Poksol — Business in your pocket</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
   <header class="hero">
     <nav class="navbar">
       <div class="brand">
-        <img src="poksol_icon.svg" alt="Poksol" class="brand-icon">
-        <span class="brand-name">POK<span>SOL</span></span>
+        <img src="poksol_icon.svg" alt="Poksol" />
+        <div>
+          <strong>POK<span>SOL</span></strong>
+          <small>Your business in your pocket</small>
+        </div>
       </div>
-      <a href="mailto:contact@poksol.com" class="nav-btn">Demander une démo</a>
+
+      <div class="nav-links">
+        <a href="#">Accueil</a>
+        <a href="#produits">Produits</a>
+        <a href="#presence">À propos</a>
+        <a href="mailto:contact@poksol.com">Contact</a>
+      </div>
+
+      <a class="demo-btn" href="mailto:contact@poksol.com">Demander une démo</a>
     </nav>
 
-    <div class="hero-grid">
+    <section class="hero-content">
       <div class="hero-text">
-        <p class="eyebrow">Business solutions in your pocket</p>
-        <h1>Votre entreprise, dans votre poche.</h1>
-        <p class="hero-lead">
-          Poksol développe des applications professionnelles mobiles pour gérer vos ventes,
+        <h1>Votre entreprise,<br>dans votre <span>poche.</span></h1>
+        <p>
+          Applications professionnelles mobiles pour gérer vos ventes,
           réservations, paiements et opérations quotidiennes.
         </p>
-        <div class="hero-actions">
-          <a href="mailto:contact@poksol.com" class="main-btn">Contacter Poksol</a>
-          <a href="#solutions" class="secondary-btn">Découvrir les solutions</a>
+
+        <div class="actions">
+          <a class="primary-btn" href="mailto:contact@poksol.com">Contacter Poksol</a>
+          <a class="outline-btn" href="#produits">Voir la démo</a>
+        </div>
+
+        <div class="badges">
+          <div><strong>✓</strong><span>Sécurisé<br><small>Données protégées</small></span></div>
+          <div><strong>☁</strong><span>Cloud<br><small>Accessible partout</small></span></div>
+          <div><strong>⚡</strong><span>Rapide<br><small>Performance optimale</small></span></div>
         </div>
       </div>
 
-      <div class="hero-card">
-        <img src="poksol_icon.svg" alt="Icône Poksol" class="hero-logo">
-        <div class="mock-card">
-          <span>Ventes aujourd’hui</span>
-          <strong>2 450 €</strong>
-          <small>+12,5 % cette semaine</small>
+      <div class="phones">
+        <div class="phone side">
+          <h4>Commandes</h4>
+          <p>Commande #1258 <span>Terminée</span></p>
+          <p>Commande #1257 <span>En attente</span></p>
+          <p>Commande #1256 <span>Payée</span></p>
+        </div>
+
+        <div class="phone main">
+          <h4>Tableau de bord</h4>
+          <strong>12 750,00 €</strong>
+          <small>+10% vs hier</small>
+          <div class="grid">
+            <div>156<br><small>Ventes</small></div>
+            <div>42<br><small>Commandes</small></div>
+            <div>89<br><small>Clients</small></div>
+            <div>18<br><small>Réservations</small></div>
+          </div>
+        </div>
+
+        <div class="phone side">
+          <h4>Réservations</h4>
+          <p>Marie Dupont <span>19:00</span></p>
+          <p>Jean Martin <span>20:00</span></p>
+          <p>Sophie Bernard <span>20:30</span></p>
         </div>
       </div>
-    </div>
+    </section>
   </header>
 
   <main>
-    <section id="solutions" class="section">
-      <p class="section-label">Suite professionnelle</p>
-      <h2>Des outils simples pour les entrepreneurs de terrain.</h2>
-      <p class="lead">
-        Une plateforme pensée pour les commerçants, restaurateurs, PME et équipes mobiles.
+    <section id="produits" class="products">
+      <h2>Une suite d’applications pour les professionnels</h2>
+      <p>
+        Poksol accompagne les commerçants, restaurateurs, PME et entrepreneurs
+        avec des outils simples, mobiles et connectés.
       </p>
 
       <div class="cards">
-        <article class="card">
-          <div class="card-icon">POS</div>
+        <article>
+          <div class="icon">🛒</div>
           <h3>Poksol POS</h3>
           <p>Système de caisse moderne pour restaurants, commerces et points de vente.</p>
+          <a href="#">En savoir plus →</a>
         </article>
 
-        <article class="card">
-          <div class="card-icon">BOOK</div>
+        <article>
+          <div class="icon green">📅</div>
           <h3>Poksol Booking</h3>
-          <p>Réservations, clients, horaires, confirmations et suivi opérationnel.</p>
+          <p>Gestion des réservations, clients, horaires et confirmations.</p>
+          <a href="#">En savoir plus →</a>
         </article>
 
-        <article class="card">
-          <div class="card-icon">PAY</div>
+        <article>
+          <div class="icon purple">💳</div>
           <h3>Poksol Pay</h3>
-          <p>Suivi des paiements, ventes, performances et indicateurs clés.</p>
+          <p>Suivi des paiements, ventes et performances commerciales.</p>
+          <a href="#">En savoir plus →</a>
         </article>
       </div>
     </section>
 
-    <section class="bridge">
+    <section id="presence" class="presence">
       <div>
-        <p class="section-label">France · Liban · Afrique de l’Ouest</p>
-        <h2>Une marque construite pour connecter les marchés.</h2>
+        <h2>Présent en France, au Liban et en Afrique de l’Ouest</h2>
+        <p>Une solution pensée pour les professionnels d’aujourd’hui, partout où vous êtes.</p>
       </div>
-      <p>
-        Poksol accompagne les professionnels qui veulent travailler vite, proprement
-        et partout, depuis une tablette ou un smartphone.
-      </p>
+      <div class="flags">
+        <span>🇫🇷<br>France</span>
+        <span>🇱🇧<br>Liban</span>
+        <span>🌍<br>Afrique de l’Ouest</span>
+      </div>
     </section>
   </main>
-
-  <footer>
-    <div class="footer-brand">
-      <img src="poksol_icon.svg" alt="Poksol" class="footer-icon">
-      <strong>POKSOL</strong>
-    </div>
-    <p>© 2026 Poksol — Tous droits réservés</p>
-  </footer>
 </body>
 </html>
