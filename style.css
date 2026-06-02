@@ -6,8 +6,10 @@
   --poksol-navy: #0A2540;
   --poksol-blue: #1976F3;
   --poksol-green: #42C96F;
-  --surface: #f5f7fa;
+  --surface: #f4f7fb;
+  --surface-warm: #fbfaf7;
   --text-muted: #475569;
+  --line: #d9e3ef;
 }
 
 body {
@@ -18,12 +20,15 @@ body {
 }
 
 .hero {
-  min-height: 760px;
-  padding: 32px 8% 70px;
+  min-height: 720px;
+  padding: 30px 8% 58px;
   color: white;
   background:
-    radial-gradient(circle at right, rgba(25, 118, 243, 0.25), transparent 35%),
-    linear-gradient(135deg, #061b31, var(--poksol-navy) 65%, #071827);
+    linear-gradient(120deg, rgba(10, 37, 64, 0.96), rgba(10, 37, 64, 0.82)),
+    url("poksol_logo_color.svg");
+  background-position: center, right 8% center;
+  background-repeat: no-repeat;
+  background-size: cover, min(520px, 38vw);
 }
 
 .navbar {
@@ -31,6 +36,8 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 28px;
+  max-width: 1180px;
+  margin: 0 auto;
 }
 
 .brand {
@@ -66,6 +73,10 @@ body {
 .nav-links {
   display: flex;
   gap: 34px;
+  padding: 12px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .nav-links a,
@@ -90,17 +101,28 @@ body {
 
 .hero-content {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.82fr);
   align-items: center;
-  gap: 70px;
-  margin-top: 70px;
+  gap: 64px;
+  max-width: 1180px;
+  margin: 76px auto 0;
+}
+
+.eyebrow,
+.product-kicker {
+  color: var(--poksol-green);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0 0 12px;
+  text-transform: uppercase;
 }
 
 .hero-text h1 {
-  font-size: clamp(44px, 6vw, 74px);
+  font-size: clamp(46px, 6vw, 72px);
   line-height: 1.05;
   margin: 0 0 24px;
-  letter-spacing: -2px;
+  letter-spacing: 0;
 }
 
 .hero-text h1 span {
@@ -117,7 +139,7 @@ body {
 .actions {
   display: flex;
   gap: 18px;
-  margin-top: 34px;
+  margin-top: 32px;
 }
 
 .primary-btn,
@@ -135,20 +157,24 @@ body {
 }
 
 .badges {
-  display: flex;
-  gap: 38px;
-  margin-top: 50px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 42px;
 }
 
 .badges div {
   display: flex;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
+  padding: 16px;
+  border-left: 2px solid rgba(66, 201, 111, 0.8);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .badges strong {
   color: var(--poksol-green);
-  font-size: 28px;
+  font-size: 16px;
 }
 
 .badges small {
@@ -156,44 +182,69 @@ body {
 }
 
 .screenshots-zone {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 18px;
-  padding: 26px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  padding: 22px;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.24);
 }
 
-.screenshots-zone h3 {
-  margin: 0 0 8px;
-  font-size: 28px;
+.screenshots-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--poksol-navy);
 }
 
-.screenshots-zone p {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.82);
+.screenshots-header span {
+  color: var(--poksol-blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.screenshots-header strong {
+  font-size: 14px;
 }
 
 .screenshots-grid {
   margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(120px, 1fr));
-  gap: 12px;
+  grid-template-columns: 0.86fr 1.08fr 0.86fr;
+  gap: 14px;
+  align-items: end;
 }
 
 .screenshot-slot {
-  min-height: 230px;
-  border-radius: 14px;
-  border: 2px dashed rgba(255, 255, 255, 0.45);
+  min-height: 245px;
+  border-radius: 8px;
+  border: 1px dashed #9fb3ca;
+  background:
+    linear-gradient(180deg, #ffffff, #edf4fb);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--poksol-navy);
   font-weight: 700;
+}
+
+.screenshot-slot.is-featured {
+  min-height: 310px;
+  border-color: var(--poksol-blue);
+  box-shadow: 0 18px 45px rgba(25, 118, 243, 0.16);
+}
+
+.screenshot-slot span {
+  color: var(--poksol-green);
+  font-size: 13px;
+  margin-bottom: 8px;
 }
 
 .products,
 .product-page {
-  padding: 55px 8%;
+  padding: 68px 8%;
   text-align: center;
 }
 
@@ -219,9 +270,10 @@ body {
   gap: 40px;
   align-items: center;
   background: white;
-  padding: 38px;
-  border-radius: 28px;
-  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.12);
+  padding: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
   text-align: left;
 }
 
@@ -233,14 +285,14 @@ body {
 
 .single-product-link:hover {
   transform: translateY(-2px);
-  box-shadow: 0 22px 55px rgba(10, 37, 64, 0.16);
+  box-shadow: 0 22px 55px rgba(10, 37, 64, 0.12);
 }
 
 .single-product img,
 .product-logo {
   width: 100%;
   max-width: 420px;
-  border-radius: 18px;
+  border-radius: 8px;
 }
 
 .single-product h3,
@@ -271,10 +323,10 @@ body {
 }
 
 .features-list span {
-  background: #eaf3ff;
+  background: #edf6ff;
   color: var(--poksol-navy);
   border: 1px solid #d3e5ff;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 8px 14px;
   font-size: 14px;
   font-weight: 700;
@@ -323,13 +375,21 @@ body {
 }
 
 .upcoming {
-  padding: 10px 8% 70px;
+  padding: 26px 8% 76px;
   text-align: center;
+  background: var(--surface-warm);
 }
 
 .upcoming h2 {
   font-size: 36px;
-  margin-bottom: 22px;
+  margin-bottom: 10px;
+}
+
+.upcoming > p {
+  max-width: 760px;
+  margin: 0 auto 28px;
+  color: var(--text-muted);
+  line-height: 1.6;
 }
 
 .upcoming-cards {
@@ -342,10 +402,18 @@ body {
 
 .upcoming-card {
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 8px;
   padding: 28px;
-  box-shadow: 0 14px 35px rgba(10, 37, 64, 0.1);
-  border-top: 4px solid var(--poksol-blue);
+  box-shadow: 0 14px 35px rgba(10, 37, 64, 0.07);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.upcoming-card span {
+  color: var(--poksol-blue);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .upcoming-card h3 {
@@ -371,6 +439,7 @@ body {
   }
 
   .hero-content,
+  .badges,
   .product-actions {
     grid-template-columns: 1fr;
   }
