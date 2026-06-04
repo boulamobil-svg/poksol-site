@@ -23,12 +23,7 @@ body {
   min-height: 720px;
   padding: 30px 8% 58px;
   color: white;
-  background:
-    linear-gradient(120deg, rgba(10, 37, 64, 0.96), rgba(10, 37, 64, 0.82)),
-    url("poksol_logo_color.svg");
-  background-position: center, right 8% center;
-  background-repeat: no-repeat;
-  background-size: cover, min(520px, 38vw);
+  background: linear-gradient(120deg, #0a2540, #173e62);
 }
 
 .product-hero {
@@ -158,6 +153,13 @@ body {
 
 .hero-text {
   grid-column: 2;
+}
+
+.hero-brand-logo {
+  display: block;
+  width: min(330px, 68%);
+  height: auto;
+  margin: 0 0 20px;
 }
 
 .screenshots-zone {
@@ -597,6 +599,10 @@ body {
   .products,
   .product-page {
     text-align: center;
+  }
+
+  .hero-brand-logo {
+    margin-inline: auto;
   }
 
   .actions,
