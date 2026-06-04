@@ -52,18 +52,29 @@
           <span>POKSOL APP</span>
           <strong>Captures reelles de l'application</strong>
         </div>
-        <div class="screenshots-grid">
-          <div class="screenshot-slot">
+        <div class="screenshots-carousel" data-carousel aria-label="Captures de Poket Restaurants">
+          <button class="carousel-arrow carousel-arrow-prev" type="button" data-carousel-prev aria-label="Capture precedente">&#8249;</button>
+          <div class="carousel-viewport">
+            <div class="carousel-track" data-carousel-track>
+          <figure class="screenshot-slide is-active" data-carousel-slide>
             <img src="assets/screenshots/poket-reservations-full.png" alt="Apercu Poket Restaurants - reservations" />
-            <span>Reservations</span>
-          </div>
-          <div class="screenshot-slot is-featured">
+            <figcaption>Reservations</figcaption>
+          </figure>
+          <figure class="screenshot-slide" data-carousel-slide>
             <img src="assets/screenshots/poket-salle-full.png" alt="Apercu Poket Restaurants - salle" />
-            <span>Salle</span>
-          </div>
-          <div class="screenshot-slot">
+            <figcaption>Salle</figcaption>
+          </figure>
+          <figure class="screenshot-slide" data-carousel-slide>
             <img src="assets/screenshots/poket-emporte-full.png" alt="Apercu Poket Restaurants - emporte" />
-            <span>Emporte</span>
+            <figcaption>Emporte</figcaption>
+          </figure>
+            </div>
+          </div>
+          <button class="carousel-arrow carousel-arrow-next" type="button" data-carousel-next aria-label="Capture suivante">&#8250;</button>
+          <div class="carousel-dots" aria-label="Choisir une capture">
+            <button class="carousel-dot is-active" type="button" data-carousel-dot="0" aria-label="Afficher Reservations" aria-current="true"></button>
+            <button class="carousel-dot" type="button" data-carousel-dot="1" aria-label="Afficher Salle"></button>
+            <button class="carousel-dot" type="button" data-carousel-dot="2" aria-label="Afficher Emporte"></button>
           </div>
         </div>
       </div>
