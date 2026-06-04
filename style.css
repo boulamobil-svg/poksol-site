@@ -149,11 +149,20 @@ body {
 
 .hero-content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.82fr);
+  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1fr);
   align-items: center;
   gap: 64px;
   max-width: 1180px;
   margin: 76px auto 0;
+}
+
+.hero-text {
+  grid-column: 2;
+}
+
+.screenshots-zone {
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .eyebrow,
@@ -556,6 +565,19 @@ body {
   .badges,
   .product-actions {
     grid-template-columns: 1fr;
+  }
+
+  .hero-text,
+  .screenshots-zone {
+    grid-column: 1;
+  }
+
+  .hero-text {
+    grid-row: 1;
+  }
+
+  .screenshots-zone {
+    grid-row: 2;
   }
 
   .upcoming-cards {
