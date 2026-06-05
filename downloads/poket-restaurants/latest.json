@@ -1,4 +1,4 @@
-{
+﻿{
     "releaseId":  "1.0.3+5",
     "targetVersionName":  "1.0.3",
     "targetBuildNumber":  5,
@@ -12,5 +12,6 @@
     "publishedAt":  "2026-06-04T15:26:20.4720233Z",
     "updatedAt":  "2026-06-04T15:26:20.4720233Z",
     "webUrl":  "https://poksol.com/apps/poket-restaurants/",
-    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.3+5.zip"
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.3+5.zip",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.3+5.zip"
 }

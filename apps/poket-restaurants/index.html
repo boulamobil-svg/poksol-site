@@ -1,47 +1,53 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Poket Restaurants - Application navigateur</title>
-  <link rel="stylesheet" href="../../style.css?v=20260604-4" />
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/apps/poket-restaurants/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Application de restauration Poket Restaurants.">
+
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="modulepreload" crossorigin href="https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js">
+  <link rel="modulepreload" crossorigin href="https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js">
+  <link rel="modulepreload" crossorigin href="https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js">
+  <link rel="modulepreload" crossorigin href="https://www.gstatic.com/firebasejs/11.9.1/firebase-app-check.js">
+  <link rel="modulepreload" crossorigin href="https://www.gstatic.com/firebasejs/11.9.1/firebase-messaging.js">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Poket Restaurants">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Poket Restaurants</title>
+  <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <header class="product-hero">
-    <nav class="navbar">
-      <div class="brand">
-        <img src="../../poksol_icon.svg" alt="Poksol" />
-        <div>
-          <strong>POK<span>SOL</span></strong>
-          <small>Your business in your pocket</small>
-        </div>
-      </div>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
 
-      <div class="nav-links">
-        <a href="../../index.html">Accueil</a>
-        <a href="../../poket-restaurants.html">Poket Restaurants</a>
-        <a href="mailto:contact@poksol.com">Contact</a>
-      </div>
-    </nav>
-
-    <section class="product-hero-content">
-      <div>
-        <p class="eyebrow">Application navigateur</p>
-        <h1>Poket Restaurants</h1>
-        <p>
-          La version navigateur n'est pas encore publiee pour cette release.
-          Les versions Android et Windows sont disponibles maintenant.
-        </p>
-        <div class="actions">
-          <a class="primary-btn" href="../../downloads/poket-restaurants/android/chez_marwan_pos_1.0.3+5.apk" download>Telecharger APK Android</a>
-          <a class="outline-btn" href="../../downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.3+5.zip" download>Telecharger Windows</a>
-        </div>
-      </div>
-
-      <div class="product-visual">
-        <img src="../../poket-restaurants-logo.png" alt="Logo Poket Restaurants" />
-      </div>
-    </section>
-  </header>
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
