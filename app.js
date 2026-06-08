@@ -2,11 +2,19 @@
   const PoksolApp = {
     config: {
       product: "poket-restaurants",
-      version: "1.0.0",
+      version: "future-prep-1",
       features: {
         authEnabled: false,
-        adminEnabled: false
-      }
+        adminEnabled: false,
+        deviceLimitEnabled: false,
+        qrInviteEnabled: false
+      },
+      roadmap: [
+        "user-authentication",
+        "single-device-per-standard-user",
+        "owner-admin-console",
+        "physical-qr-user-invite"
+      ]
     },
 
     auth: {
@@ -30,6 +38,16 @@
         return {
           ok: false,
           reason: "Admin area is not implemented yet"
+        };
+      }
+    },
+
+    devices: {
+      getPolicy: function () {
+        return {
+          enabled: false,
+          standardUserLimit: 1,
+          reason: "Device control will be enabled with the future backend phase"
         };
       }
     }
