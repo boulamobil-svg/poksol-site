@@ -8,13 +8,17 @@
         adminEnabled: false,
         deviceLimitEnabled: false,
         qrInviteEnabled: false,
-        accountPortalEnabled: false
+        accountPortalEnabled: false,
+        publicRestaurantPagesEnabled: true,
+        reservationsBackendEnabled: false
       },
       roadmap: [
         "user-authentication",
         "single-device-per-standard-user",
         "owner-admin-console",
-        "physical-qr-user-invite"
+        "physical-qr-user-invite",
+        "public-restaurant-pages",
+        "online-reservations"
       ]
     },
 
@@ -59,6 +63,23 @@
           ok: true,
           mode: "static-preview",
           message: "Poksol account and admin portal are prepared on the front end"
+        };
+      }
+    },
+
+    restaurants: {
+      getPublicPageModel: function () {
+        return {
+          enabled: true,
+          source: "static-preview",
+          futureDataSource: "Firestore",
+          features: [
+            "opening-hours",
+            "menu-with-photos",
+            "reservation-form",
+            "google-business-link",
+            "shareable-qr-code"
+          ]
         };
       }
     }
@@ -142,6 +163,16 @@
         "admin-action": "Action admin preparee mais non activee sans backend securise."
       };
       window.alert(messages[action] || "Fonction preparee pour une prochaine phase Poksol.");
+    });
+  });
+
+  document.querySelectorAll("[data-reservation-preview]").forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      window.alert(
+        "Reservation preparee cote site. La prochaine phase branchera ce formulaire a Poket Restaurants."
+      );
+      form.reset();
     });
   });
 })();

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chez Marwan | Page restaurant Poksol</title>
+  <link rel="stylesheet" href="../style.css?v=20260609-2" />
+</head>
+<body class="restaurant-public-body">
+  <header class="restaurant-public-hero" data-restaurant-slug="chez-marwan">
+    <nav class="restaurant-public-nav">
+      <a class="restaurant-powered-brand" href="../index.html">
+        <img src="../poksol_icon.svg" alt="Poksol" />
+        <span>Propulse par <strong>POKSOL</strong></span>
+      </a>
+      <div class="restaurant-public-links">
+        <a href="#menu">Menu</a>
+        <a href="#horaires">Horaires</a>
+        <a href="#reservation">Reservation</a>
+      </div>
+    </nav>
+
+    <section class="restaurant-hero-content">
+      <div class="restaurant-identity">
+        <span class="restaurant-pill">Restaurant exemple</span>
+        <h1>Chez Marwan</h1>
+        <p>
+          Cuisine conviviale, service rapide et reservations simplifiees.
+          Cette page montre comment chaque restaurant Poksol pourra presenter
+          son menu, ses horaires et son formulaire de reservation.
+        </p>
+        <div class="restaurant-hero-actions">
+          <a class="primary-btn" href="#reservation">Reserver une table</a>
+          <a class="outline-btn" href="tel:+33156344658">Appeler</a>
+        </div>
+      </div>
+
+      <aside class="restaurant-cover-card" aria-label="Apercu restaurant">
+        <div class="restaurant-cover-photo">
+          <span>Photo restaurant</span>
+        </div>
+        <div class="restaurant-cover-info">
+          <strong>Ouvert aujourd'hui</strong>
+          <span>12:00 - 14:30 / 19:00 - 22:30</span>
+        </div>
+      </aside>
+    </section>
+  </header>
+
+  <main class="restaurant-public-main">
+    <section class="restaurant-quick-actions" aria-label="Actions rapides">
+      <a href="https://www.google.com/maps/search/?api=1&query=Chez%20Marwan" target="_blank" rel="noopener noreferrer">
+        Itineraire
+      </a>
+      <a href="tel:+33156344658">Telephone</a>
+      <a href="#reservation">Lien reservation</a>
+      <a href="#menu">Voir le menu</a>
+    </section>
+
+    <section class="restaurant-layout">
+      <div>
+        <section id="menu" class="restaurant-section">
+          <p class="eyebrow">Menu en ligne</p>
+          <h2>Les suggestions</h2>
+          <p>
+            Les plats, prix et photos seront gerables depuis l'espace owner/admin.
+            Pour l'instant, cette page sert de modele statique.
+          </p>
+
+          <div class="menu-grid">
+            <article class="menu-item-card">
+              <div class="menu-photo placeholder-one"></div>
+              <div>
+                <span>Entree</span>
+                <h3>Mezze maison</h3>
+                <p>Assortiment frais a partager.</p>
+                <strong>12 EUR</strong>
+              </div>
+            </article>
+            <article class="menu-item-card">
+              <div class="menu-photo placeholder-two"></div>
+              <div>
+                <span>Plat</span>
+                <h3>Grillade du chef</h3>
+                <p>Viande grillee, legumes et accompagnement.</p>
+                <strong>19 EUR</strong>
+              </div>
+            </article>
+            <article class="menu-item-card">
+              <div class="menu-photo placeholder-three"></div>
+              <div>
+                <span>Dessert</span>
+                <h3>Dessert oriental</h3>
+                <p>Douceur maison et the a la menthe.</p>
+                <strong>8 EUR</strong>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="reservation" class="restaurant-section reservation-section">
+          <p class="eyebrow">Reservation</p>
+          <h2>Reserver une table</h2>
+          <p>
+            Ce formulaire est pret pour etre branche plus tard a Poket Restaurants.
+            Le lien pourra etre copie dans Google Business, Instagram, WhatsApp ou un QR code.
+          </p>
+
+          <form class="reservation-form" data-reservation-preview>
+            <label>
+              Nom
+              <input type="text" name="name" placeholder="Votre nom" required />
+            </label>
+            <label>
+              Telephone
+              <input type="tel" name="phone" placeholder="Votre telephone" required />
+            </label>
+            <label>
+              Date
+              <input type="date" name="date" required />
+            </label>
+            <label>
+              Heure
+              <input type="time" name="time" required />
+            </label>
+            <label>
+              Couverts
+              <input type="number" name="guests" min="1" max="20" value="2" required />
+            </label>
+            <label>
+              Message
+              <textarea name="message" rows="4" placeholder="Allergie, terrasse, occasion speciale..."></textarea>
+            </label>
+            <button class="primary-btn button-reset" type="submit">Envoyer la demande</button>
+          </form>
+        </section>
+      </div>
+
+      <aside class="restaurant-sidebar">
+        <section id="horaires" class="restaurant-side-card">
+          <p class="eyebrow">Horaires</p>
+          <h2>Ouverture</h2>
+          <ul class="hours-list">
+            <li><span>Lundi</span><strong>Ferme</strong></li>
+            <li><span>Mardi</span><strong>12:00 - 22:30</strong></li>
+            <li><span>Mercredi</span><strong>12:00 - 22:30</strong></li>
+            <li><span>Jeudi</span><strong>12:00 - 22:30</strong></li>
+            <li><span>Vendredi</span><strong>12:00 - 23:00</strong></li>
+            <li><span>Samedi</span><strong>12:00 - 23:00</strong></li>
+            <li><span>Dimanche</span><strong>12:00 - 22:00</strong></li>
+          </ul>
+        </section>
+
+        <section class="restaurant-side-card">
+          <p class="eyebrow">Package Poksol</p>
+          <h2>Services monetisables</h2>
+          <ul class="package-list">
+            <li>Page publique restaurant</li>
+            <li>Menu en ligne avec photos</li>
+            <li>Formulaire de reservation</li>
+            <li>Lien Google Business</li>
+            <li>QR code partageable</li>
+          </ul>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="restaurant-public-footer">
+    <span>Chez Marwan</span>
+    <a href="../index.html">Propulse par Poksol</a>
+  </footer>
+
+  <script src="../app.js?v=20260609-2"></script>
+</body>
+</html>
