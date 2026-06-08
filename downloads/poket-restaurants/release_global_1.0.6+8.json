@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+8",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  8,
+    "minimumVersionName":  "1.0.6",
+    "minimumBuildNumber":  8,
+    "forceUpdate":  true,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+8.apk",
+    "apkSha256":  "1649D8ED87E308709D7F5AF31D00D6E36DE2D47D239B3009A16C185E3228F426",
+    "apkFileSize":  88928124,
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+8.zip",
+    "webSha256":  "95896E64666852264E49B760AD59A9996D43835C1129C0E12EB1B91DA335ED2C",
+    "webFileSize":  14389702,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+8.zip",
+    "windowsSha256":  "8CC36E3B3FA39E07C4241EEDEAD71AAD80D940423AA90CC92AC4C05EFFD20917",
+    "windowsFileSize":  24772297,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+8 : acces restaurant par QR code physique, popup admin/owner pour assigner le role, correction texte encode, Firestore-only par defaut, APK Web et Windows publies.",
+    "publishedAt":  "2026-06-08T15:34:01.8460622Z",
+    "updatedAt":  "2026-06-08T15:34:01.8460622Z"
+}
