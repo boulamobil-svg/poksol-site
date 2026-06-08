@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compte Poksol | Portail client</title>
+  <link rel="stylesheet" href="style.css?v=20260609-1" />
+</head>
+<body>
+  <header class="portal-hero">
+    <nav class="navbar">
+      <div class="brand">
+        <img src="poksol_icon.svg" alt="Poksol" />
+        <div>
+          <strong>POK<span>SOL</span></strong>
+          <small>Your business in your pocket</small>
+        </div>
+      </div>
+
+      <div class="nav-links">
+        <a href="index.html">Accueil</a>
+        <a href="poket-restaurants.html">Poket Restaurants</a>
+        <a href="account.html">Compte</a>
+        <a href="mailto:contact@poksol.com">Contact</a>
+      </div>
+
+      <a class="demo-btn" href="admin.html">Espace admin</a>
+    </nav>
+
+    <section class="portal-hero-content">
+      <p class="eyebrow">Phase 3A Poksol</p>
+      <h1>Portail client Poksol</h1>
+      <p>
+        Une base front pour le futur espace compte : connexion utilisateur,
+        appareil autorise, produits actifs et telechargements centralises.
+      </p>
+      <div class="actions">
+        <button class="primary-btn button-reset" type="button" data-future-action="login">
+          Se connecter
+        </button>
+        <a class="outline-btn" href="admin.html">Voir l'espace admin</a>
+      </div>
+    </section>
+  </header>
+
+  <main class="portal-page">
+    <section class="portal-grid" aria-label="Apercu du futur compte Poksol">
+      <article class="portal-panel portal-profile">
+        <span class="portal-tag">Compte</span>
+        <h2>Utilisateur</h2>
+        <p class="portal-muted">Connexion non activee pour le moment.</p>
+        <div class="profile-card">
+          <div class="profile-avatar">PK</div>
+          <div>
+            <strong>Utilisateur Poksol</strong>
+            <span>En attente de connexion securisee</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="portal-panel">
+        <span class="portal-tag green">Appareil</span>
+        <h2>Appareil autorise</h2>
+        <p>
+          Un utilisateur standard ne pourra utiliser qu'un seul appareil actif.
+          Le changement d'appareil devra etre valide par un owner/admin.
+        </p>
+        <div class="device-status">
+          <strong>Limite prevue</strong>
+          <span>1 appareil par utilisateur standard</span>
+        </div>
+        <button class="ghost-action" type="button" data-future-action="device-reset">
+          Demander une reinitialisation
+        </button>
+      </article>
+
+      <article class="portal-panel">
+        <span class="portal-tag">Produit actif</span>
+        <h2>Poket Restaurants</h2>
+        <p>
+          Acces centralise a l'application navigateur, Android, Windows et aux notes de version.
+        </p>
+        <div class="portal-actions-list">
+          <a href="/apps/poket-restaurants/" target="_blank" rel="noopener noreferrer">Ouvrir l'application</a>
+          <a href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+8.apk" download>Telecharger Android</a>
+          <a href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+8.zip" download>Telecharger Windows</a>
+        </div>
+      </article>
+    </section>
+
+    <section class="portal-roadmap">
+      <div>
+        <p class="eyebrow">Ce qui sera branche ensuite</p>
+        <h2>Connexion, roles et securite</h2>
+      </div>
+      <div class="roadmap-list">
+        <article>
+          <strong>01</strong>
+          <span>Firebase Auth / Google</span>
+        </article>
+        <article>
+          <strong>02</strong>
+          <span>Profil utilisateur Poksol</span>
+        </article>
+        <article>
+          <strong>03</strong>
+          <span>Validation owner/admin</span>
+        </article>
+        <article>
+          <strong>04</strong>
+          <span>Controle d'appareil actif</span>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js?v=20260609-1"></script>
+</body>
+</html>

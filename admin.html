@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Poksol | Preparation</title>
+  <link rel="stylesheet" href="style.css?v=20260609-1" />
+</head>
+<body>
+  <header class="portal-hero admin-hero">
+    <nav class="navbar">
+      <div class="brand">
+        <img src="poksol_icon.svg" alt="Poksol" />
+        <div>
+          <strong>POK<span>SOL</span></strong>
+          <small>Your business in your pocket</small>
+        </div>
+      </div>
+
+      <div class="nav-links">
+        <a href="index.html">Accueil</a>
+        <a href="poket-restaurants.html">Poket Restaurants</a>
+        <a href="account.html">Compte</a>
+        <a href="mailto:contact@poksol.com">Contact</a>
+      </div>
+
+      <a class="demo-btn" href="account.html">Portail client</a>
+    </nav>
+
+    <section class="portal-hero-content">
+      <p class="eyebrow">Administration future</p>
+      <h1>Espace owner/admin Poksol</h1>
+      <p>
+        Maquette front du futur tableau de bord pour valider les utilisateurs,
+        controler les appareils et superviser les acces Poket Restaurants.
+      </p>
+    </section>
+  </header>
+
+  <main class="portal-page">
+    <section class="admin-dashboard" aria-label="Apercu du futur tableau admin">
+      <article class="admin-card highlight">
+        <span>Utilisateurs</span>
+        <strong>3</strong>
+        <p>Profils a gerer dans le futur espace restaurant.</p>
+      </article>
+      <article class="admin-card">
+        <span>Appareils actifs</span>
+        <strong>1</strong>
+        <p>Limite standard prevue par utilisateur lambda.</p>
+      </article>
+      <article class="admin-card">
+        <span>Demandes</span>
+        <strong>0</strong>
+        <p>Validation owner/admin avant activation.</p>
+      </article>
+    </section>
+
+    <section class="admin-workspace">
+      <div class="admin-table-card">
+        <div class="section-title-row">
+          <div>
+            <p class="eyebrow">Acces restaurant</p>
+            <h2>Utilisateurs prevus</h2>
+          </div>
+          <button class="ghost-action" type="button" data-future-action="invite-user">
+            Inviter par QR
+          </button>
+        </div>
+
+        <div class="admin-table" role="table" aria-label="Utilisateurs exemple">
+          <div role="row" class="admin-table-head">
+            <span role="columnheader">Nom</span>
+            <span role="columnheader">Role</span>
+            <span role="columnheader">Appareil</span>
+            <span role="columnheader">Action</span>
+          </div>
+          <div role="row">
+            <span role="cell">Owner restaurant</span>
+            <span role="cell">Owner</span>
+            <span role="cell">Admin principal</span>
+            <button role="cell" type="button" data-future-action="admin-action">Gerer</button>
+          </div>
+          <div role="row">
+            <span role="cell">Utilisateur standard</span>
+            <span role="cell">Staff</span>
+            <span role="cell">1 appareil actif</span>
+            <button role="cell" type="button" data-future-action="admin-action">Reinitialiser</button>
+          </div>
+          <div role="row">
+            <span role="cell">Nouvel employe</span>
+            <span role="cell">En attente</span>
+            <span role="cell">Non valide</span>
+            <button role="cell" type="button" data-future-action="admin-action">Valider</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="admin-policy">
+        <p class="eyebrow">Regle cible</p>
+        <h2>Un appareil par utilisateur standard</h2>
+        <p>
+          Les owners/admins pourront retirer l'appareil autorise d'un utilisateur
+          afin de permettre une reconnexion sur un nouveau telephone, tablette ou ordinateur.
+        </p>
+        <ul>
+          <li>Validation admin avant changement d'appareil.</li>
+          <li>Historique des appareils conservable cote backend.</li>
+          <li>Roles separes : owner, admin, manager, staff.</li>
+        </ul>
+      </aside>
+    </section>
+  </main>
+
+  <script src="app.js?v=20260609-1"></script>
+</body>
+</html>

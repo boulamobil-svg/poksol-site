@@ -7,7 +7,8 @@
         authEnabled: false,
         adminEnabled: false,
         deviceLimitEnabled: false,
-        qrInviteEnabled: false
+        qrInviteEnabled: false,
+        accountPortalEnabled: false
       },
       roadmap: [
         "user-authentication",
@@ -48,6 +49,16 @@
           enabled: false,
           standardUserLimit: 1,
           reason: "Device control will be enabled with the future backend phase"
+        };
+      }
+    },
+
+    portal: {
+      status: function () {
+        return {
+          ok: true,
+          mode: "static-preview",
+          message: "Poksol account and admin portal are prepared on the front end"
         };
       }
     }
@@ -119,5 +130,18 @@
 
     showSlide(0);
     startAutoplay();
+  });
+
+  document.querySelectorAll("[data-future-action]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      const action = button.dataset.futureAction;
+      const messages = {
+        login: "Connexion utilisateur prevue en Phase 3B. Aucun backend actif pour le moment.",
+        "device-reset": "La demande de reinitialisation appareil sera reservee aux comptes connectes.",
+        "invite-user": "L'invitation par QR physique sera activee avec l'espace owner/admin.",
+        "admin-action": "Action admin preparee mais non activee sans backend securise."
+      };
+      window.alert(messages[action] || "Fonction preparee pour une prochaine phase Poksol.");
+    });
   });
 })();
