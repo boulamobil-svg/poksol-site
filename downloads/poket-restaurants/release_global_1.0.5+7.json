@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.5+7",
+    "targetVersionName":  "1.0.5",
+    "targetBuildNumber":  7,
+    "minimumVersionName":  "1.0.5",
+    "minimumBuildNumber":  7,
+    "forceUpdate":  true,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.5+7.apk",
+    "apkSha256":  "A5E931B22271AAFC00908E7A03625BECC63F6C14A9C7FC0B8F2B75A31246573E",
+    "apkFileSize":  88928108,
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.5+7.zip",
+    "webSha256":  "3C8F39A53CA4E13912F46AFA7EF1C1F0778C1F079636936F81E99A516D8F9A94",
+    "webFileSize":  14389513,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.5+7.zip",
+    "windowsSha256":  "EE7413D28E162D27D0581B487F2035400347FAA4E1237F5437677F27142A5610",
+    "windowsFileSize":  21940545,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.5+7 : invitations par QR code pour rejoindre un restaurant en presence de l owner/admin, scanner camera Android/Web, saisie manuelle en secours, correction overflow mise a jour obligatoire, saisie manuelle des quantites avec confirmation grands nombres, et blocage minimal obligatoire.",
+    "publishedAt":  "2026-06-08T12:15:40.8678803Z",
+    "updatedAt":  "2026-06-08T12:15:40.8678803Z"
+}
