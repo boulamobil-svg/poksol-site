@@ -1,12 +1,12 @@
 {
-    "releaseId":  "1.0.6+8",
+    "releaseId":  "1.0.6+9",
     "targetVersionName":  "1.0.6",
-    "targetBuildNumber":  8,
+    "targetBuildNumber":  9,
     "minimumVersionName":  "1.0.4",
     "minimumBuildNumber":  6,
     "forceUpdate":  false,
-    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+8.apk",
-    "apkSha256":  "7e41ad5400dd8e287f886b683fe8576f5da77a477e830f06f65666c8e2937bbc",
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+9.apk",
+    "apkSha256":  "f056648f182d83ce9a1565f89b85467e9d9803badf46bd5d316846ab45ace964",
     "apkFileSize":  89009888,
     "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+8.zip",
     "webSha256":  "95896e64666852264e49b760ad59a9996d43835c1129c0e12eb1b91da335ed2c",
@@ -14,8 +14,8 @@
     "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+8.zip",
     "windowsSha256":  "8cc36e3b3fa39e07c4241eedead71aad80d940423aa90cc92ac4c05effd20917",
     "windowsFileSize":  24772297,
-    "notes":  "Release 1.0.6+8 : sync catalogue/reservations, QR ajout membre admin, nettoyage commandes sans LAN P2P, correctif saisie quantite.",
-    "publishedAt":  "2026-06-15T09:50:49Z",
-    "updatedAt":  "2026-06-15T11:04:01Z",
+    "notes":  "Release 1.0.6+9 : correctifs sync UI Firestore/Riverpod pour catalogue, reservations, reglages et membres.",
+    "publishedAt":  "2026-06-15T16:19:29Z",
+    "updatedAt":  "2026-06-15T16:20:12Z",
     "webUrl":  "https://poksol.com/apps/poket-restaurants/"
 }
