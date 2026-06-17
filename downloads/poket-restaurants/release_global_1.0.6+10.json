@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+10",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  10,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+10.apk",
+    "apkSha256":  "ecaf5255e06edc89bdf0a5db9696d6f77f8fa948fdff1f3d8ca6c87ee992e5e6",
+    "apkFileSize":  89272948,
+    "webDownloadUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "webSha256":  "7e86ab116099e52b107c2780bc46f0452eb4f6f4f46f93eff6dbefd0e9490f65",
+    "webFileSize":  14397640,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+8.zip",
+    "windowsSha256":  "c5b2a71942a886e27130e841e1be3e873e172f27880ede1db5b9139f38c0d364",
+    "windowsFileSize":  21939522,
+    "notes":  "Release 1.0.6+10 : module reglement, paiements partiels, paiement par articles, remises, bouton Solder et tickets enrichis.",
+    "publishedAt":  "2026-06-17T08:30:55Z",
+    "updatedAt":  "2026-06-17T08:30:55Z"
+}
