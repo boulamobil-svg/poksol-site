@@ -1,0 +1,15 @@
+{
+    "releaseId":  "1.0.6+14",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  14,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+14.apk",
+    "apkSha256":  "d97ee0b9ea10ce0e95de2c94841f8fd5e4c17681f6d03901148fa03566234b6d",
+    "apkFileSize":  89880120,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+14 : module comptes clients, Sur le compte, releves, encaissements et impressions client.",
+    "publishedAt":  "2026-06-23T08:46:59Z",
+    "updatedAt":  "2026-06-23T08:46:59Z"
+}
