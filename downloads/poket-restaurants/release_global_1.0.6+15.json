@@ -1,0 +1,15 @@
+{
+    "releaseId":  "1.0.6+15",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  15,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+15.apk",
+    "apkSha256":  "1d2d16f5f78c9c2217619c93aef2a0529bf1bf8812ef423f5ff79c00918254a0",
+    "apkFileSize":  89880120,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+15 : correctif Firestore clients sans index composite pour le module comptes clients.",
+    "publishedAt":  "2026-06-23T13:24:29Z",
+    "updatedAt":  "2026-06-23T13:24:29Z"
+}
