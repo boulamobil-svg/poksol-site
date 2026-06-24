@@ -2,6 +2,7 @@ const ACCESS_SESSION_KEY = "poksolAccessSession";
 const RESTAURANT_PROFILE_KEY = "poksolRestaurantProfile";
 const RESTAURANT_CONTEXT_KEY = "poksolRestaurantContext";
 const APP_URL = "/apps/poket-restaurants/";
+const INVITE_COLLECTION = "restaurant_invites";
 const DAYS = [
   ["monday", "Lundi"],
   ["tuesday", "Mardi"],
@@ -28,6 +29,7 @@ let firebaseServices = null;
 let currentUser = null;
 let previewMode = false;
 let restaurantContext = loadRestaurantContext();
+let pendingInviteCode = readInviteCodeFromUrl();
 
 const form = document.querySelector("[data-restaurant-profile-form]");
 const statusBox = document.querySelector("[data-access-status]");
@@ -35,6 +37,9 @@ const authState = document.querySelector("[data-auth-state]");
 const loginButton = document.querySelector("[data-auth-login]");
 const demoButton = document.querySelector("[data-auth-demo]");
 const logoutButton = document.querySelector("[data-auth-logout]");
+const inviteCodeInput = document.querySelector("[data-invite-code]");
+const inviteAcceptButton = document.querySelector("[data-invite-accept]");
+const inviteStatus = document.querySelector("[data-invite-status]");
 const stepButtons = Array.from(document.querySelectorAll("[data-access-step-button]"));
 const steps = Array.from(document.querySelectorAll("[data-access-step]"));
 const previousButton = document.querySelector("[data-access-prev]");
@@ -52,6 +57,7 @@ const restaurantMode = document.querySelector("[data-restaurant-mode]");
 
 renderOpeningHours();
 hydrateForm(loadLocalProfile());
+hydrateInviteFromUrl();
 bindEvents();
 initializeFirebase();
 updateUi();
@@ -60,6 +66,11 @@ function bindEvents() {
   loginButton.addEventListener("click", signIn);
   demoButton.addEventListener("click", enablePreviewMode);
   logoutButton.addEventListener("click", signOut);
+  inviteAcceptButton.addEventListener("click", acceptInviteFromInput);
+  inviteCodeInput.addEventListener("input", () => {
+    pendingInviteCode = normalizeInviteCode(inviteCodeInput.value);
+    updateInviteStatus();
+  });
   previousButton.addEventListener("click", () => setStep(activeStep - 1));
   nextButton.addEventListener("click", () => {
     if (activeStep < steps.length - 1) setStep(activeStep + 1);
@@ -97,7 +108,14 @@ async function initializeFirebase() {
     authModule.onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       if (user) {
-        await loadRemoteProfile(user.uid);
+        if (pendingInviteCode) {
+          const accepted = await acceptInviteCode(pendingInviteCode);
+          if (!accepted) {
+            await loadRemoteProfile(user.uid);
+          }
+        } else {
+          await loadRemoteProfile(user.uid);
+        }
         const profile = loadLocalProfile();
         if (profile && validateProfile(profile).minimumOk) {
           saveSession(true);
@@ -492,6 +510,153 @@ function collectOpeningHours(data) {
   }, {});
 }
 
+function validateInvite(invite, user) {
+  if (!invite || invite.active === false || invite.status === "revoked" || invite.status === "expired") {
+    return { ok: false, message: "Invitation inactive ou expiree." };
+  }
+  if (!normalizeRestaurantId(invite.restaurantId)) {
+    return { ok: false, message: "Invitation incomplete : restaurant manquant." };
+  }
+  if (invite.invitedEmail && user.email) {
+    const invitedEmail = invite.invitedEmail.toString().trim().toLowerCase();
+    const userEmail = user.email.toString().trim().toLowerCase();
+    if (invitedEmail && invitedEmail !== userEmail) {
+      return { ok: false, message: "Cette invitation est reservee a une autre adresse email." };
+    }
+  }
+  if (invite.expiresAt && typeof invite.expiresAt.toDate === "function" && invite.expiresAt.toDate() < new Date()) {
+    return { ok: false, message: "Cette invitation a expire." };
+  }
+  return { ok: true, message: "" };
+}
+
+async function acceptInviteFromInput() {
+  pendingInviteCode = normalizeInviteCode(inviteCodeInput.value);
+  if (!pendingInviteCode) {
+    inviteStatus.textContent = "Saisissez un code d'invitation.";
+    return;
+  }
+  if (!currentUser || previewMode) {
+    inviteStatus.textContent = "Connectez-vous avec Google pour rejoindre un restaurant existant.";
+    return;
+  }
+  await acceptInviteCode(pendingInviteCode);
+}
+
+async function acceptInviteCode(inviteCode) {
+  if (!firebaseServices || !currentUser || previewMode) {
+    return false;
+  }
+
+  const code = normalizeInviteCode(inviteCode);
+  if (!code) return false;
+
+  try {
+    inviteAcceptButton.disabled = true;
+    inviteStatus.textContent = "Verification de l'invitation...";
+
+    const {
+      doc,
+      getDoc,
+      setDoc,
+      updateDoc,
+      serverTimestamp,
+      arrayUnion
+    } = firebaseServices.firestoreModule;
+
+    const inviteRef = doc(firebaseServices.db, INVITE_COLLECTION, code);
+    const inviteSnapshot = await getDoc(inviteRef);
+    if (!inviteSnapshot.exists()) {
+      inviteStatus.textContent = "Invitation introuvable ou expiree.";
+      return false;
+    }
+
+    const invite = inviteSnapshot.data();
+    const validation = validateInvite(invite, currentUser);
+    if (!validation.ok) {
+      inviteStatus.textContent = validation.message;
+      return false;
+    }
+
+    const restaurantId = normalizeRestaurantId(invite.restaurantId);
+    const restaurantSnapshot = await getDoc(doc(firebaseServices.db, "restaurants", restaurantId));
+    if (!restaurantSnapshot.exists()) {
+      inviteStatus.textContent = "Restaurant introuvable pour cette invitation.";
+      return false;
+    }
+
+    const restaurantData = restaurantSnapshot.data();
+    const profile = normalizeProfileFromRestaurant(restaurantData, null);
+    const role = invite.role || "staff";
+
+    await setDoc(
+      doc(firebaseServices.db, "users", currentUser.uid),
+      {
+        uid: currentUser.uid,
+        email: currentUser.email || "",
+        displayName: currentUser.displayName || "",
+        activeRestaurantId: restaurantId,
+        restaurantIds: arrayUnion(restaurantId),
+        joinedInviteCode: code,
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    await setDoc(
+      doc(firebaseServices.db, "restaurants", restaurantId, "members", currentUser.uid),
+      {
+        uid: currentUser.uid,
+        email: currentUser.email || "",
+        displayName: currentUser.displayName || "",
+        role,
+        status: "active",
+        inviteCode: code,
+        joinedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    try {
+      await updateDoc(inviteRef, {
+        acceptedBy: arrayUnion(currentUser.uid),
+        lastAcceptedBy: currentUser.uid,
+        lastAcceptedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    } catch (_) {
+      // L'association utilisateur/restaurant reste valide meme si l'historique
+      // de l'invitation est bloque par des regles Firestore plus strictes.
+    }
+
+    restaurantContext = {
+      restaurantId,
+      mode: "existing",
+      source: "invite",
+      inviteCode: code,
+      role
+    };
+    saveRestaurantContext(restaurantContext);
+    if (profile) {
+      saveLocalProfile(profile);
+      hydrateForm(profile);
+    }
+    saveSession(Boolean(profile && validateProfile(profile).minimumOk));
+    inviteStatus.textContent = `Restaurant rejoint : ${profile?.name || invite.restaurantName || restaurantId}.`;
+    statusBox.textContent = "Restaurant existant associe a votre compte. Ouverture de Poket Restaurants...";
+    window.setTimeout(() => {
+      window.location.href = APP_URL;
+    }, 900);
+    return true;
+  } catch (error) {
+    inviteStatus.textContent = "Impossible de rejoindre le restaurant : " + (error.message || error);
+    return false;
+  } finally {
+    inviteAcceptButton.disabled = false;
+  }
+}
+
 async function uploadRestaurantLogo() {
   const file = logoUploadInput.files?.[0];
   if (!file) {
@@ -666,6 +831,50 @@ function buildRestaurantId(userId) {
 
 function normalizeRestaurantId(value) {
   return (value || "").toString().trim();
+}
+
+function hydrateInviteFromUrl() {
+  if (!pendingInviteCode) {
+    updateInviteStatus();
+    return;
+  }
+  inviteCodeInput.value = pendingInviteCode;
+  inviteStatus.textContent = `Invitation detectee : ${pendingInviteCode}. Connectez-vous pour rejoindre le restaurant.`;
+}
+
+function updateInviteStatus() {
+  if (!inviteStatus) return;
+  if (pendingInviteCode) {
+    inviteStatus.textContent = `Code pret : ${pendingInviteCode}.`;
+  } else {
+    inviteStatus.textContent = "Aucune invitation detectee.";
+  }
+}
+
+function readInviteCodeFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeInviteCode(
+    params.get("invite") ||
+    params.get("inviteCode") ||
+    params.get("code") ||
+    ""
+  );
+}
+
+function normalizeInviteCode(value) {
+  let raw = (value || "").toString().trim();
+  raw = raw.replace(/^POKET-RESTAURANTS-INVITE:/i, "");
+  if (raw.startsWith("{")) {
+    try {
+      const payload = JSON.parse(raw);
+      raw = payload.inviteCode || payload.code || raw;
+    } catch (_) {
+      // If a QR payload is malformed, fall back to the sanitized text.
+    }
+  }
+  return raw
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .toUpperCase();
 }
 
 function normalizeProfileFromRestaurant(restaurantData, fallbackProfile) {

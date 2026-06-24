@@ -1431,6 +1431,30 @@ body {
   margin-top: 10px;
 }
 
+.invite-card {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.invite-card input {
+  width: 100%;
+  border: 1px solid #d3e5ff;
+  border-radius: 14px;
+  background: white;
+  color: var(--poksol-navy);
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 13px 14px;
+  text-transform: uppercase;
+}
+
+.invite-card small {
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 .access-steps {
   display: grid;
   gap: 10px;

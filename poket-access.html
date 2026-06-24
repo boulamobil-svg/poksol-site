@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Acces Poket Restaurants | Poksol</title>
-  <link rel="stylesheet" href="style.css?v=20260624-3" />
+  <link rel="stylesheet" href="style.css?v=20260624-5" />
 </head>
 <body>
   <header class="access-hero">
@@ -53,6 +53,17 @@
           <button class="ghost-action is-hidden" type="button" data-auth-logout>
             Se deconnecter
           </button>
+        </div>
+
+        <div class="access-user-card invite-card">
+          <span class="portal-tag green">Invitation</span>
+          <h2>Rejoindre un restaurant</h2>
+          <p>Entrez le code fourni par le owner/admin ou ouvrez un lien d'invitation Poksol.</p>
+          <input name="inviteCode" placeholder="CODE INVITATION" data-invite-code />
+          <button class="ghost-action" type="button" data-invite-accept>
+            Rejoindre
+          </button>
+          <small data-invite-status>Aucune invitation detectee.</small>
         </div>
 
         <nav class="access-steps" aria-label="Etapes de configuration">
@@ -222,6 +233,6 @@
     </section>
   </main>
 
-  <script type="module" src="poket-access.js?v=20260624-3"></script>
+  <script type="module" src="poket-access.js?v=20260624-5"></script>
 </body>
 </html>
