@@ -1,10 +1,22 @@
 (function () {
+  const firebaseConfig = {
+    apiKey: "AIzaSyCRhBXuuJhbSDo9e4kQEEvc1x28HfxAi_E",
+    authDomain: "restaurantpos-7a4f0d11.firebaseapp.com",
+    projectId: "restaurantpos-7a4f0d11",
+    storageBucket: "restaurantpos-7a4f0d11.firebasestorage.app",
+    messagingSenderId: "486823214144",
+    appId: "1:486823214144:web:a6253af9f0821929e8f3a5"
+  };
+
+  let accountAuth = null;
+  let accountAuthModule = null;
+
   const PoksolApp = {
     config: {
       product: "poket-restaurants",
       version: "future-prep-1",
       features: {
-        authEnabled: false,
+        authEnabled: true,
         adminEnabled: false,
         deviceLimitEnabled: false,
         qrInviteEnabled: false,
@@ -25,13 +37,10 @@
     auth: {
       isAuthenticated: false,
       login: function () {
-        return Promise.resolve({
-          ok: false,
-          reason: "Auth backend not enabled yet"
-        });
+        return signInToAccount();
       },
       logout: function () {
-        this.isAuthenticated = false;
+        return signOutFromAccount();
       }
     },
 
@@ -102,6 +111,110 @@
 
     notice.textContent = message;
     notice.classList.add("is-visible");
+  }
+
+  const accountLoginButton = document.querySelector("[data-account-login]");
+  const accountLogoutButton = document.querySelector("[data-account-logout]");
+  const accountState = document.querySelector("[data-account-state]");
+  const accountAvatar = document.querySelector("[data-account-avatar]");
+  const accountName = document.querySelector("[data-account-name]");
+  const accountEmail = document.querySelector("[data-account-email]");
+  const deviceTitle = document.querySelector("[data-device-title]");
+  const deviceStatus = document.querySelector("[data-device-status]");
+
+  if (accountLoginButton) {
+    initializeAccountAuth();
+    accountLoginButton.addEventListener("click", signInToAccount);
+  }
+
+  if (accountLogoutButton) {
+    accountLogoutButton.addEventListener("click", signOutFromAccount);
+  }
+
+  async function initializeAccountAuth() {
+    try {
+      const [{ initializeApp }, authModule] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js")
+      ]);
+      const app = initializeApp(firebaseConfig);
+      accountAuthModule = authModule;
+      accountAuth = authModule.getAuth(app);
+      authModule.onAuthStateChanged(accountAuth, updateAccountUi);
+    } catch (error) {
+      updateAccountMessage("Connexion indisponible : Firebase n'a pas pu etre charge.");
+    }
+  }
+
+  async function signInToAccount() {
+    if (!accountAuth || !accountAuthModule) {
+      updateAccountMessage("Connexion en cours de chargement. Reessayez dans quelques secondes.");
+      return { ok: false };
+    }
+
+    try {
+      const provider = new accountAuthModule.GoogleAuthProvider();
+      await accountAuthModule.signInWithPopup(accountAuth, provider);
+      return { ok: true };
+    } catch (error) {
+      updateAccountMessage("Connexion impossible : " + readableAuthError(error));
+      return { ok: false, reason: error.code || error.message || String(error) };
+    }
+  }
+
+  async function signOutFromAccount() {
+    if (!accountAuth || !accountAuthModule) return { ok: false };
+    await accountAuthModule.signOut(accountAuth);
+    return { ok: true };
+  }
+
+  function updateAccountUi(user) {
+    PoksolApp.auth.isAuthenticated = Boolean(user);
+
+    if (!accountState) return;
+
+    if (!user) {
+      accountState.textContent = "Connectez-vous avec Google pour acceder au portail Poksol.";
+      accountAvatar.textContent = "PK";
+      accountName.textContent = "Utilisateur Poksol";
+      accountEmail.textContent = "En attente de connexion securisee";
+      accountLoginButton.classList.remove("is-hidden");
+      accountLogoutButton.classList.add("is-hidden");
+      deviceTitle.textContent = "Limite prevue";
+      deviceStatus.textContent = "1 appareil par utilisateur standard";
+      return;
+    }
+
+    const displayName = user.displayName || "Utilisateur Poksol";
+    accountState.textContent = "Connexion active.";
+    accountAvatar.textContent = initials(displayName, user.email);
+    accountName.textContent = displayName;
+    accountEmail.textContent = user.email || "Compte Google connecte";
+    accountLoginButton.classList.add("is-hidden");
+    accountLogoutButton.classList.remove("is-hidden");
+    deviceTitle.textContent = "Session active";
+    deviceStatus.textContent = "Controle appareil pret pour la phase owner/admin.";
+  }
+
+  function updateAccountMessage(message) {
+    if (accountState) accountState.textContent = message;
+  }
+
+  function readableAuthError(error) {
+    if (error?.code === "auth/unauthorized-domain") {
+      return "le domaine poksol.com doit etre ajoute dans Firebase Authentication > Authorized domains.";
+    }
+    if (error?.code === "auth/popup-closed-by-user") {
+      return "la fenetre Google a ete fermee avant la fin.";
+    }
+    return error?.message || String(error);
+  }
+
+  function initials(name, email) {
+    const source = (name || email || "Poksol").trim();
+    const parts = source.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return source.slice(0, 2).toUpperCase();
   }
 
   document.querySelectorAll("[data-carousel]").forEach(function (carousel) {

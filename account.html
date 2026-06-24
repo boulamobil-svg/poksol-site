@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Compte Poksol | Portail client</title>
-  <link rel="stylesheet" href="style.css?v=20260624-1" />
+  <link rel="stylesheet" href="style.css?v=20260624-4" />
 </head>
 <body>
   <header class="portal-hero">
@@ -35,8 +35,11 @@
         appareil autorise, produits actifs et telechargements centralises.
       </p>
       <div class="actions">
-        <button class="primary-btn button-reset" type="button" data-future-action="login">
+        <button class="primary-btn button-reset" type="button" data-account-login>
           Se connecter
+        </button>
+        <button class="outline-btn button-reset is-hidden" type="button" data-account-logout>
+          Se deconnecter
         </button>
         <a class="outline-btn" href="admin.html">Voir l'espace admin</a>
       </div>
@@ -48,12 +51,12 @@
       <article class="portal-panel portal-profile">
         <span class="portal-tag">Compte</span>
         <h2>Utilisateur</h2>
-        <p class="portal-muted">Connexion non activee pour le moment.</p>
+        <p class="portal-muted" data-account-state>Connexion en cours d'initialisation.</p>
         <div class="profile-card">
-          <div class="profile-avatar">PK</div>
+          <div class="profile-avatar" data-account-avatar>PK</div>
           <div>
-            <strong>Utilisateur Poksol</strong>
-            <span>En attente de connexion securisee</span>
+            <strong data-account-name>Utilisateur Poksol</strong>
+            <span data-account-email>En attente de connexion securisee</span>
           </div>
         </div>
       </article>
@@ -66,8 +69,8 @@
           Le changement d'appareil devra etre valide par un owner/admin.
         </p>
         <div class="device-status">
-          <strong>Limite prevue</strong>
-          <span>1 appareil par utilisateur standard</span>
+          <strong data-device-title>Limite prevue</strong>
+          <span data-device-status>1 appareil par utilisateur standard</span>
         </div>
         <button class="ghost-action" type="button" data-future-action="device-reset">
           Demander une reinitialisation
@@ -114,6 +117,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=20260624-1"></script>
+  <script src="app.js?v=20260624-4"></script>
 </body>
 </html>
