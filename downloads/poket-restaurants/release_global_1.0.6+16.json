@@ -1,0 +1,15 @@
+{
+    "releaseId":  "1.0.6+16",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  16,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+16.apk",
+    "apkSha256":  "7ebb24bb767112c316c30a57c1fef3da2609fdd742e66216e00f6d561773604d",
+    "apkFileSize":  89994804,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+16 : nettoyage depot, synchronisation Firebase, paiements, comptes clients, livraison et preparation facturation restaurant.",
+    "publishedAt":  "2026-06-24T15:45:19Z",
+    "updatedAt":  "2026-06-24T15:45:19Z"
+}

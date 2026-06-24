@@ -1,13 +1,13 @@
 {
-    "releaseId":  "1.0.6+15",
+    "releaseId":  "1.0.6+16",
     "targetVersionName":  "1.0.6",
-    "targetBuildNumber":  15,
+    "targetBuildNumber":  16,
     "minimumVersionName":  "1.0.4",
     "minimumBuildNumber":  6,
     "forceUpdate":  false,
-    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+15.apk",
-    "apkSha256":  "1d2d16f5f78c9c2217619c93aef2a0529bf1bf8812ef423f5ff79c00918254a0",
-    "apkFileSize":  89880120,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+16.apk",
+    "apkSha256":  "7ebb24bb767112c316c30a57c1fef3da2609fdd742e66216e00f6d561773604d",
+    "apkFileSize":  89994804,
     "webUrl":  "https://poksol.com/apps/poket-restaurants/",
     "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+12.zip",
     "webSha256":  "19c3eb3e48b4ddde61070ba6e38c70330d93cd54b43a4cfdc1d150adfa54eed5",
@@ -15,7 +15,7 @@
     "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+12.zip",
     "windowsSha256":  "5fd1013b95e96ca87b52878a8e5d71a31a6ea89e1a4a1bda79f9b1049bd2bdf2",
     "windowsFileSize":  24815443,
-    "notes":  "Release 1.0.6+15 : correctif Firestore clients sans index composite pour le module comptes clients.",
-    "publishedAt":  "2026-06-23T13:24:29Z",
-    "updatedAt":  "2026-06-23T13:24:29Z"
+    "notes":  "Release 1.0.6+16 : nettoyage depot, synchronisation Firebase, paiements, comptes clients, livraison et preparation facturation restaurant.",
+    "publishedAt":  "2026-06-24T15:45:19Z",
+    "updatedAt":  "2026-06-24T15:45:19Z"
 }
