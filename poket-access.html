@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Acces Poket Restaurants | Poksol</title>
-  <link rel="stylesheet" href="style.css?v=20260624-2" />
+  <link rel="stylesheet" href="style.css?v=20260624-3" />
 </head>
 <body>
   <header class="access-hero">
@@ -90,8 +90,19 @@
               <label>Telephone principal<input name="phone" type="tel" /></label>
               <label>Email principal<input name="email" type="email" /></label>
             </div>
-            <div class="logo-preview" data-logo-preview>
-              <span>Apercu logo</span>
+            <div class="logo-tools">
+              <div class="logo-preview" data-logo-preview>
+                <span>Apercu logo</span>
+              </div>
+              <div class="logo-upload-card">
+                <strong>Heberger le logo sur Poksol</strong>
+                <span>Importez une image PNG, JPG, WEBP ou SVG. Elle sera liee au profil du restaurant.</span>
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo-upload />
+                <button class="ghost-action" type="button" data-logo-upload-button>
+                  Charger le logo
+                </button>
+                <small data-logo-upload-status>Aucun logo importe pour le moment.</small>
+              </div>
             </div>
           </section>
 
@@ -211,6 +222,6 @@
     </section>
   </main>
 
-  <script type="module" src="poket-access.js?v=20260624-2"></script>
+  <script type="module" src="poket-access.js?v=20260624-3"></script>
 </body>
 </html>

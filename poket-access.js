@@ -20,6 +20,8 @@ const firebaseConfig = {
   messagingSenderId: "486823214144",
   appId: "1:486823214144:web:a6253af9f0821929e8f3a5"
 };
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const LOGO_CONTENT_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 
 let activeStep = 0;
 let firebaseServices = null;
@@ -41,6 +43,9 @@ const saveLaterButton = document.querySelector("[data-save-later]");
 const saveFinalButton = document.querySelector("[data-save-final]");
 const summaryBox = document.querySelector("[data-profile-summary]");
 const logoPreview = document.querySelector("[data-logo-preview]");
+const logoUploadInput = document.querySelector("[data-logo-upload]");
+const logoUploadButton = document.querySelector("[data-logo-upload-button]");
+const logoUploadStatus = document.querySelector("[data-logo-upload-status]");
 const hoursEditor = document.querySelector("[data-opening-hours]");
 const accessTitle = document.querySelector("[data-access-title]");
 const restaurantMode = document.querySelector("[data-restaurant-mode]");
@@ -69,6 +74,8 @@ function bindEvents() {
     updateSummary();
     updateUi();
   });
+  logoUploadInput.addEventListener("change", updateLogoUploadStatus);
+  logoUploadButton.addEventListener("click", uploadRestaurantLogo);
   stepButtons.forEach((button) => {
     button.addEventListener("click", () => setStep(Number(button.dataset.accessStepButton)));
   });
@@ -76,15 +83,17 @@ function bindEvents() {
 
 async function initializeFirebase() {
   try {
-    const [{ initializeApp }, authModule, firestoreModule] = await Promise.all([
+    const [{ initializeApp }, authModule, firestoreModule, storageModule] = await Promise.all([
       import("https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js"),
       import("https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js"),
-      import("https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js")
+      import("https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js"),
+      import("https://www.gstatic.com/firebasejs/11.9.1/firebase-storage.js")
     ]);
     const app = initializeApp(firebaseConfig);
     const auth = authModule.getAuth(app);
     const db = firestoreModule.getFirestore(app);
-    firebaseServices = { auth, db, authModule, firestoreModule };
+    const storage = storageModule.getStorage(app);
+    firebaseServices = { auth, db, storage, authModule, firestoreModule, storageModule };
     authModule.onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       if (user) {
@@ -231,6 +240,7 @@ async function saveProfile({ final }) {
         name: profile.name,
         tradeName: profile.tradeName,
         legalName: profile.legalName,
+        logoUrl: profile.logoUrl,
         phone: profile.phone,
         email: profile.email,
         address: profile.address,
@@ -482,6 +492,69 @@ function collectOpeningHours(data) {
   }, {});
 }
 
+async function uploadRestaurantLogo() {
+  const file = logoUploadInput.files?.[0];
+  if (!file) {
+    logoUploadStatus.textContent = "Selectionnez d'abord un fichier image.";
+    return;
+  }
+  if (!firebaseServices) {
+    logoUploadStatus.textContent = "Firebase Storage n'est pas charge pour le moment.";
+    return;
+  }
+  if (!currentUser || previewMode) {
+    logoUploadStatus.textContent = "Connectez-vous avec Google pour heberger le logo sur Poksol.";
+    return;
+  }
+  if (!LOGO_CONTENT_TYPES.includes(file.type)) {
+    logoUploadStatus.textContent = "Format non accepte. Utilisez PNG, JPG, WEBP ou SVG.";
+    return;
+  }
+  if (file.size > MAX_LOGO_SIZE_BYTES) {
+    logoUploadStatus.textContent = "Logo trop lourd. Limite : 2 Mo.";
+    return;
+  }
+
+  try {
+    const restaurantId = ensureRestaurantId();
+    const extension = logoExtension(file);
+    const storagePath = `restaurants/${restaurantId}/branding/logo.${extension}`;
+    const { ref, uploadBytes, getDownloadURL } = firebaseServices.storageModule;
+    const logoRef = ref(firebaseServices.storage, storagePath);
+
+    logoUploadButton.disabled = true;
+    logoUploadStatus.textContent = "Import du logo en cours...";
+
+    await uploadBytes(logoRef, file, {
+      contentType: file.type,
+      customMetadata: {
+        restaurantId,
+        ownerUid: currentUser.uid
+      }
+    });
+
+    const downloadUrl = await getDownloadURL(logoRef);
+    form.elements.logoUrl.value = downloadUrl;
+    updateLogoPreview();
+    updateSummary();
+    saveLocalProfile(collectProfile());
+    logoUploadStatus.textContent = "Logo importe. L'URL a ete ajoutee au profil restaurant.";
+  } catch (error) {
+    logoUploadStatus.textContent = "Import impossible : " + (error.message || error);
+  } finally {
+    logoUploadButton.disabled = false;
+  }
+}
+
+function updateLogoUploadStatus() {
+  const file = logoUploadInput.files?.[0];
+  if (!file) {
+    logoUploadStatus.textContent = "Aucun logo importe pour le moment.";
+    return;
+  }
+  logoUploadStatus.textContent = `${file.name} selectionne (${formatBytes(file.size)}).`;
+}
+
 function openingHoursToList(hoursByDay) {
   return DAYS.map(([key], index) => {
     const day = hoursByDay[key] || {};
@@ -670,6 +743,24 @@ function isValidUrl(url) {
   } catch (_) {
     return false;
   }
+}
+
+function logoExtension(file) {
+  const byType = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "image/svg+xml": "svg"
+  };
+  if (byType[file.type]) return byType[file.type];
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  return extension && /^[a-z0-9]+$/.test(extension) ? extension : "png";
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
 function escapeHtml(text) {
