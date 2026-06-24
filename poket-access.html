@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acces Poket Restaurants | Poksol</title>
+  <link rel="stylesheet" href="style.css?v=20260624-1" />
+</head>
+<body>
+  <header class="access-hero">
+    <nav class="navbar">
+      <div class="brand">
+        <img src="poksol_icon.svg" alt="Poksol" />
+        <div>
+          <strong>POK<span>SOL</span></strong>
+          <small>Your business in your pocket</small>
+        </div>
+      </div>
+
+      <div class="nav-links">
+        <a href="index.html">Accueil</a>
+        <a href="poket-restaurants.html">Poket Restaurants</a>
+        <a href="account.html">Compte</a>
+        <a href="mailto:contact@poksol.com">Contact</a>
+      </div>
+
+      <a class="demo-btn" href="poket-restaurants.html">Retour produit</a>
+    </nav>
+
+    <section class="access-hero-content">
+      <p class="eyebrow">Acces securise</p>
+      <h1>Configurer votre restaurant avant d'ouvrir Poket Restaurants</h1>
+      <p>
+        Connectez-vous, completez les informations essentielles de votre restaurant,
+        puis ouvrez l'application navigateur. Les APK et telechargements restent publics.
+      </p>
+    </section>
+  </header>
+
+  <main class="access-page">
+    <section class="access-shell" data-access-shell>
+      <aside class="access-sidebar">
+        <div class="access-user-card" data-auth-panel>
+          <span class="portal-tag">Session</span>
+          <h2>Connexion</h2>
+          <p data-auth-state>Session non connectee.</p>
+          <button class="primary-btn button-reset" type="button" data-auth-login>
+            Se connecter avec Google
+          </button>
+          <button class="ghost-action" type="button" data-auth-demo>
+            Continuer en mode preview
+          </button>
+          <button class="ghost-action is-hidden" type="button" data-auth-logout>
+            Se deconnecter
+          </button>
+        </div>
+
+        <nav class="access-steps" aria-label="Etapes de configuration">
+          <button class="is-active" type="button" data-access-step-button="0">Identite</button>
+          <button type="button" data-access-step-button="1">Adresse</button>
+          <button type="button" data-access-step-button="2">Facturation</button>
+          <button type="button" data-access-step-button="3">Paiement</button>
+          <button type="button" data-access-step-button="4">Horaires</button>
+          <button type="button" data-access-step-button="5">Operations</button>
+          <button type="button" data-access-step-button="6">Resume</button>
+        </nav>
+      </aside>
+
+      <section class="access-form-card">
+        <div class="access-status" data-access-status>
+          Connectez-vous pour charger ou creer le profil restaurant.
+        </div>
+
+        <form data-restaurant-profile-form>
+          <section class="access-step is-active" data-access-step="0">
+            <p class="eyebrow">Section A</p>
+            <h2>Identite commerciale</h2>
+            <p class="step-help">
+              Informations visibles pour les clients, tickets, documents commerciaux et interface.
+            </p>
+            <div class="form-grid">
+              <label>Nom du restaurant *<input name="name" required /></label>
+              <label>Enseigne / nom commercial<input name="tradeName" /></label>
+              <label>Raison sociale<input name="legalName" /></label>
+              <label>Logo URL<input name="logoUrl" type="url" placeholder="https://..." /></label>
+              <label>Telephone principal<input name="phone" type="tel" /></label>
+              <label>Email principal<input name="email" type="email" /></label>
+            </div>
+            <div class="logo-preview" data-logo-preview>
+              <span>Apercu logo</span>
+            </div>
+          </section>
+
+          <section class="access-step" data-access-step="1">
+            <p class="eyebrow">Section B</p>
+            <h2>Adresse</h2>
+            <p class="step-help">
+              Adresse affichee sur tickets, factures, documents client et profil restaurant.
+            </p>
+            <div class="form-grid">
+              <label>Adresse ligne 1 *<input name="addressLine1" required /></label>
+              <label>Complement d'adresse<input name="addressLine2" /></label>
+              <label>Code postal *<input name="postalCode" required /></label>
+              <label>Ville *<input name="city" required /></label>
+              <label>Pays *<input name="country" required value="France" /></label>
+            </div>
+          </section>
+
+          <section class="access-step" data-access-step="2">
+            <p class="eyebrow">Section C</p>
+            <h2>Facturation</h2>
+            <p class="step-help">
+              Informations legales necessaires pour generer des factures conformes.
+            </p>
+            <div class="form-grid">
+              <label>SIREN<input name="siren" /></label>
+              <label>SIRET si disponible<input name="siret" /></label>
+              <label>Numero de TVA intracommunautaire<input name="vatNumber" /></label>
+              <label>Forme juridique<input name="legalForm" placeholder="SARL, SAS, EI..." /></label>
+              <label>Capital social<input name="shareCapital" /></label>
+              <label>RCS / ville d'immatriculation<input name="rcsCity" /></label>
+              <label>Code APE / NAF<input name="apeCode" /></label>
+            </div>
+            <p class="soft-warning">
+              Ces informations seront necessaires pour generer des factures completes.
+            </p>
+          </section>
+
+          <section class="access-step" data-access-step="3">
+            <p class="eyebrow">Section D</p>
+            <h2>Paiement et mentions legales</h2>
+            <p class="step-help">
+              Informations utilisees sur les factures, reglements client et documents comptables.
+            </p>
+            <div class="form-grid">
+              <label>Email de facturation<input name="billingEmail" type="email" /></label>
+              <label>Telephone de facturation<input name="billingPhone" type="tel" /></label>
+              <label>IBAN<input name="iban" /></label>
+              <label>BIC<input name="bic" /></label>
+              <label>Conditions de paiement *<input name="paymentTerms" required value="Paiement comptant a reception de facture." /></label>
+              <label>Penalites de retard<input name="latePenaltyTerms" value="Penalites selon taux legal en vigueur." /></label>
+              <label>Indemnite forfaitaire de recouvrement<input name="recoveryIndemnity" value="40 EUR" /></label>
+              <label>Prefixe facture *<input name="invoicePrefix" required value="FAC" /></label>
+              <label>Prochain numero de facture *<input name="nextInvoiceNumber" type="number" min="1" required value="1" /></label>
+              <label class="wide-field">Mentions legales personnalisees<textarea name="invoiceLegalNotice" rows="4"></textarea></label>
+            </div>
+          </section>
+
+          <section class="access-step" data-access-step="4">
+            <p class="eyebrow">Section E</p>
+            <h2>Horaires d'ouverture</h2>
+            <p class="step-help">
+              Informations utilisees pour les reservations, commandes futures, livraison et affichage client.
+            </p>
+            <div class="hours-editor" data-opening-hours></div>
+          </section>
+
+          <section class="access-step" data-access-step="5">
+            <p class="eyebrow">Section F</p>
+            <h2>Informations operationnelles utiles</h2>
+            <p class="step-help">Preparer le fonctionnement du POS.</p>
+            <div class="form-grid">
+              <label>Devise principale<input name="currency" value="EUR" /></label>
+              <label>Fuseau horaire<input name="timezone" value="Europe/Paris" /></label>
+              <label>Langue principale<input name="locale" value="fr-FR" /></label>
+              <label>Type d'activite
+                <select name="businessType">
+                  <option value="restaurant">Restaurant</option>
+                  <option value="snack">Snack</option>
+                  <option value="boulangerie">Boulangerie</option>
+                  <option value="food_truck">Food truck</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </label>
+              <fieldset class="sales-modes">
+                <legend>Modes de vente actives</legend>
+                <label><input type="checkbox" name="enabledSalesModes" value="salle" checked /> Salle</label>
+                <label><input type="checkbox" name="enabledSalesModes" value="emporter" checked /> Emporter</label>
+                <label><input type="checkbox" name="enabledSalesModes" value="livraison" /> Livraison</label>
+              </fieldset>
+              <label>TVA par defaut sur place<input name="defaultVatOnSite" type="number" step="0.01" value="10" /></label>
+              <label>TVA par defaut emporter<input name="defaultVatTakeaway" type="number" step="0.01" value="10" /></label>
+              <label>Nombre de couverts / capacite<input name="capacity" type="number" min="0" /></label>
+              <label>Contact responsable<input name="managerContactName" /></label>
+            </div>
+          </section>
+
+          <section class="access-step" data-access-step="6">
+            <p class="eyebrow">Validation finale</p>
+            <h2>Resume avant ouverture</h2>
+            <p class="step-help">
+              Verifiez les informations essentielles avant d'ouvrir Poket Restaurants.
+            </p>
+            <div class="profile-summary" data-profile-summary></div>
+          </section>
+
+          <div class="access-form-actions">
+            <button class="outline-dark-btn" type="button" data-access-prev>Retour</button>
+            <button class="primary-btn button-reset" type="button" data-access-next>Continuer</button>
+            <button class="ghost-action" type="button" data-save-later disabled>Completer plus tard</button>
+            <button class="primary-btn button-reset is-hidden" type="submit" data-save-final>
+              Enregistrer et continuer
+            </button>
+          </div>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="poket-access.js?v=20260624-1"></script>
+</body>
+</html>
