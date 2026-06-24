@@ -833,6 +833,28 @@ body {
   padding: 13px 16px;
 }
 
+.prepared-notice {
+  display: none;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(66, 201, 111, 0.35);
+  border-left: 4px solid var(--poksol-green);
+  border-radius: 14px;
+  color: #dbeafe;
+  background: rgba(10, 37, 64, 0.55);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.portal-panel .prepared-notice {
+  color: var(--poksol-navy);
+  background: #f0f8f3;
+}
+
+.prepared-notice.is-visible {
+  display: block;
+}
+
 .portal-actions-list {
   display: grid;
   gap: 12px;

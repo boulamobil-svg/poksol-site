@@ -87,6 +87,23 @@
 
   window.PoksolApp = PoksolApp;
 
+  function showPreparedNotice(anchor, message) {
+    const target = anchor.closest(".portal-panel") || anchor.closest(".portal-hero-content") || document.body;
+    let notice = target.querySelector("[data-prepared-notice]");
+
+    if (!notice) {
+      notice = document.createElement("div");
+      notice.className = "prepared-notice";
+      notice.setAttribute("data-prepared-notice", "");
+      notice.setAttribute("role", "status");
+      notice.setAttribute("aria-live", "polite");
+      target.appendChild(notice);
+    }
+
+    notice.textContent = message;
+    notice.classList.add("is-visible");
+  }
+
   document.querySelectorAll("[data-carousel]").forEach(function (carousel) {
     const track = carousel.querySelector("[data-carousel-track]");
     const slides = Array.from(carousel.querySelectorAll("[data-carousel-slide]"));
@@ -162,7 +179,10 @@
         "invite-user": "L'invitation par QR physique sera activee avec l'espace owner/admin.",
         "admin-action": "Action admin preparee mais non activee sans backend securise."
       };
-      window.alert(messages[action] || "Fonction preparee pour une prochaine phase Poksol.");
+      showPreparedNotice(
+        button,
+        messages[action] || "Fonction preparee pour une prochaine phase Poksol."
+      );
     });
   });
 
