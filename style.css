@@ -1446,6 +1446,35 @@ body {
   font-weight: 800;
 }
 
+.restaurant-mode-card {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #edf6ff;
+  border: 1px solid #d3e5ff;
+}
+
+.restaurant-mode-card strong {
+  color: var(--poksol-blue);
+  font-size: 18px;
+}
+
+.restaurant-mode-card span {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.restaurant-mode-card.is-existing {
+  background: #f0f8f3;
+  border-color: #cbeed8;
+}
+
+.restaurant-mode-card.is-existing strong {
+  color: var(--poksol-green);
+}
+
 .access-step {
   display: none;
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Acces Poket Restaurants | Poksol</title>
-  <link rel="stylesheet" href="style.css?v=20260624-1" />
+  <link rel="stylesheet" href="style.css?v=20260624-2" />
 </head>
 <body>
   <header class="access-hero">
@@ -29,10 +29,10 @@
 
     <section class="access-hero-content">
       <p class="eyebrow">Acces securise</p>
-      <h1>Configurer votre restaurant avant d'ouvrir Poket Restaurants</h1>
+      <h1 data-access-title>Créer ou compléter votre restaurant</h1>
       <p>
-        Connectez-vous, completez les informations essentielles de votre restaurant,
-        puis ouvrez l'application navigateur. Les APK et telechargements restent publics.
+        Connectez-vous : si un restaurant existe déjà, Poksol le charge sans le recréer.
+        Sinon, nous vous guidons pour créer votre établissement avant d'ouvrir l'application.
       </p>
     </section>
   </header>
@@ -69,6 +69,10 @@
       <section class="access-form-card">
         <div class="access-status" data-access-status>
           Connectez-vous pour charger ou creer le profil restaurant.
+        </div>
+        <div class="restaurant-mode-card" data-restaurant-mode>
+          <strong>Mode en attente</strong>
+          <span>La connexion permettra de savoir s'il faut creer ou completer un restaurant.</span>
         </div>
 
         <form data-restaurant-profile-form>
@@ -207,6 +211,6 @@
     </section>
   </main>
 
-  <script type="module" src="poket-access.js?v=20260624-1"></script>
+  <script type="module" src="poket-access.js?v=20260624-2"></script>
 </body>
 </html>

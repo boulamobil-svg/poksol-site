@@ -1,5 +1,6 @@
 const ACCESS_SESSION_KEY = "poksolAccessSession";
 const RESTAURANT_PROFILE_KEY = "poksolRestaurantProfile";
+const RESTAURANT_CONTEXT_KEY = "poksolRestaurantContext";
 const APP_URL = "/apps/poket-restaurants/";
 const DAYS = [
   ["monday", "Lundi"],
@@ -24,6 +25,7 @@ let activeStep = 0;
 let firebaseServices = null;
 let currentUser = null;
 let previewMode = false;
+let restaurantContext = loadRestaurantContext();
 
 const form = document.querySelector("[data-restaurant-profile-form]");
 const statusBox = document.querySelector("[data-access-status]");
@@ -40,6 +42,8 @@ const saveFinalButton = document.querySelector("[data-save-final]");
 const summaryBox = document.querySelector("[data-profile-summary]");
 const logoPreview = document.querySelector("[data-logo-preview]");
 const hoursEditor = document.querySelector("[data-opening-hours]");
+const accessTitle = document.querySelector("[data-access-title]");
+const restaurantMode = document.querySelector("[data-restaurant-mode]");
 
 renderOpeningHours();
 hydrateForm(loadLocalProfile());
@@ -123,6 +127,14 @@ function enablePreviewMode() {
     displayName: "Utilisateur preview",
     email: "preview@poksol.local"
   };
+  if (!restaurantContext.restaurantId) {
+    restaurantContext = {
+      restaurantId: "preview-restaurant",
+      mode: loadLocalProfile() ? "existing" : "new",
+      source: "preview"
+    };
+    saveRestaurantContext(restaurantContext);
+  }
   saveSession(false);
   updateAuthState();
   updateUi();
@@ -132,6 +144,8 @@ async function signOut() {
   previewMode = false;
   currentUser = null;
   localStorage.removeItem(ACCESS_SESSION_KEY);
+  restaurantContext = {};
+  localStorage.removeItem(RESTAURANT_CONTEXT_KEY);
   if (firebaseServices) {
     await firebaseServices.authModule.signOut(firebaseServices.auth);
   }
@@ -143,12 +157,41 @@ async function loadRemoteProfile(uid) {
   if (!firebaseServices) return;
   try {
     const { doc, getDoc } = firebaseServices.firestoreModule;
-    const snapshot = await getDoc(doc(firebaseServices.db, "users", uid));
-    const data = snapshot.exists() ? snapshot.data() : null;
-    const profile = data?.restaurantProfile;
-    if (profile) {
-      saveLocalProfile(profile);
-      hydrateForm(profile);
+    const userSnapshot = await getDoc(doc(firebaseServices.db, "users", uid));
+    const userData = userSnapshot.exists() ? userSnapshot.data() : null;
+    const existingRestaurantId = normalizeRestaurantId(
+      userData?.activeRestaurantId ||
+      (Array.isArray(userData?.restaurantIds) ? userData.restaurantIds[0] : "")
+    );
+
+    if (existingRestaurantId) {
+      const restaurantSnapshot = await getDoc(doc(firebaseServices.db, "restaurants", existingRestaurantId));
+      const restaurantData = restaurantSnapshot.exists() ? restaurantSnapshot.data() : null;
+      const profile = normalizeProfileFromRestaurant(restaurantData, userData?.restaurantProfile);
+      restaurantContext = {
+        restaurantId: existingRestaurantId,
+        mode: "existing",
+        source: "firestore"
+      };
+      saveRestaurantContext(restaurantContext);
+      if (profile) {
+        saveLocalProfile(profile);
+        hydrateForm(profile);
+      }
+      statusBox.textContent = `Restaurant trouve : ${profile?.name || existingRestaurantId}. Completez les informations manquantes.`;
+      return;
+    }
+
+    const legacyProfile = userData?.restaurantProfile;
+    restaurantContext = {
+      restaurantId: buildRestaurantId(uid),
+      mode: legacyProfile ? "existing" : "new",
+      source: legacyProfile ? "user-profile" : "new"
+    };
+    saveRestaurantContext(restaurantContext);
+    if (legacyProfile) {
+      saveLocalProfile(legacyProfile);
+      hydrateForm(legacyProfile);
     }
   } catch (error) {
     statusBox.textContent = "Profil distant non charge. Vous pouvez continuer localement.";
@@ -169,27 +212,75 @@ async function saveProfile({ final }) {
 
   profile.updatedAt = new Date().toISOString();
   profile.profileComplete = validation.minimumOk;
+  const restaurantId = ensureRestaurantId();
+  profile.restaurantId = restaurantId;
   saveLocalProfile(profile);
   saveSession(profile.profileComplete);
 
   if (firebaseServices && currentUser && !previewMode) {
     try {
-      const { doc, setDoc, serverTimestamp } = firebaseServices.firestoreModule;
+      const { doc, setDoc, serverTimestamp, arrayUnion } = firebaseServices.firestoreModule;
+      const isExisting = restaurantContext.mode === "existing";
+      const restaurantPayload = {
+        restaurantId,
+        restaurantProfile: {
+          ...profile,
+          restaurantId,
+          updatedAt: serverTimestamp()
+        },
+        name: profile.name,
+        tradeName: profile.tradeName,
+        legalName: profile.legalName,
+        phone: profile.phone,
+        email: profile.email,
+        address: profile.address,
+        addressLine1: profile.addressLine1,
+        postalCode: profile.postalCode,
+        city: profile.city,
+        country: profile.country,
+        openingHours: profile.openingHours,
+        timezone: profile.timezone,
+        currency: profile.currency,
+        locale: profile.locale,
+        businessType: profile.businessType,
+        enabledSalesModes: profile.enabledSalesModes,
+        updatedAt: serverTimestamp()
+      };
+      if (!isExisting) {
+        restaurantPayload.ownerUid = currentUser.uid;
+        restaurantPayload.createdAt = serverTimestamp();
+        restaurantPayload.status = "active";
+      }
+
+      await setDoc(
+        doc(firebaseServices.db, "restaurants", restaurantId),
+        restaurantPayload,
+        { merge: true }
+      );
+
       await setDoc(
         doc(firebaseServices.db, "users", currentUser.uid),
         {
           uid: currentUser.uid,
           email: currentUser.email || "",
           displayName: currentUser.displayName || "",
+          activeRestaurantId: restaurantId,
+          restaurantIds: arrayUnion(restaurantId),
           restaurantProfile: {
             ...profile,
+            restaurantId,
             updatedAt: serverTimestamp()
           },
-          activeRestaurantId: currentUser.uid,
           updatedAt: serverTimestamp()
         },
         { merge: true }
       );
+      restaurantContext = {
+        restaurantId,
+        mode: "existing",
+        source: "firestore"
+      };
+      saveRestaurantContext(restaurantContext);
     } catch (error) {
       statusBox.textContent = "Sauvegarde locale OK. Firestore a refuse ou bloque la sauvegarde.";
       return;
@@ -224,10 +315,13 @@ function updateUi() {
   if (!isAuthenticated) {
     statusBox.textContent = "Connectez-vous pour configurer le restaurant.";
   } else if (validation.minimumOk) {
-    statusBox.textContent = "Champs minimum remplis. Vous pouvez enregistrer ou completer plus tard.";
+    statusBox.textContent = restaurantContext.mode === "existing"
+      ? "Restaurant existant charge. Vous pouvez enregistrer les informations manquantes."
+      : "Champs minimum remplis. Vous pouvez creer le restaurant ou completer plus tard.";
   } else {
     statusBox.textContent = validation.message;
   }
+  updateRestaurantModeCard();
 }
 
 function updateAuthState() {
@@ -285,6 +379,7 @@ function collectProfile() {
   const enabledSalesModes = data.getAll("enabledSalesModes");
   const profile = {
     name: value(data, "name"),
+    restaurantId: restaurantContext.restaurantId || "",
     tradeName: value(data, "tradeName"),
     legalName: value(data, "legalName"),
     logoUrl: value(data, "logoUrl"),
@@ -395,8 +490,11 @@ function updateLogoPreview() {
 
 function updateSummary() {
   const profile = collectProfile();
+  const modeLabel = restaurantContext.mode === "existing" ? "Mise a jour" : "Creation";
   summaryBox.innerHTML = `
     <dl>
+      <div><dt>Mode</dt><dd>${escapeHtml(modeLabel)}</dd></div>
+      <div><dt>Restaurant ID</dt><dd>${escapeHtml(restaurantContext.restaurantId || "Sera genere a la sauvegarde")}</dd></div>
       <div><dt>Restaurant</dt><dd>${escapeHtml(profile.name || "A completer")}</dd></div>
       <div><dt>Adresse</dt><dd>${escapeHtml(profile.address || "A completer")}</dd></div>
       <div><dt>Contact</dt><dd>${escapeHtml(profile.phone || profile.email || "A completer")}</dd></div>
@@ -412,6 +510,7 @@ function saveSession(profileComplete) {
     active: true,
     userId: currentUser?.uid || "preview-user",
     email: currentUser?.email || "",
+    restaurantId: restaurantContext.restaurantId || "",
     profileComplete,
     updatedAt: new Date().toISOString()
   }));
@@ -427,6 +526,69 @@ function loadLocalProfile() {
   } catch (_) {
     return null;
   }
+}
+
+function ensureRestaurantId() {
+  if (restaurantContext.restaurantId) {
+    return restaurantContext.restaurantId;
+  }
+  const userId = currentUser?.uid || "preview-user";
+  restaurantContext = {
+    restaurantId: buildRestaurantId(userId),
+    mode: loadLocalProfile() ? "existing" : "new",
+    source: previewMode ? "preview" : "generated"
+  };
+  saveRestaurantContext(restaurantContext);
+  return restaurantContext.restaurantId;
+}
+
+function buildRestaurantId(userId) {
+  return "restaurant_" + String(userId || "preview-user").replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+function normalizeRestaurantId(value) {
+  return (value || "").toString().trim();
+}
+
+function normalizeProfileFromRestaurant(restaurantData, fallbackProfile) {
+  if (!restaurantData && !fallbackProfile) return null;
+  return {
+    ...(fallbackProfile || {}),
+    ...(restaurantData?.restaurantProfile || {}),
+    restaurantId: restaurantData?.restaurantId || fallbackProfile?.restaurantId || restaurantContext.restaurantId || "",
+    name: restaurantData?.restaurantProfile?.name || restaurantData?.name || fallbackProfile?.name || "",
+    tradeName: restaurantData?.restaurantProfile?.tradeName || restaurantData?.tradeName || fallbackProfile?.tradeName || "",
+    legalName: restaurantData?.restaurantProfile?.legalName || restaurantData?.legalName || fallbackProfile?.legalName || "",
+    phone: restaurantData?.restaurantProfile?.phone || restaurantData?.phone || fallbackProfile?.phone || "",
+    email: restaurantData?.restaurantProfile?.email || restaurantData?.email || fallbackProfile?.email || ""
+  };
+}
+
+function saveRestaurantContext(context) {
+  localStorage.setItem(RESTAURANT_CONTEXT_KEY, JSON.stringify(context));
+}
+
+function loadRestaurantContext() {
+  try {
+    return JSON.parse(localStorage.getItem(RESTAURANT_CONTEXT_KEY) || "{}");
+  } catch (_) {
+    return {};
+  }
+}
+
+function updateRestaurantModeCard() {
+  const isExisting = restaurantContext.mode === "existing";
+  const localProfile = loadLocalProfile();
+  const title = isExisting ? "Compléter votre restaurant" : "Créer votre restaurant";
+  const description = isExisting
+    ? `Restaurant trouve${localProfile?.name ? " : " + localProfile.name : ""}. Les informations seront mises a jour sans recreer l'etablissement.`
+    : "Aucun restaurant existant n'a ete trouve pour cette session. Poksol creera un nouvel etablissement.";
+  accessTitle.textContent = title;
+  restaurantMode.innerHTML = `
+    <strong>${escapeHtml(title)}</strong>
+    <span>${escapeHtml(description)}</span>
+  `;
+  restaurantMode.classList.toggle("is-existing", isExisting);
 }
 
 function value(data, key) {
