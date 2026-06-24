@@ -377,6 +377,7 @@ function validateProfile(profile) {
 function collectProfile() {
   const data = new FormData(form);
   const enabledSalesModes = data.getAll("enabledSalesModes");
+  const openingHoursByDay = collectOpeningHours(data);
   const profile = {
     name: value(data, "name"),
     restaurantId: restaurantContext.restaurantId || "",
@@ -410,7 +411,8 @@ function collectProfile() {
     invoicePrefix: value(data, "invoicePrefix"),
     nextInvoiceNumber: Number(value(data, "nextInvoiceNumber") || 1),
     invoiceLegalNotice: value(data, "invoiceLegalNotice"),
-    openingHours: collectOpeningHours(data),
+    openingHours: openingHoursToList(openingHoursByDay),
+    openingHoursByDay,
     timezone: value(data, "timezone"),
     currency: value(data, "currency"),
     locale: value(data, "locale"),
@@ -428,7 +430,7 @@ function collectProfile() {
 function hydrateForm(profile) {
   if (!profile) return;
   Object.entries(profile).forEach(([key, val]) => {
-    if (key === "openingHours" || key === "enabledSalesModes") return;
+    if (key === "openingHours" || key === "openingHoursByDay" || key === "enabledSalesModes") return;
     const field = form.elements[key];
     if (field) field.value = val ?? "";
   });
@@ -437,10 +439,11 @@ function hydrateForm(profile) {
       input.checked = profile.enabledSalesModes.includes(input.value);
     });
   }
-  if (profile.openingHours) {
+  const normalizedHours = normalizeOpeningHoursForForm(profile);
+  if (normalizedHours) {
     DAYS.forEach(([key]) => {
-      const day = profile.openingHours[key] || {};
-      setField(`openingHours.${key}.open`, day.open !== false);
+      const day = normalizedHours[key] || {};
+      setField(`openingHours.${key}.open`, day.open !== false && day.isOpen !== false);
       setField(`openingHours.${key}.lunchStart`, day.lunchStart || "");
       setField(`openingHours.${key}.lunchEnd`, day.lunchEnd || "");
       setField(`openingHours.${key}.dinnerStart`, day.dinnerStart || "");
@@ -477,6 +480,48 @@ function collectOpeningHours(data) {
     };
     return hours;
   }, {});
+}
+
+function openingHoursToList(hoursByDay) {
+  return DAYS.map(([key], index) => {
+    const day = hoursByDay[key] || {};
+    return {
+      day: index + 1,
+      isOpen: day.open !== false,
+      lunchStart: day.lunchStart || "",
+      lunchEnd: day.lunchEnd || "",
+      dinnerStart: day.dinnerStart || "",
+      dinnerEnd: day.dinnerEnd || ""
+    };
+  });
+}
+
+function normalizeOpeningHoursForForm(profile) {
+  if (profile.openingHoursByDay && !Array.isArray(profile.openingHoursByDay)) {
+    return profile.openingHoursByDay;
+  }
+
+  if (Array.isArray(profile.openingHours)) {
+    return profile.openingHours.reduce((hours, item) => {
+      const dayNumber = Number(item.day || 0);
+      const dayKey = DAYS[dayNumber - 1]?.[0];
+      if (!dayKey) return hours;
+      hours[dayKey] = {
+        open: item.isOpen !== false && item.open !== false,
+        lunchStart: item.lunchStart || "",
+        lunchEnd: item.lunchEnd || "",
+        dinnerStart: item.dinnerStart || "",
+        dinnerEnd: item.dinnerEnd || ""
+      };
+      return hours;
+    }, {});
+  }
+
+  if (profile.openingHours && typeof profile.openingHours === "object") {
+    return profile.openingHours;
+  }
+
+  return null;
 }
 
 function updateLogoPreview() {
@@ -552,15 +597,27 @@ function normalizeRestaurantId(value) {
 
 function normalizeProfileFromRestaurant(restaurantData, fallbackProfile) {
   if (!restaurantData && !fallbackProfile) return null;
-  return {
+  const nestedProfile = restaurantData?.restaurantProfile || {};
+  const mergedProfile = {
     ...(fallbackProfile || {}),
-    ...(restaurantData?.restaurantProfile || {}),
+    ...(restaurantData || {}),
+    ...nestedProfile
+  };
+  const normalizedHours = normalizeOpeningHoursForForm(mergedProfile);
+  return {
+    ...mergedProfile,
     restaurantId: restaurantData?.restaurantId || fallbackProfile?.restaurantId || restaurantContext.restaurantId || "",
-    name: restaurantData?.restaurantProfile?.name || restaurantData?.name || fallbackProfile?.name || "",
-    tradeName: restaurantData?.restaurantProfile?.tradeName || restaurantData?.tradeName || fallbackProfile?.tradeName || "",
-    legalName: restaurantData?.restaurantProfile?.legalName || restaurantData?.legalName || fallbackProfile?.legalName || "",
-    phone: restaurantData?.restaurantProfile?.phone || restaurantData?.phone || fallbackProfile?.phone || "",
-    email: restaurantData?.restaurantProfile?.email || restaurantData?.email || fallbackProfile?.email || ""
+    name: mergedProfile.name || "",
+    tradeName: mergedProfile.tradeName || mergedProfile.name || "",
+    legalName: mergedProfile.legalName || "",
+    phone: mergedProfile.phone || "",
+    email: mergedProfile.email || "",
+    openingHours: Array.isArray(mergedProfile.openingHours)
+      ? mergedProfile.openingHours
+      : normalizedHours
+        ? openingHoursToList(normalizedHours)
+        : undefined,
+    openingHoursByDay: normalizedHours || undefined
   };
 }
 
@@ -579,7 +636,7 @@ function loadRestaurantContext() {
 function updateRestaurantModeCard() {
   const isExisting = restaurantContext.mode === "existing";
   const localProfile = loadLocalProfile();
-  const title = isExisting ? "Compléter votre restaurant" : "Créer votre restaurant";
+  const title = isExisting ? "Completer votre restaurant" : "Creer votre restaurant";
   const description = isExisting
     ? `Restaurant trouve${localProfile?.name ? " : " + localProfile.name : ""}. Les informations seront mises a jour sans recreer l'etablissement.`
     : "Aucun restaurant existant n'a ete trouve pour cette session. Poksol creera un nouvel etablissement.";
