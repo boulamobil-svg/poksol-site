@@ -517,8 +517,9 @@ function validateInvite(invite, user) {
   if (!normalizeRestaurantId(invite.restaurantId)) {
     return { ok: false, message: "Invitation incomplete : restaurant manquant." };
   }
-  if (invite.invitedEmail && user.email) {
-    const invitedEmail = invite.invitedEmail.toString().trim().toLowerCase();
+  const reservedEmail = invite.invitedEmail || invite.email || "";
+  if (reservedEmail && user.email) {
+    const invitedEmail = reservedEmail.toString().trim().toLowerCase();
     const userEmail = user.email.toString().trim().toLowerCase();
     if (invitedEmail && invitedEmail !== userEmail) {
       return { ok: false, message: "Cette invitation est reservee a une autre adresse email." };
@@ -578,16 +579,50 @@ async function acceptInviteCode(inviteCode) {
       return false;
     }
 
+    const role = invite.role || "staff";
     const restaurantId = normalizeRestaurantId(invite.restaurantId);
+
+    const staffPayload = {
+      uid: currentUser.uid,
+      userId: currentUser.uid,
+      restaurantId,
+      email: currentUser.email || "",
+      displayName: currentUser.displayName || invite.displayName || "",
+      phone: invite.phone || "",
+      jobTitle: invite.jobTitle || "",
+      role,
+      active: true,
+      status: "active",
+      inviteCode: code,
+      joinedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    await setDoc(
+      doc(firebaseServices.db, "restaurants", restaurantId, "staff", currentUser.uid),
+      staffPayload,
+      { merge: true }
+    );
+
+    if (role === "staff") {
+      await setDoc(
+        doc(firebaseServices.db, "restaurants", restaurantId, "staff_users", currentUser.uid),
+        {
+          ...staffPayload,
+          updatedAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
+    }
+
     const restaurantSnapshot = await getDoc(doc(firebaseServices.db, "restaurants", restaurantId));
     if (!restaurantSnapshot.exists()) {
-      inviteStatus.textContent = "Restaurant introuvable pour cette invitation.";
+      inviteStatus.textContent = "Restaurant associe, mais profil restaurant introuvable.";
       return false;
     }
 
     const restaurantData = restaurantSnapshot.data();
     const profile = normalizeProfileFromRestaurant(restaurantData, null);
-    const role = invite.role || "staff";
 
     await setDoc(
       doc(firebaseServices.db, "users", currentUser.uid),
@@ -598,21 +633,6 @@ async function acceptInviteCode(inviteCode) {
         activeRestaurantId: restaurantId,
         restaurantIds: arrayUnion(restaurantId),
         joinedInviteCode: code,
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    );
-
-    await setDoc(
-      doc(firebaseServices.db, "restaurants", restaurantId, "members", currentUser.uid),
-      {
-        uid: currentUser.uid,
-        email: currentUser.email || "",
-        displayName: currentUser.displayName || "",
-        role,
-        status: "active",
-        inviteCode: code,
-        joinedAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       },
       { merge: true }
