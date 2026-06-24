@@ -464,6 +464,85 @@ body {
   gap: 16px;
 }
 
+.product-access-panel {
+  max-width: 980px;
+  margin: 0 auto 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding: 30px;
+  border: 1px solid #d3e5ff;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(66, 201, 111, 0.14), transparent 32%),
+    linear-gradient(135deg, #ffffff 0%, #f5f9ff 100%);
+  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
+  text-align: left;
+}
+
+.product-access-panel h2 {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 4vw, 44px);
+}
+
+.product-access-panel p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.product-account-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.compact-profile-card {
+  margin-top: 0;
+}
+
+.attached-restaurant-card {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  padding: 16px;
+  border: 1px solid #cbeed8;
+  border-radius: 16px;
+  background: #f0f8f3;
+}
+
+.attached-restaurant-card span {
+  color: var(--poksol-green);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.attached-restaurant-card strong {
+  color: var(--poksol-navy);
+  font-size: 20px;
+}
+
+.product-access-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+  gap: 14px;
+}
+
+.product-access-actions .primary-btn,
+.product-access-actions .outline-dark-btn,
+.product-access-actions .product-action {
+  width: 100%;
+  min-height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
 .product-action.windows {
   background: var(--poksol-green);
   box-shadow: 0 14px 35px rgba(66, 201, 111, 0.3);
@@ -1902,6 +1981,8 @@ body {
   .access-shell,
   .form-grid,
   .hours-row,
+  .product-account-card,
+  .product-access-actions,
   .profile-summary dl {
     grid-template-columns: 1fr;
   }

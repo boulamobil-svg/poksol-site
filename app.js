@@ -10,6 +10,8 @@
 
   let accountAuth = null;
   let accountAuthModule = null;
+  let accountDb = null;
+  let accountFirestoreModule = null;
 
   const PoksolApp = {
     config: {
@@ -119,6 +121,7 @@
   const accountAvatar = document.querySelector("[data-account-avatar]");
   const accountName = document.querySelector("[data-account-name]");
   const accountEmail = document.querySelector("[data-account-email]");
+  const accountRestaurant = document.querySelector("[data-account-restaurant]");
   const deviceTitle = document.querySelector("[data-device-title]");
   const deviceStatus = document.querySelector("[data-device-status]");
 
@@ -133,13 +136,16 @@
 
   async function initializeAccountAuth() {
     try {
-      const [{ initializeApp }, authModule] = await Promise.all([
+      const [{ initializeApp }, authModule, firestoreModule] = await Promise.all([
         import("https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js"),
-        import("https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js")
+        import("https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js"),
+        import("https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js")
       ]);
       const app = initializeApp(firebaseConfig);
       accountAuthModule = authModule;
+      accountFirestoreModule = firestoreModule;
       accountAuth = authModule.getAuth(app);
+      accountDb = firestoreModule.getFirestore(app);
       authModule.onAuthStateChanged(accountAuth, updateAccountUi);
     } catch (error) {
       updateAccountMessage("Connexion indisponible : Firebase n'a pas pu etre charge.");
@@ -168,32 +174,42 @@
     return { ok: true };
   }
 
-  function updateAccountUi(user) {
+  async function updateAccountUi(user) {
     PoksolApp.auth.isAuthenticated = Boolean(user);
 
     if (!accountState) return;
 
     if (!user) {
       accountState.textContent = "Connectez-vous avec Google pour acceder au portail Poksol.";
-      accountAvatar.textContent = "PK";
-      accountName.textContent = "Utilisateur Poksol";
-      accountEmail.textContent = "En attente de connexion securisee";
-      accountLoginButton.classList.remove("is-hidden");
-      accountLogoutButton.classList.add("is-hidden");
-      deviceTitle.textContent = "Limite prevue";
-      deviceStatus.textContent = "1 appareil par utilisateur standard";
+      setText(accountAvatar, "PK");
+      setText(accountName, "Utilisateur Poksol");
+      setText(accountEmail, "En attente de connexion securisee");
+      setText(accountRestaurant, "Aucun restaurant charge");
+      accountLoginButton?.classList.remove("is-hidden");
+      accountLogoutButton?.classList.add("is-hidden");
+      setText(deviceTitle, "Limite prevue");
+      setText(deviceStatus, "1 appareil par utilisateur standard");
       return;
     }
 
     const displayName = user.displayName || "Utilisateur Poksol";
     accountState.textContent = "Connexion active.";
-    accountAvatar.textContent = initials(displayName, user.email);
-    accountName.textContent = displayName;
-    accountEmail.textContent = user.email || "Compte Google connecte";
-    accountLoginButton.classList.add("is-hidden");
-    accountLogoutButton.classList.remove("is-hidden");
-    deviceTitle.textContent = "Session active";
-    deviceStatus.textContent = "Controle appareil pret pour la phase owner/admin.";
+    setText(accountAvatar, initials(displayName, user.email));
+    setText(accountName, displayName);
+    setText(accountEmail, user.email || "Compte Google connecte");
+    accountLoginButton?.classList.add("is-hidden");
+    accountLogoutButton?.classList.remove("is-hidden");
+    setText(deviceTitle, "Session active");
+    setText(deviceStatus, "Controle appareil pret pour la phase owner/admin.");
+
+    const attachedRestaurant = await loadAttachedRestaurant(user.uid);
+    if (attachedRestaurant) {
+      setText(accountRestaurant, attachedRestaurant.name || attachedRestaurant.id);
+      accountState.textContent = `Connexion active. Restaurant attache : ${attachedRestaurant.name || attachedRestaurant.id}.`;
+    } else {
+      setText(accountRestaurant, "Aucun restaurant attache");
+      accountState.textContent = "Connexion active. Aucun restaurant attache pour le moment.";
+    }
   }
 
   function updateAccountMessage(message) {
@@ -215,6 +231,37 @@
     const parts = source.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return source.slice(0, 2).toUpperCase();
+  }
+
+  async function loadAttachedRestaurant(uid) {
+    if (!accountDb || !accountFirestoreModule || !uid) return null;
+    try {
+      const { doc, getDoc } = accountFirestoreModule;
+      const userSnapshot = await getDoc(doc(accountDb, "users", uid));
+      const userData = userSnapshot.exists() ? userSnapshot.data() : null;
+      const restaurantId = (
+        userData?.activeRestaurantId ||
+        (Array.isArray(userData?.restaurantIds) ? userData.restaurantIds[0] : "")
+      )?.toString().trim();
+      if (!restaurantId) return null;
+
+      const restaurantSnapshot = await getDoc(doc(accountDb, "restaurants", restaurantId));
+      if (!restaurantSnapshot.exists()) {
+        return { id: restaurantId, name: restaurantId };
+      }
+      const restaurantData = restaurantSnapshot.data();
+      const profile = restaurantData.restaurantProfile || {};
+      return {
+        id: restaurantId,
+        name: profile.tradeName || profile.name || restaurantData.tradeName || restaurantData.name || restaurantId
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function setText(element, value) {
+    if (element) element.textContent = value;
   }
 
   document.querySelectorAll("[data-carousel]").forEach(function (carousel) {

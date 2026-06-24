@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Poket Restaurants | Poksol</title>
-  <link rel="stylesheet" href="style.css?v=20260624-1" />
+  <link rel="stylesheet" href="style.css?v=20260624-6" />
 </head>
 <body>
   <header class="product-hero">
@@ -37,7 +37,7 @@
           et la communication cuisine.
         </p>
         <div class="actions">
-          <a class="primary-btn" href="poket-access.html">Ouvrir l'application navigateur</a>
+          <a class="primary-btn" href="#mon-acces-poket">Se connecter / gerer mon acces</a>
           <a class="outline-btn" href="mailto:contact@poksol.com">Demander une demo</a>
         </div>
       </div>
@@ -49,6 +49,43 @@
   </header>
 
   <main class="product-page">
+    <section class="product-access-panel" id="mon-acces-poket">
+      <div>
+        <p class="eyebrow">Compte utilisateur</p>
+        <h2>Mon acces Poket Restaurants</h2>
+        <p data-account-state>
+          Connectez-vous pour retrouver votre restaurant, modifier ses informations et ouvrir l'application.
+        </p>
+      </div>
+
+      <div class="product-account-card">
+        <div class="profile-card compact-profile-card">
+          <div class="profile-avatar" data-account-avatar>PK</div>
+          <div>
+            <strong data-account-name>Utilisateur Poksol</strong>
+            <span data-account-email>Connexion requise</span>
+          </div>
+        </div>
+        <div class="attached-restaurant-card">
+          <span>Restaurant attache</span>
+          <strong data-account-restaurant>Aucun restaurant charge</strong>
+        </div>
+      </div>
+
+      <div class="product-access-actions">
+        <button class="primary-btn button-reset" type="button" data-account-login>
+          Se connecter avec Google
+        </button>
+        <button class="outline-dark-btn button-reset is-hidden" type="button" data-account-logout>
+          Se deconnecter
+        </button>
+        <a class="product-action" href="poket-access.html">Modifier les infos restaurant</a>
+        <a class="product-action" href="poket-access.html">Ouvrir l'application navigateur</a>
+        <a class="product-action" href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+15.apk" download>Telecharger APK Android</a>
+        <a class="product-action windows" href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+12.zip" download>Telecharger Windows</a>
+      </div>
+    </section>
+
     <div class="product-actions">
       <a class="product-action" href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+15.apk" download>Telecharger APK Android</a>
       <a class="product-action windows" href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+12.zip" download>Telecharger Windows</a>
@@ -71,9 +108,9 @@
         <p class="eyebrow">Phase 2 Poksol</p>
         <h2 id="future-version-title">Preparation version future</h2>
         <p>
-          Cette page inclut une base front prete pour une future connexion utilisateur,
-          un controle par appareil et un espace admin via le module JavaScript global
-          <code>window.PoksolApp</code>, sans backend actif pour le moment.
+          Cette page inclut maintenant une connexion utilisateur Firebase et une base front pour le
+          controle par appareil, les invitations et l'espace admin via le module JavaScript global
+          <code>window.PoksolApp</code>.
         </p>
       </div>
 
@@ -107,7 +144,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=20260624-1"></script>
+  <script src="app.js?v=20260624-6"></script>
 </body>
 </html>
 
