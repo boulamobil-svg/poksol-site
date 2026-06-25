@@ -30,6 +30,10 @@ let currentUser = null;
 let previewMode = false;
 let restaurantContext = loadRestaurantContext();
 let pendingInviteCode = readInviteCodeFromUrl();
+const accessParams = new URLSearchParams(window.location.search);
+const accessMode = (accessParams.get("mode") || "").toLowerCase();
+const accessSection = (accessParams.get("section") || "").toLowerCase();
+const stayOnAccessPage = accessMode === "edit" || accessMode === "public-page";
 
 const form = document.querySelector("[data-restaurant-profile-form]");
 const statusBox = document.querySelector("[data-access-status]");
@@ -119,11 +123,14 @@ async function initializeFirebase() {
         const profile = loadLocalProfile();
         if (profile && validateProfile(profile).minimumOk) {
           saveSession(true);
-          window.location.href = APP_URL;
-          return;
+          if (!stayOnAccessPage) {
+            window.location.href = APP_URL;
+            return;
+          }
         }
       }
       updateAuthState();
+      applyAccessModeStep();
       updateUi();
     });
   } catch (error) {
@@ -315,6 +322,12 @@ async function saveProfile({ final }) {
     }
   }
 
+  if (stayOnAccessPage) {
+    statusBox.textContent = "Profil restaurant enregistre. Les informations sont pretes pour le web et Poket Restaurants.";
+    updateUi();
+    return;
+  }
+
   statusBox.textContent = "Profil restaurant enregistre. Ouverture de Poket Restaurants...";
   window.setTimeout(() => {
     window.location.href = APP_URL;
@@ -343,9 +356,15 @@ function updateUi() {
   if (!isAuthenticated) {
     statusBox.textContent = "Connectez-vous pour configurer le restaurant.";
   } else if (validation.minimumOk) {
-    statusBox.textContent = restaurantContext.mode === "existing"
-      ? "Restaurant existant charge. Vous pouvez enregistrer les informations manquantes."
-      : "Champs minimum remplis. Vous pouvez creer le restaurant ou completer plus tard.";
+    if (accessMode === "edit") {
+      statusBox.textContent = "Restaurant charge. Modifiez l'adresse, les horaires ou les informations utiles, puis enregistrez.";
+    } else if (accessMode === "public-page") {
+      statusBox.textContent = "Preparez la page publique : logo, adresse, horaires, contact et informations visibles.";
+    } else {
+      statusBox.textContent = restaurantContext.mode === "existing"
+        ? "Restaurant existant charge. Vous pouvez enregistrer les informations manquantes."
+        : "Champs minimum remplis. Vous pouvez creer le restaurant ou completer plus tard.";
+    }
   } else {
     statusBox.textContent = validation.message;
   }
@@ -394,7 +413,7 @@ function validateProfile(profile) {
     return { minimumOk: true, strictOk: false, message: "Email de facturation invalide." };
   }
   if (profile.logoUrl && !isValidUrl(profile.logoUrl)) {
-    return { minimumOk: true, strictOk: false, message: "Logo URL doit etre une URL valide." };
+    return { minimumOk: true, strictOk: false, message: "L'adresse du logo doit etre une URL valide." };
   }
   if (Number(profile.nextInvoiceNumber) < 1) {
     return { minimumOk: true, strictOk: false, message: "Le prochain numero de facture doit etre superieur ou egal a 1." };
@@ -664,10 +683,15 @@ async function acceptInviteCode(inviteCode) {
     }
     saveSession(Boolean(profile && validateProfile(profile).minimumOk));
     inviteStatus.textContent = `Restaurant rejoint : ${profile?.name || invite.restaurantName || restaurantId}.`;
-    statusBox.textContent = "Restaurant existant associe a votre compte. Ouverture de Poket Restaurants...";
-    window.setTimeout(() => {
-      window.location.href = APP_URL;
-    }, 900);
+    if (stayOnAccessPage) {
+      statusBox.textContent = "Restaurant existant associe a votre compte. Vous pouvez maintenant verifier ou modifier ses informations.";
+      updateUi();
+    } else {
+      statusBox.textContent = "Restaurant existant associe a votre compte. Ouverture de Poket Restaurants...";
+      window.setTimeout(() => {
+        window.location.href = APP_URL;
+      }, 900);
+    }
     return true;
   } catch (error) {
     inviteStatus.textContent = "Impossible de rejoindre le restaurant : " + (error.message || error);
@@ -938,16 +962,52 @@ function loadRestaurantContext() {
 function updateRestaurantModeCard() {
   const isExisting = restaurantContext.mode === "existing";
   const localProfile = loadLocalProfile();
-  const title = isExisting ? "Completer votre restaurant" : "Creer votre restaurant";
-  const description = isExisting
+  let title = isExisting ? "Completer votre restaurant" : "Creer votre restaurant";
+  let description = isExisting
     ? `Restaurant trouve${localProfile?.name ? " : " + localProfile.name : ""}. Les informations seront mises a jour sans recreer l'etablissement.`
     : "Aucun restaurant existant n'a ete trouve pour cette session. Poksol creera un nouvel etablissement.";
+  if (accessMode === "edit") {
+    title = "Modifier votre restaurant";
+    description = isExisting
+      ? `Restaurant charge${localProfile?.name ? " : " + localProfile.name : ""}. Adresse, horaires, logo et contacts restent communs entre le web et Poket Restaurants.`
+      : "Connectez-vous ou rejoignez un restaurant pour modifier ses informations communes.";
+  }
+  if (accessMode === "public-page") {
+    title = "Editer la page restaurant";
+    description = isExisting
+      ? "Completez les informations visibles publiquement : logo, adresse, horaires, contact et presentation client."
+      : "Connectez-vous ou rejoignez un restaurant pour preparer sa page publique.";
+  }
   accessTitle.textContent = title;
   restaurantMode.innerHTML = `
     <strong>${escapeHtml(title)}</strong>
     <span>${escapeHtml(description)}</span>
   `;
   restaurantMode.classList.toggle("is-existing", isExisting);
+}
+
+function applyAccessModeStep() {
+  if (!stayOnAccessPage) return;
+  const stepBySection = {
+    identity: 0,
+    identite: 0,
+    address: 1,
+    adresse: 1,
+    billing: 2,
+    facturation: 2,
+    payment: 3,
+    paiement: 3,
+    hours: 4,
+    horaires: 4,
+    operations: 5,
+    public: 0,
+    resume: 6
+  };
+  if (Object.prototype.hasOwnProperty.call(stepBySection, accessSection)) {
+    setStep(stepBySection[accessSection]);
+  } else if (accessMode === "public-page") {
+    setStep(0);
+  }
 }
 
 function value(data, key) {

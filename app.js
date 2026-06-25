@@ -160,7 +160,8 @@
 
     try {
       const provider = new accountAuthModule.GoogleAuthProvider();
-      await accountAuthModule.signInWithPopup(accountAuth, provider);
+      const result = await accountAuthModule.signInWithPopup(accountAuth, provider);
+      await ensureAccountUserDoc(result.user);
       return { ok: true };
     } catch (error) {
       updateAccountMessage("Connexion impossible : " + readableAuthError(error));
@@ -202,6 +203,7 @@
     setText(deviceTitle, "Session active");
     setText(deviceStatus, "Controle appareil pret pour la phase owner/admin.");
 
+    await ensureAccountUserDoc(user);
     const attachedRestaurant = await loadAttachedRestaurant(user.uid);
     if (attachedRestaurant) {
       setText(accountRestaurant, attachedRestaurant.name || attachedRestaurant.id);
@@ -209,6 +211,27 @@
     } else {
       setText(accountRestaurant, "Aucun restaurant attache");
       accountState.textContent = "Connexion active. Aucun restaurant attache pour le moment.";
+    }
+  }
+
+  async function ensureAccountUserDoc(user) {
+    if (!accountDb || !accountFirestoreModule || !user) return;
+    try {
+      const { doc, setDoc, serverTimestamp } = accountFirestoreModule;
+      await setDoc(
+        doc(accountDb, "users", user.uid),
+        {
+          uid: user.uid,
+          email: user.email || "",
+          displayName: user.displayName || "",
+          provider: user.providerData?.[0]?.providerId || "google",
+          lastLoginAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        },
+        { merge: true }
+      );
+    } catch (_) {
+      updateAccountMessage("Connexion active, mais le profil utilisateur n'a pas encore pu etre synchronise.");
     }
   }
 
