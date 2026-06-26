@@ -1,0 +1,15 @@
+{
+    "releaseId":  "1.0.6+17",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  17,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+17.apk",
+    "apkSha256":  "21871540bbc04097a64e1339d1d64251f22f7cfd4a45c020bee2c2dad8039b4d",
+    "apkFileSize":  90011192,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+17 : V2 comptable paiements sur compte client, cloture POS, affichage tickets client et separation encaisse reel / compte client.",
+    "publishedAt":  "2026-06-26T07:40:06Z",
+    "updatedAt":  "2026-06-26T07:40:06Z"
+}
