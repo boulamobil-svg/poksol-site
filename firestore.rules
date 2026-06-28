@@ -162,6 +162,10 @@ service cloud.firestore {
       match /invitations/{invitationId} {
         allow read, write: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
       }
+
+      match /{internalPath=**} {
+        allow read, write: if isRestaurantMember(restaurantId) || userReferencesRestaurant(restaurantId);
+      }
     }
 
     match /invitations/{invitationId} {
