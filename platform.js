@@ -497,9 +497,13 @@ async function submitContact(form) {
 function initAuthObserver(callback) {
   getServices().then((services) => {
     services.authModule.onAuthStateChanged(services.auth, async (user) => {
-      currentUser = user;
-      if (user) await ensureUser(user);
-      callback(user);
+      try {
+        currentUser = user;
+        if (user) await ensureUser(user).catch(() => {});
+        await callback(user);
+      } catch (error) {
+        await callback(null, error);
+      }
     });
   }).catch((error) => callback(null, error));
 }
@@ -602,24 +606,41 @@ function initDashboardPage() {
     await renderDashboard(root, currentUser, restaurantId);
   });
   initAuthObserver(async (user, error) => {
-    if (error) root.innerHTML = alertHtml("Firebase indisponible pour le moment.");
-    else if (!user) root.innerHTML = dashboardSignedOutHtml();
-    else {
+    try {
+      if (error) {
+        root.innerHTML = dashboardErrorHtml(error);
+        return;
+      }
+      if (!user) {
+        root.innerHTML = dashboardSignedOutHtml();
+        return;
+      }
+      const userDoc = await getUserDoc(user.uid).catch(() => null);
       const restaurantId = new URLSearchParams(window.location.search).get("restaurant") ||
         localStorage.getItem("poksolActiveRestaurantId") ||
-        (await getUserDoc(user.uid))?.activeRestaurantId;
+        userDoc?.activeRestaurantId;
       await renderDashboard(root, user, restaurantId);
+    } catch (dashboardError) {
+      root.innerHTML = dashboardErrorHtml(dashboardError);
     }
   });
 }
 
 async function renderDashboard(root, user, restaurantId) {
+  if (!user) {
+    root.innerHTML = dashboardSignedOutHtml();
+    return;
+  }
   if (!restaurantId) {
-    const restaurants = await listUserRestaurants(user.uid);
+    const restaurants = await listUserRestaurants(user.uid).catch(() => []);
     root.innerHTML = restaurantChooserHtml(restaurants);
     return;
   }
-  const restaurant = await getRestaurant(restaurantId);
+  const restaurant = await getRestaurant(restaurantId).catch((error) => {
+    root.innerHTML = dashboardErrorHtml(error);
+    return null;
+  });
+  if (!restaurant) return;
   if (!restaurant) {
     root.innerHTML = restaurantChooserHtml(await listUserRestaurants(user.uid), "Restaurant introuvable.");
     return;
@@ -628,8 +649,8 @@ async function renderDashboard(root, user, restaurantId) {
   root.dataset.restaurantId = restaurant.id;
   const services = await getServices();
   const { doc, getDoc } = services.firestoreModule;
-  const memberSnap = await getDoc(doc(services.db, "restaurants", restaurant.id, "members", user.uid));
-  const role = memberSnap.exists() ? memberSnap.data().role : restaurant.ownerUid === user.uid ? "owner" : "staff";
+  const memberSnap = await getDoc(doc(services.db, "restaurants", restaurant.id, "members", user.uid)).catch(() => null);
+  const role = memberSnap?.exists() ? memberSnap.data().role : restaurant.ownerUid === user.uid ? "owner" : "staff";
   const [reservations, members, menu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listMembers(restaurant.id).catch(() => []),
@@ -822,6 +843,26 @@ function dashboardSignedOutHtml() {
       <h2>Connexion necessaire</h2>
       <p>Connectez-vous depuis le portail compte pour ouvrir le dashboard restaurant.</p>
       <button class="primary-btn button-reset" type="button" data-platform-login>Se connecter avec Google</button>
+    </section>
+  `;
+}
+
+function dashboardErrorHtml(error) {
+  const message = readableFirebaseError(error);
+  return `
+    <section class="platform-card">
+      <p class="eyebrow">Dashboard indisponible</p>
+      <h2>Impossible de charger l'espace admin</h2>
+      <p class="alert-note">${escapeHtml(message)}</p>
+      <div class="quick-links">
+        <a href="account.html">Retour au compte</a>
+        <a href="poket-access.html">Creer ou rejoindre un restaurant</a>
+        <button class="ghost-action" type="button" onclick="window.location.reload()">Reessayer</button>
+      </div>
+      <p>
+        Si le compte est bien connecte, verifiez aussi que les regles Firestore V1/V2
+        sont publiees et que l'utilisateur est membre du restaurant.
+      </p>
     </section>
   `;
 }
@@ -1126,6 +1167,20 @@ function normalizeRestaurant(id, data) {
     email: data.email || profile.email || "",
     openingHours: data.openingHoursByDay || profile.openingHoursByDay || data.openingHours || profile.openingHours || defaultOpeningHours()
   };
+}
+
+function readableFirebaseError(error) {
+  const raw = error?.code || error?.message || String(error || "");
+  if (raw.includes("permission-denied")) {
+    return "Acces refuse par Firestore. Les regles Firebase doivent autoriser le membre du restaurant a lire ce dashboard.";
+  }
+  if (raw.includes("unauthorized-domain")) {
+    return "Domaine non autorise dans Firebase Authentication.";
+  }
+  if (raw.includes("network")) {
+    return "Connexion reseau ou Firebase indisponible.";
+  }
+  return raw || "Erreur inconnue pendant le chargement du dashboard.";
 }
 
 function normalizeHours(hours) {
