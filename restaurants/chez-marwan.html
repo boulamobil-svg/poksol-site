@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chez Marwan | Page restaurant Poksol</title>
-  <link rel="stylesheet" href="../style.css?v=20260624-1" />
+  <link rel="stylesheet" href="../style.css?v=20260628-1" />
 </head>
-<body class="restaurant-public-body">
+<body class="restaurant-public-body" data-public-restaurant data-restaurant-slug="chez-marwan">
   <header class="restaurant-public-hero" data-restaurant-slug="chez-marwan">
     <nav class="restaurant-public-nav">
       <a class="restaurant-powered-brand" href="../index.html">
@@ -23,20 +23,20 @@
     <section class="restaurant-hero-content">
       <div class="restaurant-identity">
         <span class="restaurant-pill">Restaurant exemple</span>
-        <h1>Chez Marwan</h1>
-        <p>
+        <h1 data-public-name>Chez Marwan</h1>
+        <p data-public-description>
           Cuisine conviviale, service rapide et reservations simplifiees.
           Cette page montre comment chaque restaurant Poksol pourra presenter
           son menu, ses horaires et son formulaire de reservation.
         </p>
         <div class="restaurant-hero-actions">
           <a class="primary-btn" href="#reservation">Reserver une table</a>
-          <a class="outline-btn" href="tel:+33156344658">Appeler</a>
+          <a class="outline-btn" href="tel:+33156344658" data-public-phone-link>Appeler</a>
         </div>
       </div>
 
       <aside class="restaurant-cover-card" aria-label="Apercu restaurant">
-        <div class="restaurant-cover-photo">
+        <div class="restaurant-cover-photo" data-public-cover>
           <span>Photo restaurant</span>
         </div>
         <div class="restaurant-cover-info">
@@ -49,12 +49,12 @@
 
   <main class="restaurant-public-main">
     <section class="restaurant-quick-actions" aria-label="Actions rapides">
-      <a href="https://www.google.com/maps/search/?api=1&query=Chez%20Marwan" target="_blank" rel="noopener noreferrer">
+      <a href="https://www.google.com/maps/search/?api=1&query=Chez%20Marwan" target="_blank" rel="noopener noreferrer" data-public-maps-link>
         Itineraire
       </a>
-      <a href="tel:+33156344658">Telephone</a>
+      <a href="tel:+33156344658" data-public-phone-link>Telephone</a>
       <a href="#reservation">Lien reservation</a>
-      <a href="#menu">Voir le menu</a>
+      <a href="#menu" data-public-menu-link>Voir le menu</a>
     </section>
 
     <section class="restaurant-layout">
@@ -106,7 +106,7 @@
             Le lien pourra etre copie dans Google Business, Instagram, WhatsApp ou un QR code.
           </p>
 
-          <form class="reservation-form" data-reservation-preview>
+          <form class="reservation-form" data-public-reservation-form>
             <label>
               Nom
               <input type="text" name="name" placeholder="Votre nom" required />
@@ -114,6 +114,10 @@
             <label>
               Telephone
               <input type="tel" name="phone" placeholder="Votre telephone" required />
+            </label>
+            <label>
+              Email
+              <input type="email" name="email" placeholder="vous@email.com" />
             </label>
             <label>
               Date
@@ -132,6 +136,7 @@
               <textarea name="message" rows="4" placeholder="Allergie, terrasse, occasion speciale..."></textarea>
             </label>
             <button class="primary-btn button-reset" type="submit">Envoyer la demande</button>
+            <small data-form-status></small>
           </form>
         </section>
       </div>
@@ -140,7 +145,7 @@
         <section id="horaires" class="restaurant-side-card">
           <p class="eyebrow">Horaires</p>
           <h2>Ouverture</h2>
-          <ul class="hours-list">
+          <ul class="hours-list" data-public-hours>
             <li><span>Lundi</span><strong>Ferme</strong></li>
             <li><span>Mardi</span><strong>12:00 - 22:30</strong></li>
             <li><span>Mercredi</span><strong>12:00 - 22:30</strong></li>
@@ -152,14 +157,13 @@
         </section>
 
         <section class="restaurant-side-card">
-          <p class="eyebrow">Package Poksol</p>
-          <h2>Services monetisables</h2>
+          <p class="eyebrow" data-public-cuisine>Package Poksol</p>
+          <h2>Contact</h2>
           <ul class="package-list">
-            <li>Page publique restaurant</li>
-            <li>Menu en ligne avec photos</li>
-            <li>Formulaire de reservation</li>
-            <li>Lien Google Business</li>
-            <li>QR code partageable</li>
+            <li data-public-address>Adresse a completer</li>
+            <li><a href="tel:+33156344658" data-public-phone-link><span data-public-phone>Telephone</span></a></li>
+            <li><a href="mailto:contact@poksol.com" data-public-email-link><span data-public-email>Email</span></a></li>
+            <li>Page publique propulsee par Poksol</li>
           </ul>
         </section>
       </aside>
@@ -171,6 +175,7 @@
     <a href="../index.html">Propulse par Poksol</a>
   </footer>
 
-  <script src="../app.js?v=20260625-1"></script>
+  <script src="../app.js?v=20260628-1"></script>
+  <script type="module" src="../platform.js?v=20260628-1"></script>
 </body>
 </html>

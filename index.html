@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Poksol - Solutions business mobiles</title>
-  <link rel="stylesheet" href="style.css?v=20260624-1" />
+  <link rel="stylesheet" href="style.css?v=20260628-1" />
 </head>
 <body>
   <header class="hero">
@@ -21,7 +21,7 @@
         <a href="index.html">Accueil</a>
         <a href="#produit">Solutions</a>
         <a href="account.html">Compte</a>
-        <a href="mailto:contact@poksol.com">Contact</a>
+        <a href="index.html#contact">Contact</a>
       </div>
 
       <a class="demo-btn" href="poket-restaurants.html">Voir Poket Restaurants</a>
@@ -39,7 +39,7 @@
 
         <div class="actions">
           <a class="primary-btn" href="poket-restaurants.html">Decouvrir Poket Restaurants</a>
-          <a class="outline-btn" href="mailto:contact@poksol.com">Contacter Poksol</a>
+          <a class="outline-btn" href="index.html#contact">Contacter Poksol</a>
         </div>
 
         <div class="badges">
@@ -134,8 +134,32 @@
         </article>
       </div>
     </section>
+
+    <section class="platform-section contact-platform-section" id="contact">
+      <div class="platform-card contact-platform-card">
+        <div>
+          <p class="eyebrow">Contact Poksol</p>
+          <h2>Parlons de votre business</h2>
+          <p>
+            Vous voulez tester Poket Restaurants, preparer une page restaurant
+            ou discuter d'une future solution Poksol ? Envoyez un message.
+          </p>
+        </div>
+        <form class="platform-form" data-contact-form>
+          <div class="form-grid">
+            <label>Nom<input name="name" required /></label>
+            <label>Email<input name="email" type="email" required /></label>
+            <label class="wide-field">Restaurant / entreprise<input name="company" /></label>
+            <label class="wide-field">Message<textarea name="message" rows="4" required></textarea></label>
+          </div>
+          <button class="primary-btn button-reset" type="submit">Envoyer</button>
+          <small data-form-status></small>
+        </form>
+      </div>
+    </section>
   </main>
 
-  <script src="app.js?v=20260625-1"></script>
+  <script src="app.js?v=20260628-1"></script>
+  <script type="module" src="platform.js?v=20260628-1"></script>
 </body>
 </html>

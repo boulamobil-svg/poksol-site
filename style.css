@@ -954,6 +954,317 @@ body {
   background: var(--poksol-green);
 }
 
+.platform-section {
+  max-width: 1120px;
+  margin: 28px auto 0;
+}
+
+.platform-card {
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: white;
+  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
+}
+
+.platform-card + .platform-card,
+.platform-grid-two + .platform-card,
+.platform-card + .platform-grid-two {
+  margin-top: 18px;
+}
+
+.platform-card h2 {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1.08;
+}
+
+.platform-card p {
+  color: var(--text-muted);
+  line-height: 1.62;
+}
+
+.platform-card-header,
+.dashboard-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.platform-grid-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.7fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.platform-form {
+  display: grid;
+  gap: 18px;
+}
+
+.platform-form label,
+.platform-form fieldset {
+  display: grid;
+  gap: 8px;
+  color: var(--poksol-navy);
+  font-weight: 900;
+}
+
+.platform-form input,
+.platform-form textarea,
+.platform-form select {
+  width: 100%;
+  border: 1px solid #d3e5ff;
+  border-radius: 14px;
+  background: #f8fbff;
+  color: var(--poksol-navy);
+  font: inherit;
+  font-weight: 700;
+  padding: 14px 16px;
+}
+
+.platform-form input[type="checkbox"] {
+  width: auto;
+}
+
+.platform-form small,
+.alert-note {
+  display: block;
+  color: var(--text-muted);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.alert-note {
+  padding: 14px 16px;
+  border-left: 4px solid var(--poksol-green);
+  border-radius: 14px;
+  background: #f0f8f3;
+}
+
+.restaurant-list,
+.dashboard-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.restaurant-mini-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #d3e5ff;
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.restaurant-mini-card strong,
+.restaurant-mini-card span {
+  display: block;
+}
+
+.restaurant-mini-card span {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.mini-actions,
+.quick-links,
+.download-inline,
+.download-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mini-actions a,
+.quick-links a,
+.download-inline a,
+.download-grid a,
+.disabled-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--poksol-blue);
+  color: white;
+  text-decoration: none;
+  font-weight: 900;
+  padding: 12px 14px;
+}
+
+.mini-actions a:nth-child(2),
+.download-grid a:nth-child(3) {
+  background: var(--poksol-green);
+}
+
+.disabled-download {
+  background: #9aa7b8;
+}
+
+.empty-state {
+  padding: 18px;
+  border: 1px dashed #aac8ef;
+  border-radius: 18px;
+  color: var(--text-muted);
+  background: #f8fbff;
+  font-weight: 800;
+}
+
+.contact-platform-section {
+  padding: 0 8% 84px;
+}
+
+.contact-platform-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.7fr) 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.dashboard-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #edf6ff;
+}
+
+.dashboard-tabs button {
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--poksol-navy);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  padding: 12px 14px;
+}
+
+.dashboard-tabs button.is-active {
+  background: var(--poksol-blue);
+  color: white;
+}
+
+.dashboard-panel {
+  display: none;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: white;
+}
+
+.dashboard-panel.is-active {
+  display: block;
+}
+
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.dashboard-stats article {
+  padding: 18px;
+  border-radius: 18px;
+  background: #f5f9ff;
+  border: 1px solid #d3e5ff;
+}
+
+.dashboard-stats span,
+.dashboard-stats strong {
+  display: block;
+}
+
+.dashboard-stats span {
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.dashboard-stats strong {
+  margin-top: 6px;
+  color: var(--poksol-navy);
+  font-size: 24px;
+}
+
+.weekly-hours {
+  display: grid;
+  gap: 12px;
+}
+
+.weekly-hour-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(140px, 0.7fr));
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.toggle-grid label {
+  padding: 14px;
+  border-radius: 14px;
+  background: #f8fbff;
+  border: 1px solid #d3e5ff;
+}
+
+.responsive-table {
+  display: grid;
+  gap: 10px;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.1fr 0.6fr 0.8fr;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.table-head {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.table-row select {
+  width: 100%;
+  border: 1px solid #d3e5ff;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.invite-form {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.downloads-card {
+  margin-top: 18px;
+}
+
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .portal-roadmap {
   max-width: 1120px;
   margin: 24px auto 0;
@@ -1916,7 +2227,8 @@ body {
   .portal-panel,
   .portal-roadmap,
   .admin-table-card,
-  .admin-policy {
+  .admin-policy,
+  .platform-card {
     text-align: center;
   }
 
@@ -1924,19 +2236,34 @@ body {
   .portal-roadmap,
   .admin-dashboard,
   .admin-workspace,
-  .roadmap-list {
+  .roadmap-list,
+  .platform-grid-two,
+  .contact-platform-card,
+  .dashboard-stats,
+  .toggle-grid,
+  .download-grid {
     grid-template-columns: 1fr;
   }
 
   .section-title-row,
-  .profile-card {
+  .profile-card,
+  .platform-card-header,
+  .dashboard-topline,
+  .restaurant-mini-card {
     flex-direction: column;
     align-items: center;
   }
 
-  .admin-table [role="row"] {
+  .admin-table [role="row"],
+  .weekly-hour-row,
+  .table-row {
     grid-template-columns: 1fr;
     text-align: center;
+  }
+
+  .dashboard-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .admin-public-page-card,

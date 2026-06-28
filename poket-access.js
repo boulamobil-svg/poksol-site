@@ -256,10 +256,13 @@ async function saveProfile({ final }) {
       const { doc, setDoc, serverTimestamp, arrayUnion } = firebaseServices.firestoreModule;
       const isExisting = restaurantContext.mode === "existing";
       const restaurantPayload = {
+        id: restaurantId,
         restaurantId,
+        slug: normalizeSlug(profile.name) || restaurantId,
         restaurantProfile: {
           ...profile,
           restaurantId,
+          slug: normalizeSlug(profile.name) || restaurantId,
           updatedAt: serverTimestamp()
         },
         name: profile.name,
@@ -279,6 +282,9 @@ async function saveProfile({ final }) {
         locale: profile.locale,
         businessType: profile.businessType,
         enabledSalesModes: profile.enabledSalesModes,
+        publicPageEnabled: true,
+        qrMenuEnabled: false,
+        reservationEnabled: true,
         updatedAt: serverTimestamp()
       };
       if (!isExisting) {
@@ -299,6 +305,7 @@ async function saveProfile({ final }) {
           uid: currentUser.uid,
           email: currentUser.email || "",
           displayName: currentUser.displayName || "",
+          photoURL: currentUser.photoURL || "",
           activeRestaurantId: restaurantId,
           restaurantIds: arrayUnion(restaurantId),
           restaurantProfile: {
@@ -308,6 +315,22 @@ async function saveProfile({ final }) {
           },
           updatedAt: serverTimestamp()
         },
+        { merge: true }
+      );
+      const memberPayload = {
+        uid: currentUser.uid,
+        email: currentUser.email || "",
+        displayName: currentUser.displayName || "",
+        status: "active",
+        updatedAt: serverTimestamp()
+      };
+      if (!isExisting) {
+        memberPayload.role = "owner";
+        memberPayload.createdAt = serverTimestamp();
+      }
+      await setDoc(
+        doc(firebaseServices.db, "restaurants", restaurantId, "members", currentUser.uid),
+        memberPayload,
         { merge: true }
       );
       restaurantContext = {
@@ -622,6 +645,19 @@ async function acceptInviteCode(inviteCode) {
       staffPayload,
       { merge: true }
     );
+    await setDoc(
+      doc(firebaseServices.db, "restaurants", restaurantId, "members", currentUser.uid),
+      {
+        uid: currentUser.uid,
+        email: currentUser.email || "",
+        displayName: currentUser.displayName || invite.displayName || "",
+        role,
+        status: "active",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
 
     if (role === "staff") {
       await setDoc(
@@ -875,6 +911,17 @@ function buildRestaurantId(userId) {
 
 function normalizeRestaurantId(value) {
   return (value || "").toString().trim();
+}
+
+function normalizeSlug(value) {
+  return (value || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
 }
 
 function hydrateInviteFromUrl() {
