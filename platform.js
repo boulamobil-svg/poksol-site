@@ -387,11 +387,13 @@ async function saveQrMenu(restaurantId, form) {
   const services = await getServices();
   const { doc, serverTimestamp, setDoc } = services.firestoreModule;
   const data = new FormData(form);
+  const structuredItems = parseMenuItems(text(data, "structuredItems"));
   await setDoc(doc(services.db, "restaurants", restaurantId, "menus", "main"), {
     title: text(data, "title") || "Menu principal",
     type: text(data, "type") || "external_link",
     pdfUrl: text(data, "pdfUrl"),
     externalUrl: text(data, "externalUrl"),
+    items: structuredItems,
     isActive: data.get("isActive") === "on",
     updatedAt: serverTimestamp()
   }, { merge: true });
@@ -406,6 +408,14 @@ async function listReservations(restaurantId) {
   const { collection, getDocs, orderBy, query } = services.firestoreModule;
   const snaps = await getDocs(query(collection(services.db, "restaurants", restaurantId, "reservations"), orderBy("createdAt", "desc")));
   return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+}
+
+async function getActiveMenu(restaurantId) {
+  const services = await getServices();
+  const { doc, getDoc } = services.firestoreModule;
+  const snap = await getDoc(doc(services.db, "restaurants", restaurantId, "menus", "main"));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() };
 }
 
 async function updateReservationStatus(restaurantId, reservationId, status) {
@@ -575,8 +585,8 @@ function initDashboardPage() {
       if (form.matches("[data-dashboard-invite-form]")) {
         const code = await createInvitation(restaurantId, form, currentUser);
         form.code.value = code;
-        status.textContent = `Invitation creee : ${code}`;
-        await renderDashboard(root, currentUser, restaurantId);
+        const inviteUrl = `${window.location.origin}/poket-access.html?invite=${encodeURIComponent(code)}`;
+        status.innerHTML = `Invitation creee : <strong>${escapeHtml(code)}</strong><br><a href="${escapeAttr(inviteUrl)}">${escapeHtml(inviteUrl)}</a>`;
         return;
       }
       status.textContent = "Enregistre.";
@@ -620,11 +630,12 @@ async function renderDashboard(root, user, restaurantId) {
   const { doc, getDoc } = services.firestoreModule;
   const memberSnap = await getDoc(doc(services.db, "restaurants", restaurant.id, "members", user.uid));
   const role = memberSnap.exists() ? memberSnap.data().role : restaurant.ownerUid === user.uid ? "owner" : "staff";
-  const [reservations, members] = await Promise.all([
+  const [reservations, members, menu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
-    listMembers(restaurant.id).catch(() => [])
+    listMembers(restaurant.id).catch(() => []),
+    getActiveMenu(restaurant.id).catch(() => null)
   ]);
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, members);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, members, menu);
 }
 
 function initPublicRestaurantPage() {
@@ -632,9 +643,12 @@ function initPublicRestaurantPage() {
   if (!root) return;
   const slug = root.dataset.restaurantSlug || new URLSearchParams(window.location.search).get("slug") || "chez-marwan";
   let loadedRestaurant = null;
-  getRestaurantBySlug(slug).then((restaurant) => {
+  getRestaurantBySlug(slug).then(async (restaurant) => {
     loadedRestaurant = restaurant;
-    if (restaurant && restaurant.publicPageEnabled !== false) hydratePublicRestaurant(root, restaurant);
+    if (restaurant && restaurant.publicPageEnabled !== false) {
+      const menu = await getActiveMenu(restaurant.id).catch(() => null);
+      hydratePublicRestaurant(root, restaurant, menu);
+    }
   }).catch(() => {});
   const reservationForm = document.querySelector("[data-public-reservation-form]");
   if (reservationForm) {
@@ -669,7 +683,7 @@ function initContactForms() {
   });
 }
 
-function hydratePublicRestaurant(root, restaurant) {
+function hydratePublicRestaurant(root, restaurant, menu) {
   setText("[data-public-name]", restaurant.name);
   setText("[data-public-description]", restaurant.description);
   setText("[data-public-cuisine]", restaurant.cuisineType || "Restaurant");
@@ -687,8 +701,23 @@ function hydratePublicRestaurant(root, restaurant) {
   if (hours) hours.innerHTML = hoursHtml(restaurant.openingHours);
   const menuLink = document.querySelector("[data-public-menu-link]");
   if (menuLink) {
-    menuLink.href = restaurant.website || "#menu";
+    const menuUrl = menu?.externalUrl || menu?.pdfUrl || "#menu";
+    menuLink.href = menuUrl;
+    if (menuUrl !== "#menu") menuLink.target = "_blank";
     menuLink.textContent = restaurant.qrMenuEnabled ? "Ouvrir le menu QR" : "Menu bientot disponible";
+  }
+  const menuContainer = document.querySelector("[data-public-menu-items]");
+  if (menuContainer && menu?.items?.length) {
+    menuContainer.innerHTML = menu.items.map((item) => `
+      <article class="menu-item-card menu-item-card-live">
+        <div>
+          <span>${escapeHtml(item.category || "Menu")}</span>
+          <h3>${escapeHtml(item.name)}</h3>
+          <p>${escapeHtml(item.description || "")}</p>
+          <strong>${escapeHtml(item.price || "")}</strong>
+        </div>
+      </article>
+    `).join("");
   }
   if (restaurant.reservationEnabled === false) {
     const reservation = document.querySelector("[data-public-reservation-form]");
@@ -759,7 +788,7 @@ function restaurantCardHtml(restaurant) {
       </div>
       <div class="mini-actions">
         <a href="admin.html?restaurant=${encodeURIComponent(restaurant.id)}">Dashboard</a>
-        <a href="restaurants/chez-marwan.html?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}">Page publique</a>
+        <a href="restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}">Page publique</a>
       </div>
     </article>
   `;
@@ -811,10 +840,10 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, members) {
+function dashboardHtml(restaurant, role, reservations, members, menu) {
   const canEditProfile = ["owner", "admin", "manager"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
-  const publicUrl = `${window.location.origin}/restaurants/chez-marwan.html?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
+  const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
   return `
     <div class="dashboard-shell">
       <div class="dashboard-topline">
@@ -838,7 +867,7 @@ function dashboardHtml(restaurant, role, reservations, members) {
       <section class="dashboard-panel" data-dashboard-panel="profile">${profileFormHtml(restaurant, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="hours">${hoursFormHtml(restaurant, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="menu">${menuFormHtml(restaurant, canEditProfile)}</section>
+      <section class="dashboard-panel" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
       <section class="dashboard-panel" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
       <section class="dashboard-panel" data-dashboard-panel="downloads">${downloadsHtml()}</section>
@@ -938,23 +967,34 @@ function publicSettingsHtml(restaurant, publicUrl, canEdit) {
   `;
 }
 
-function menuFormHtml(restaurant, canEdit) {
-  const qrUrl = `${window.location.origin}/restaurants/chez-marwan.html?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}#menu`;
+function menuFormHtml(restaurant, menu, canEdit) {
+  const qrUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}#menu`;
+  const qrImage = `https://quickchart.io/qr?size=180&text=${encodeURIComponent(qrUrl)}`;
+  const structuredText = Array.isArray(menu?.items)
+    ? menu.items.map((item) => [item.category, item.name, item.description, item.price].filter(Boolean).join(" | ")).join("\n")
+    : "";
   return `
     <form class="platform-form" data-dashboard-menu-form>
-      <p class="alert-note">Destination QR : ${escapeHtml(qrUrl)}</p>
+      <div class="qr-menu-preview">
+        <div>
+          <p class="alert-note">Destination QR : ${escapeHtml(qrUrl)}</p>
+          <button class="ghost-action" type="button" data-copy="${escapeAttr(qrUrl)}">Copier le lien QR menu</button>
+        </div>
+        <img src="${qrImage}" alt="QR menu" loading="lazy" />
+      </div>
       <div class="form-grid">
-        <label>Titre<input name="title" value="Menu principal" ${disabled(canEdit)} /></label>
+        <label>Titre<input name="title" value="${escapeAttr(menu?.title || "Menu principal")}" ${disabled(canEdit)} /></label>
         <label>Type
           <select name="type" ${disabled(canEdit)}>
-            <option value="external_link">Lien externe</option>
-            <option value="pdf">PDF</option>
-            <option value="structured">Structure Poksol</option>
+            <option value="external_link" ${menu?.type === "external_link" ? "selected" : ""}>Lien externe</option>
+            <option value="pdf" ${menu?.type === "pdf" ? "selected" : ""}>PDF</option>
+            <option value="structured" ${menu?.type === "structured" ? "selected" : ""}>Structure Poksol</option>
           </select>
         </label>
-        <label>URL externe<input name="externalUrl" placeholder="https://..." ${disabled(canEdit)} /></label>
-        <label>PDF URL<input name="pdfUrl" placeholder="https://..." ${disabled(canEdit)} /></label>
-        <label><input type="checkbox" name="isActive" ${restaurant.qrMenuEnabled ? "checked" : ""} ${disabled(canEdit)} /> Menu actif</label>
+        <label>URL externe<input name="externalUrl" value="${escapeAttr(menu?.externalUrl || "")}" placeholder="https://..." ${disabled(canEdit)} /></label>
+        <label>PDF URL<input name="pdfUrl" value="${escapeAttr(menu?.pdfUrl || "")}" placeholder="https://..." ${disabled(canEdit)} /></label>
+        <label><input type="checkbox" name="isActive" ${restaurant.qrMenuEnabled || menu?.isActive ? "checked" : ""} ${disabled(canEdit)} /> Menu actif</label>
+        <label class="wide-field">Menu structure<textarea name="structuredItems" rows="7" placeholder="Categorie | Nom du plat | Description | Prix" ${disabled(canEdit)}>${escapeHtml(structuredText)}</textarea></label>
       </div>
       ${canEdit ? `<button class="primary-btn button-reset" type="submit">Enregistrer le menu</button>` : ""}
       <small data-form-status></small>
@@ -1027,6 +1067,18 @@ function downloadsHtml() {
       </div>
     </section>
   `;
+}
+
+function parseMenuItems(raw) {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [category, name, description, price] = line.split("|").map((part) => (part || "").trim());
+      return { category, name, description, price };
+    })
+    .filter((item) => item.name);
 }
 
 function statusCardHtml(label, value) {

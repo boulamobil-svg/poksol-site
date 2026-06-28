@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page restaurant | Poksol</title>
+  <link rel="stylesheet" href="../style.css?v=20260628-2" />
+</head>
+<body class="restaurant-public-body" data-public-restaurant>
+  <header class="restaurant-public-hero">
+    <nav class="restaurant-public-nav">
+      <a class="restaurant-powered-brand" href="../index.html">
+        <img src="../poksol_icon.svg" alt="Poksol" />
+        <span>Propulse par <strong>POKSOL</strong></span>
+      </a>
+      <div class="restaurant-public-links">
+        <a href="#menu">Menu</a>
+        <a href="#horaires">Horaires</a>
+        <a href="#reservation">Reservation</a>
+      </div>
+    </nav>
+
+    <section class="restaurant-hero-content">
+      <div class="restaurant-identity">
+        <span class="restaurant-pill" data-public-cuisine>Restaurant Poksol</span>
+        <h1 data-public-name>Restaurant Poksol</h1>
+        <p data-public-description>
+          Retrouvez les horaires, le menu et le formulaire de reservation du restaurant.
+        </p>
+        <div class="restaurant-hero-actions">
+          <a class="primary-btn" href="#reservation">Reserver une table</a>
+          <a class="outline-btn" href="#" data-public-phone-link>Appeler</a>
+        </div>
+      </div>
+
+      <aside class="restaurant-cover-card" aria-label="Apercu restaurant">
+        <div class="restaurant-cover-photo" data-public-cover>
+          <span>Photo restaurant</span>
+        </div>
+        <div class="restaurant-cover-info">
+          <strong data-public-name>Restaurant Poksol</strong>
+          <span data-public-address>Adresse a completer</span>
+        </div>
+      </aside>
+    </section>
+  </header>
+
+  <main class="restaurant-public-main">
+    <section class="restaurant-quick-actions" aria-label="Actions rapides">
+      <a href="#" target="_blank" rel="noopener noreferrer" data-public-maps-link>Itineraire</a>
+      <a href="#" data-public-phone-link>Telephone</a>
+      <a href="#reservation">Lien reservation</a>
+      <a href="#menu" data-public-menu-link>Voir le menu</a>
+    </section>
+
+    <section class="restaurant-layout">
+      <div>
+        <section id="menu" class="restaurant-section">
+          <p class="eyebrow">Menu en ligne</p>
+          <h2>Menu</h2>
+          <p>
+            Le menu peut etre gere depuis le dashboard restaurant Poksol.
+          </p>
+          <div class="menu-grid" data-public-menu-items>
+            <article class="menu-item-card">
+              <div>
+                <span>Menu</span>
+                <h3>Menu bientot disponible</h3>
+                <p>Le restaurant n'a pas encore publie de menu structure.</p>
+                <strong></strong>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="reservation" class="restaurant-section reservation-section">
+          <p class="eyebrow">Reservation</p>
+          <h2>Reserver une table</h2>
+          <p>Envoyez une demande de reservation au restaurant.</p>
+
+          <form class="reservation-form" data-public-reservation-form>
+            <label>Nom<input type="text" name="name" placeholder="Votre nom" required /></label>
+            <label>Telephone<input type="tel" name="phone" placeholder="Votre telephone" required /></label>
+            <label>Email<input type="email" name="email" placeholder="vous@email.com" /></label>
+            <label>Date<input type="date" name="date" required /></label>
+            <label>Heure<input type="time" name="time" required /></label>
+            <label>Couverts<input type="number" name="guests" min="1" max="20" value="2" required /></label>
+            <label>Message<textarea name="message" rows="4" placeholder="Allergie, terrasse, occasion speciale..."></textarea></label>
+            <button class="primary-btn button-reset" type="submit">Envoyer la demande</button>
+            <small data-form-status></small>
+          </form>
+        </section>
+      </div>
+
+      <aside class="restaurant-sidebar">
+        <section id="horaires" class="restaurant-side-card">
+          <p class="eyebrow">Horaires</p>
+          <h2>Ouverture</h2>
+          <ul class="hours-list" data-public-hours>
+            <li><span>Lundi</span><strong>A completer</strong></li>
+          </ul>
+        </section>
+
+        <section class="restaurant-side-card">
+          <p class="eyebrow">Contact</p>
+          <h2>Infos pratiques</h2>
+          <ul class="package-list">
+            <li data-public-address>Adresse a completer</li>
+            <li><a href="#" data-public-phone-link><span data-public-phone>Telephone</span></a></li>
+            <li><a href="#" data-public-email-link><span data-public-email>Email</span></a></li>
+            <li>Page publique propulsee par Poksol</li>
+          </ul>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="restaurant-public-footer">
+    <span data-public-name>Restaurant Poksol</span>
+    <a href="../index.html">Propulse par Poksol</a>
+  </footer>
+
+  <script src="../app.js?v=20260628-2"></script>
+  <script type="module" src="../platform.js?v=20260628-2"></script>
+</body>
+</html>

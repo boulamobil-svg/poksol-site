@@ -1256,6 +1256,28 @@ body {
   border-top: 1px solid var(--line);
 }
 
+.qr-menu-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.qr-menu-preview img {
+  width: 180px;
+  height: 180px;
+  padding: 10px;
+  border: 1px solid #d3e5ff;
+  border-radius: 18px;
+  background: white;
+}
+
+.menu-item-card-live {
+  padding: 18px;
+  background: white;
+}
+
 .downloads-card {
   margin-top: 18px;
 }
@@ -2243,6 +2265,11 @@ body {
   .toggle-grid,
   .download-grid {
     grid-template-columns: 1fr;
+  }
+
+  .qr-menu-preview {
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
 
   .section-title-row,
