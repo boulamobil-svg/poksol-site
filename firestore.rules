@@ -63,13 +63,31 @@ service cloud.firestore {
 
     match /invitations/{invitationId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if signedIn()
+        && hasRestaurantRole(request.resource.data.restaurantId, ["owner", "admin"]);
+      allow update: if signedIn()
+        && (
+          hasRestaurantRole(resource.data.restaurantId, ["owner", "admin"])
+          || (
+            request.resource.data.status == "accepted"
+            && request.resource.data.acceptedByUid == request.auth.uid
+          )
+        );
       allow delete: if false;
     }
 
     match /restaurant_invites/{invitationId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create: if signedIn()
+        && hasRestaurantRole(request.resource.data.restaurantId, ["owner", "admin"]);
+      allow update: if signedIn()
+        && (
+          hasRestaurantRole(resource.data.restaurantId, ["owner", "admin"])
+          || (
+            request.resource.data.status == "accepted"
+            && request.resource.data.acceptedByUid == request.auth.uid
+          )
+        );
       allow delete: if false;
     }
 

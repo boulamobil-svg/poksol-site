@@ -1273,6 +1273,16 @@ body {
   background: white;
 }
 
+.inline-qr {
+  width: 160px;
+  height: 160px;
+  margin-top: 12px;
+  padding: 8px;
+  border: 1px solid #d3e5ff;
+  border-radius: 16px;
+  background: white;
+}
+
 .menu-item-card-live {
   padding: 18px;
   background: white;

@@ -547,7 +547,9 @@ function initAccountPage() {
   });
   initAuthObserver((user, error) => {
     if (error) root.innerHTML = alertHtml("Firebase indisponible pour le moment.");
-    else renderAccount(root, user);
+    else renderAccount(root, user).catch((accountError) => {
+      root.innerHTML = accountErrorHtml(accountError);
+    });
   });
 }
 
@@ -556,7 +558,7 @@ async function renderAccount(root, user) {
     root.innerHTML = accountSignedOutHtml();
     return;
   }
-  const restaurants = await listUserRestaurants(user.uid);
+  const restaurants = await listUserRestaurants(user.uid).catch(() => []);
   root.innerHTML = accountSignedInHtml(user, restaurants);
 }
 
@@ -590,7 +592,12 @@ function initDashboardPage() {
         const code = await createInvitation(restaurantId, form, currentUser);
         form.code.value = code;
         const inviteUrl = `${window.location.origin}/poket-access.html?invite=${encodeURIComponent(code)}`;
-        status.innerHTML = `Invitation creee : <strong>${escapeHtml(code)}</strong><br><a href="${escapeAttr(inviteUrl)}">${escapeHtml(inviteUrl)}</a>`;
+        const inviteQr = `https://quickchart.io/qr?size=160&text=${encodeURIComponent(inviteUrl)}`;
+        status.innerHTML = `
+          Invitation creee : <strong>${escapeHtml(code)}</strong><br>
+          <a href="${escapeAttr(inviteUrl)}">${escapeHtml(inviteUrl)}</a><br>
+          <img class="inline-qr" src="${inviteQr}" alt="QR invitation" loading="lazy" />
+        `;
         return;
       }
       status.textContent = "Enregistre.";
@@ -753,6 +760,17 @@ function accountSignedOutHtml() {
       <h2>Connectez-vous pour gerer vos restaurants</h2>
       <p>Votre compte Poksol donne acces a la creation restaurant, aux invitations, au dashboard, aux telechargements et a l'application navigateur.</p>
       <button class="primary-btn button-reset" type="button" data-platform-login>Se connecter avec Google</button>
+    </section>
+  `;
+}
+
+function accountErrorHtml(error) {
+  return `
+    <section class="platform-card">
+      <p class="eyebrow">Compte indisponible</p>
+      <h2>Impossible de charger vos restaurants</h2>
+      <p class="alert-note">${escapeHtml(readableFirebaseError(error))}</p>
+      <button class="primary-btn button-reset" type="button" onclick="window.location.reload()">Reessayer</button>
     </section>
   `;
 }
