@@ -14,6 +14,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/restaurants/$(restaurantId)/members/$(request.auth.uid);
     }
 
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
     function isRestaurantMember(restaurantId) {
       return signedIn()
         && exists(memberPath(restaurantId))
@@ -24,20 +28,54 @@ service cloud.firestore {
       return isRestaurantMember(restaurantId) && get(memberPath(restaurantId)).data.role in roles;
     }
 
+    function isLegacyRestaurantOwner() {
+      return signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    function userReferencesRestaurant(restaurantId) {
+      return signedIn()
+        && exists(userPath())
+        && (
+          get(userPath()).data.activeRestaurantId == restaurantId
+          || (
+            get(userPath()).data.restaurantIds is list
+            && restaurantId in get(userPath()).data.restaurantIds
+          )
+        );
+    }
+
+    function canReadRestaurant(restaurantId) {
+      return resource.data.publicPageEnabled == true
+        || isRestaurantMember(restaurantId)
+        || isLegacyRestaurantOwner()
+        || userReferencesRestaurant(restaurantId);
+    }
+
+    function canEditRestaurant(restaurantId) {
+      return hasRestaurantRole(restaurantId, ["owner", "admin", "manager"])
+        || isLegacyRestaurantOwner()
+        || userReferencesRestaurant(restaurantId);
+    }
+
+    function canDeleteRestaurant(restaurantId) {
+      return hasRestaurantRole(restaurantId, ["owner"])
+        || isLegacyRestaurantOwner();
+    }
+
     match /users/{uid} {
       allow read, create, update: if isSelf(uid);
       allow delete: if false;
     }
 
     match /restaurants/{restaurantId} {
-      allow read: if resource.data.publicPageEnabled == true || isRestaurantMember(restaurantId);
+      allow read: if canReadRestaurant(restaurantId);
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
-      allow update: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]);
-      allow delete: if hasRestaurantRole(restaurantId, ["owner"]);
+      allow update: if canEditRestaurant(restaurantId);
+      allow delete: if canDeleteRestaurant(restaurantId);
 
       match /members/{uid} {
-        allow read: if isRestaurantMember(restaurantId);
-        allow create: if isSelf(uid) || hasRestaurantRole(restaurantId, ["owner", "admin"]);
+        allow read: if isRestaurantMember(restaurantId) || userReferencesRestaurant(restaurantId);
+        allow create: if isSelf(uid) || hasRestaurantRole(restaurantId, ["owner", "admin"]) || userReferencesRestaurant(restaurantId);
         allow update: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
         allow delete: if hasRestaurantRole(restaurantId, ["owner"]) && uid != request.auth.uid;
       }

@@ -340,7 +340,7 @@ async function saveProfile({ final }) {
       };
       saveRestaurantContext(restaurantContext);
     } catch (error) {
-      statusBox.textContent = "Sauvegarde locale OK. Firestore a refuse ou bloque la sauvegarde.";
+      statusBox.textContent = "Sauvegarde locale OK. Firestore a refuse ou bloque la sauvegarde : " + formatFirebaseError(error);
       return;
     }
   }
@@ -996,6 +996,15 @@ function normalizeProfileFromRestaurant(restaurantData, fallbackProfile) {
 
 function saveRestaurantContext(context) {
   localStorage.setItem(RESTAURANT_CONTEXT_KEY, JSON.stringify(context));
+}
+
+function formatFirebaseError(error) {
+  const code = error?.code ? String(error.code) : "";
+  const message = error?.message ? String(error.message) : "";
+  if (code === "permission-denied") {
+    return "permission-denied. Verifiez les regles Firestore et l'association utilisateur/restaurant.";
+  }
+  return [code, message].filter(Boolean).join(" - ") || "erreur inconnue";
 }
 
 function loadRestaurantContext() {
