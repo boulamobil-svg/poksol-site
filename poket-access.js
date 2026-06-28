@@ -33,7 +33,17 @@ let pendingInviteCode = readInviteCodeFromUrl();
 const accessParams = new URLSearchParams(window.location.search);
 const accessMode = (accessParams.get("mode") || "").toLowerCase();
 const accessSection = (accessParams.get("section") || "").toLowerCase();
+const forceNewRestaurant = accessMode === "new" || accessMode === "create";
 const stayOnAccessPage = accessMode === "edit" || accessMode === "public-page";
+
+if (forceNewRestaurant) {
+  restaurantContext = {
+    mode: "new",
+    source: "new-request"
+  };
+  localStorage.removeItem(RESTAURANT_CONTEXT_KEY);
+  localStorage.removeItem(RESTAURANT_PROFILE_KEY);
+}
 
 const form = document.querySelector("[data-restaurant-profile-form]");
 const statusBox = document.querySelector("[data-access-status]");
@@ -193,10 +203,12 @@ async function loadRemoteProfile(uid) {
     const { doc, getDoc } = firebaseServices.firestoreModule;
     const userSnapshot = await getDoc(doc(firebaseServices.db, "users", uid));
     const userData = userSnapshot.exists() ? userSnapshot.data() : null;
-    const existingRestaurantId = normalizeRestaurantId(
-      userData?.activeRestaurantId ||
-      (Array.isArray(userData?.restaurantIds) ? userData.restaurantIds[0] : "")
-    );
+    const existingRestaurantId = forceNewRestaurant
+      ? ""
+      : normalizeRestaurantId(
+          userData?.activeRestaurantId ||
+          (Array.isArray(userData?.restaurantIds) ? userData.restaurantIds[0] : "")
+        );
 
     if (existingRestaurantId) {
       const restaurantSnapshot = await getDoc(doc(firebaseServices.db, "restaurants", existingRestaurantId));
@@ -246,7 +258,7 @@ async function saveProfile({ final }) {
 
   profile.updatedAt = new Date().toISOString();
   profile.profileComplete = validation.minimumOk;
-  const restaurantId = ensureRestaurantId();
+  const restaurantId = await ensureRestaurantId(profile);
   profile.restaurantId = restaurantId;
   saveLocalProfile(profile);
   saveSession(profile.profileComplete);
@@ -761,7 +773,7 @@ async function uploadRestaurantLogo() {
   }
 
   try {
-    const restaurantId = ensureRestaurantId();
+    const restaurantId = await ensureRestaurantId(collectProfile());
     const extension = logoExtension(file);
     const storagePath = `restaurants/${restaurantId}/branding/logo.${extension}`;
     const { ref, uploadBytes, getDownloadURL } = firebaseServices.storageModule;
@@ -891,18 +903,42 @@ function loadLocalProfile() {
   }
 }
 
-function ensureRestaurantId() {
-  if (restaurantContext.restaurantId) {
+async function ensureRestaurantId(profile = null) {
+  if (restaurantContext.restaurantId && restaurantContext.mode !== "new") {
+    return restaurantContext.restaurantId;
+  }
+  if (profile?.name) {
+    const slug = normalizeSlug(profile.name) || buildRestaurantId(currentUser?.uid || "preview-user");
+    const uniqueSlug = previewMode || !firebaseServices
+      ? slug
+      : await buildUniqueRestaurantId(slug);
+    restaurantContext = {
+      restaurantId: uniqueSlug,
+      mode: "new",
+      source: previewMode ? "preview" : "generated-from-name"
+    };
+    saveRestaurantContext(restaurantContext);
     return restaurantContext.restaurantId;
   }
   const userId = currentUser?.uid || "preview-user";
   restaurantContext = {
     restaurantId: buildRestaurantId(userId),
-    mode: loadLocalProfile() ? "existing" : "new",
+    mode: "new",
     source: previewMode ? "preview" : "generated"
   };
   saveRestaurantContext(restaurantContext);
   return restaurantContext.restaurantId;
+}
+
+async function buildUniqueRestaurantId(baseSlug) {
+  const { doc, getDoc } = firebaseServices.firestoreModule;
+  let candidate = baseSlug;
+  let suffix = 2;
+  while ((await getDoc(doc(firebaseServices.db, "restaurants", candidate))).exists()) {
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
 }
 
 function buildRestaurantId(userId) {

@@ -795,6 +795,7 @@ function accountSignedInHtml(user, restaurants) {
         <div class="restaurant-list">
           ${restaurants.length ? restaurants.map(restaurantCardHtml).join("") : emptyHtml("Aucun restaurant rattache pour le moment.")}
         </div>
+        <a class="ghost-action" href="poket-access.html?mode=new">Creer un nouveau restaurant</a>
       </article>
 
       <article class="platform-card">

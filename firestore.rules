@@ -68,6 +68,8 @@ service cloud.firestore {
     }
 
     match /restaurants/{restaurantId} {
+      allow get: if signedIn() || canReadRestaurant(restaurantId);
+      allow list: if signedIn();
       allow read: if canReadRestaurant(restaurantId);
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
       allow update: if canEditRestaurant(restaurantId);
