@@ -163,6 +163,14 @@ service cloud.firestore {
         allow read, write: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
       }
 
+      match /settings/{settingId} {
+        allow read: if (
+          settingId == "restaurant_profile"
+          && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.publicPageEnabled == true
+        ) || isRestaurantMember(restaurantId) || userReferencesRestaurant(restaurantId);
+        allow write: if isRestaurantMember(restaurantId) || userReferencesRestaurant(restaurantId);
+      }
+
       match /{internalPath=**} {
         allow read, write: if isRestaurantMember(restaurantId) || userReferencesRestaurant(restaurantId);
       }

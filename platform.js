@@ -97,7 +97,18 @@ async function getRestaurant(id) {
   const services = await getServices();
   const { doc, getDoc } = services.firestoreModule;
   const snap = await getDoc(doc(services.db, "restaurants", id));
-  return snap.exists() ? normalizeRestaurant(snap.id, snap.data()) : null;
+  if (!snap.exists()) return null;
+  const baseData = snap.data();
+  const settingsSnap = await getDoc(doc(services.db, "restaurants", id, "settings", "restaurant_profile")).catch(() => null);
+  const settingsData = settingsSnap?.exists() ? settingsSnap.data() : {};
+  return normalizeRestaurant(snap.id, {
+    ...baseData,
+    restaurantProfile: {
+      ...(baseData.restaurantProfile || {}),
+      ...settingsData
+    },
+    ...settingsData
+  });
 }
 
 async function getRestaurantBySlug(slug) {
@@ -114,7 +125,7 @@ async function getRestaurantBySlug(slug) {
   ));
   if (snaps.empty) return null;
   const snap = snaps.docs[0];
-  return normalizeRestaurant(snap.id, snap.data());
+  return getRestaurant(snap.id);
 }
 
 async function listUserRestaurants(uid) {
@@ -477,6 +488,9 @@ async function submitReservation(restaurant, form) {
   if (!payload.customerName || !payload.customerPhone || !payload.date || !payload.time) {
     throw new Error("Nom, telephone, date et heure sont obligatoires.");
   }
+  if (!isReservationWithinOpeningHours(restaurant.openingHours, payload.date, payload.time)) {
+    throw new Error("Ce créneau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
+  }
   await addDoc(collection(services.db, "restaurants", restaurant.id, "reservations"), payload);
 }
 
@@ -734,6 +748,7 @@ function hydratePublicRestaurant(root, restaurant, menu) {
   if (cover && restaurant.coverUrl) cover.style.backgroundImage = `url("${restaurant.coverUrl}")`;
   const hours = document.querySelector("[data-public-hours]");
   if (hours) hours.innerHTML = hoursHtml(restaurant.openingHours);
+  setupReservationHoursUi(restaurant);
   const menuLink = document.querySelector("[data-public-menu-link]");
   if (menuLink) {
     const menuUrl = menu?.externalUrl || menu?.pdfUrl || "#menu";
@@ -1205,13 +1220,18 @@ function readableFirebaseError(error) {
 
 function normalizeHours(hours) {
   if (!hours) return defaultOpeningHours();
-  if (!Array.isArray(hours)) return hours;
+  if (!Array.isArray(hours)) {
+    return DAYS.reduce((acc, [key]) => {
+      acc[key] = normalizeDaySlots(hours[key]);
+      return acc;
+    }, {});
+  }
   return hours.reduce((acc, item) => {
-    const day = DAYS[Number(item.day || 0) - 1]?.[0];
+    const day = dayKeyFromValue(item.day ?? item.dayKey ?? item.weekday);
     if (!day) return acc;
-    acc[day] = item.isOpen === false ? [] : [{ open: item.lunchStart || item.open || "09:00", close: item.dinnerEnd || item.close || "22:00" }];
+    acc[day] = normalizeDaySlots(item);
     return acc;
-  }, defaultOpeningHours());
+  }, emptyOpeningHours());
 }
 
 function defaultOpeningHours() {
@@ -1221,12 +1241,104 @@ function defaultOpeningHours() {
   }, {});
 }
 
+function emptyOpeningHours() {
+  return DAYS.reduce((acc, [key]) => {
+    acc[key] = [];
+    return acc;
+  }, {});
+}
+
+function normalizeDaySlots(day) {
+  if (!day) return [];
+  if (Array.isArray(day)) return day.map(normalizeSlot).filter(Boolean);
+  if (day.open === false || day.isOpen === false || day.closed === true) return [];
+  const slots = [];
+  const lunchStart = day.lunchStart || day.midiStart || day.noonStart;
+  const lunchEnd = day.lunchEnd || day.midiEnd || day.noonEnd;
+  const dinnerStart = day.dinnerStart || day.soirStart || day.eveningStart;
+  const dinnerEnd = day.dinnerEnd || day.soirEnd || day.eveningEnd;
+  if (lunchStart && lunchEnd) slots.push({ open: lunchStart, close: lunchEnd });
+  if (dinnerStart && dinnerEnd) slots.push({ open: dinnerStart, close: dinnerEnd });
+  if (!slots.length && day.open && day.close) slots.push({ open: day.open, close: day.close });
+  return slots.map(normalizeSlot).filter(Boolean);
+}
+
+function normalizeSlot(slot) {
+  if (!slot) return null;
+  const open = normalizeTime(slot.open || slot.start || slot.from);
+  const close = normalizeTime(slot.close || slot.end || slot.to);
+  return open && close ? { open, close } : null;
+}
+
+function normalizeTime(value) {
+  const match = String(value || "").match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return "";
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function dayKeyFromValue(value) {
+  if (typeof value === "number" || /^\d+$/.test(String(value || ""))) {
+    return DAYS[Number(value) - 1]?.[0] || "";
+  }
+  const clean = normalizeSlug(value);
+  return DAYS.find(([key, label]) => clean === key || clean === normalizeSlug(label))?.[0] || "";
+}
+
 function hoursHtml(hours) {
   const normalized = normalizeHours(hours);
   return DAYS.map(([key, label]) => {
     const slots = normalized[key] || [];
     return `<li><span>${label}</span><strong>${slots.length ? slots.map((slot) => `${slot.open} - ${slot.close}`).join(" / ") : "Ferme"}</strong></li>`;
   }).join("");
+}
+
+function isReservationWithinOpeningHours(hours, dateValue, timeValue) {
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return false;
+  const dayKey = DAYS[(date.getDay() + 6) % 7]?.[0];
+  const slots = normalizeHours(hours)[dayKey] || [];
+  const requested = minutesFromTime(timeValue);
+  return slots.some((slot) => {
+    const open = minutesFromTime(slot.open);
+    const close = minutesFromTime(slot.close);
+    return requested >= open && requested <= close;
+  });
+}
+
+function minutesFromTime(value) {
+  const [hours, minutes] = normalizeTime(value).split(":").map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+function setupReservationHoursUi(restaurant) {
+  const form = document.querySelector("[data-public-reservation-form]");
+  if (!form || restaurant.reservationEnabled === false) return;
+  const dateInput = form.elements.date;
+  const timeInput = form.elements.time;
+  if (dateInput && !dateInput.min) dateInput.min = new Date().toISOString().slice(0, 10);
+  if (timeInput) timeInput.step = 900;
+  let note = form.querySelector("[data-reservation-hours-note]");
+  if (!note) {
+    note = document.createElement("p");
+    note.className = "reservation-hours-note";
+    note.dataset.reservationHoursNote = "";
+    form.insertBefore(note, form.querySelector("[data-form-status]"));
+  }
+  const updateNote = () => {
+    if (!dateInput?.value) {
+      note.textContent = "Choisissez une date pour afficher les horaires disponibles.";
+      return;
+    }
+    const date = new Date(`${dateInput.value}T00:00:00`);
+    const dayKey = DAYS[(date.getDay() + 6) % 7]?.[0];
+    const slots = normalizeHours(restaurant.openingHours)[dayKey] || [];
+    note.textContent = slots.length
+      ? `Horaires disponibles : ${slots.map((slot) => `${slot.open} - ${slot.close}`).join(" / ")}.`
+      : "Le restaurant est fermé ce jour-là. Choisissez une autre date.";
+  };
+  dateInput?.addEventListener("change", updateNote);
+  timeInput?.addEventListener("change", updateNote);
+  updateNote();
 }
 
 function normalizeSlug(value) {
