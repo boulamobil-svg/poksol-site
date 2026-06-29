@@ -574,6 +574,13 @@ function initDashboardPage() {
       root.querySelectorAll("[data-dashboard-tab]").forEach((button) => button.classList.toggle("is-active", button === tabButton));
       root.querySelectorAll("[data-dashboard-panel]").forEach((panel) => panel.classList.toggle("is-active", panel.dataset.dashboardPanel === tabButton.dataset.dashboardTab));
     }
+    const tabLink = event.target.closest("[data-dashboard-tab-link]");
+    if (tabLink) {
+      event.preventDefault();
+      const targetTab = tabLink.dataset.dashboardTabLink;
+      root.querySelectorAll("[data-dashboard-tab]").forEach((button) => button.classList.toggle("is-active", button.dataset.dashboardTab === targetTab));
+      root.querySelectorAll("[data-dashboard-panel]").forEach((panel) => panel.classList.toggle("is-active", panel.dataset.dashboardPanel === targetTab));
+    }
     const copyButton = event.target.closest("[data-copy]");
     if (copyButton) navigator.clipboard?.writeText(copyButton.dataset.copy);
   });
@@ -912,11 +919,6 @@ function dashboardHtml(restaurant, role, reservations, members, menu) {
           <h2>${escapeHtml(restaurant.name || restaurant.id)}</h2>
           <p data-dashboard-status>Dashboard connecte a Firestore.</p>
         </div>
-        <div class="download-inline">
-          <a href="${DOWNLOADS.web}" target="_blank" rel="noopener noreferrer">Web app</a>
-          <a href="${DOWNLOADS.android}" download>Android</a>
-          <a href="${DOWNLOADS.windows}" download>Windows</a>
-        </div>
       </div>
       <nav class="dashboard-tabs" aria-label="Sections dashboard">
         ${["overview", "profile", "hours", "public", "menu", "reservations", "team", "downloads"].map((tab, index) => `
@@ -945,8 +947,7 @@ function overviewHtml(restaurant, publicUrl) {
     <div class="quick-links">
       <a href="${publicUrl}" target="_blank" rel="noopener noreferrer">Voir page publique</a>
       <a href="${DOWNLOADS.web}" target="_blank" rel="noopener noreferrer">Ouvrir web app</a>
-      <a href="${DOWNLOADS.android}" download>Telecharger Android</a>
-      <a href="${DOWNLOADS.windows}" download>Telecharger Windows</a>
+      <a href="#downloads" data-dashboard-tab-link="downloads">Telechargements</a>
     </div>
   `;
 }
