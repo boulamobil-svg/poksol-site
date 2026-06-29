@@ -101,13 +101,16 @@ async function getRestaurant(id) {
   const baseData = snap.data();
   const settingsSnap = await getDoc(doc(services.db, "restaurants", id, "settings", "restaurant_profile")).catch(() => null);
   const settingsData = settingsSnap?.exists() ? settingsSnap.data() : {};
+  const settingsProfile = settingsData.restaurantProfile || {};
   return normalizeRestaurant(snap.id, {
     ...baseData,
+    ...settingsProfile,
+    ...settingsData,
     restaurantProfile: {
       ...(baseData.restaurantProfile || {}),
+      ...settingsProfile,
       ...settingsData
-    },
-    ...settingsData
+    }
   });
 }
 
@@ -1200,7 +1203,7 @@ function normalizeRestaurant(id, data) {
     country: data.country || profile.country || "France",
     phone: data.phone || profile.phone || "",
     email: data.email || profile.email || "",
-    openingHours: data.openingHoursByDay || profile.openingHoursByDay || data.openingHours || profile.openingHours || defaultOpeningHours()
+    openingHours: resolveOpeningHours(data, profile)
   };
 }
 
@@ -1221,10 +1224,17 @@ function readableFirebaseError(error) {
 function normalizeHours(hours) {
   if (!hours) return defaultOpeningHours();
   if (!Array.isArray(hours)) {
-    return DAYS.reduce((acc, [key]) => {
-      acc[key] = normalizeDaySlots(hours[key]);
-      return acc;
-    }, {});
+    const normalized = emptyOpeningHours();
+    DAYS.forEach(([key]) => {
+      normalized[key] = normalizeDaySlots(hours[key]);
+    });
+    Object.entries(hours).forEach(([rawKey, value]) => {
+      const dayKey = dayKeyFromValue(value?.day ?? value?.dayKey ?? value?.weekday ?? rawKey);
+      if (!dayKey) return;
+      const slots = normalizeDaySlots(value);
+      if (slots.length || !normalized[dayKey]?.length) normalized[dayKey] = slots;
+    });
+    return normalized;
   }
   return hours.reduce((acc, item) => {
     const day = dayKeyFromValue(item.day ?? item.dayKey ?? item.weekday);
@@ -1252,14 +1262,22 @@ function normalizeDaySlots(day) {
   if (!day) return [];
   if (Array.isArray(day)) return day.map(normalizeSlot).filter(Boolean);
   if (day.open === false || day.isOpen === false || day.closed === true) return [];
+  const nestedSlots = day.slots || day.periods || day.ranges || day.services;
+  if (Array.isArray(nestedSlots)) return nestedSlots.map(normalizeSlot).filter(Boolean);
   const slots = [];
-  const lunchStart = day.lunchStart || day.midiStart || day.noonStart;
-  const lunchEnd = day.lunchEnd || day.midiEnd || day.noonEnd;
-  const dinnerStart = day.dinnerStart || day.soirStart || day.eveningStart;
-  const dinnerEnd = day.dinnerEnd || day.soirEnd || day.eveningEnd;
+  const lunch = day.lunch || day.midi || day.noon;
+  const dinner = day.dinner || day.soir || day.evening;
+  const lunchStart = day.lunchStart || day.midiStart || day.noonStart || lunch?.start || lunch?.open || lunch?.from;
+  const lunchEnd = day.lunchEnd || day.midiEnd || day.noonEnd || lunch?.end || lunch?.close || lunch?.to;
+  const dinnerStart = day.dinnerStart || day.soirStart || day.eveningStart || dinner?.start || dinner?.open || dinner?.from;
+  const dinnerEnd = day.dinnerEnd || day.soirEnd || day.eveningEnd || dinner?.end || dinner?.close || dinner?.to;
   if (lunchStart && lunchEnd) slots.push({ open: lunchStart, close: lunchEnd });
   if (dinnerStart && dinnerEnd) slots.push({ open: dinnerStart, close: dinnerEnd });
-  if (!slots.length && day.open && day.close) slots.push({ open: day.open, close: day.close });
+  if (!slots.length) {
+    const open = day.openTime || day.openingTime || day.opensAt || day.startTime || day.start || day.from || day.open;
+    const close = day.closeTime || day.closingTime || day.closesAt || day.endTime || day.end || day.to || day.close;
+    if (open && close && open !== true) slots.push({ open, close });
+  }
   return slots.map(normalizeSlot).filter(Boolean);
 }
 
@@ -1278,10 +1296,30 @@ function normalizeTime(value) {
 
 function dayKeyFromValue(value) {
   if (typeof value === "number" || /^\d+$/.test(String(value || ""))) {
-    return DAYS[Number(value) - 1]?.[0] || "";
+    const number = Number(value);
+    if (number >= 1 && number <= 7) return DAYS[number - 1]?.[0] || "";
+    if (number >= 0 && number <= 6) return DAYS[number]?.[0] || "";
+    return "";
   }
   const clean = normalizeSlug(value);
-  return DAYS.find(([key, label]) => clean === key || clean === normalizeSlug(label))?.[0] || "";
+  const aliases = {
+    lundi: "monday",
+    mardi: "tuesday",
+    mercredi: "wednesday",
+    jeudi: "thursday",
+    vendredi: "friday",
+    samedi: "saturday",
+    dimanche: "sunday",
+    mon: "monday",
+    tue: "tuesday",
+    tuesday: "tuesday",
+    wed: "wednesday",
+    thu: "thursday",
+    fri: "friday",
+    sat: "saturday",
+    sun: "sunday"
+  };
+  return aliases[clean] || DAYS.find(([key, label]) => clean === key || clean === normalizeSlug(label))?.[0] || "";
 }
 
 function hoursHtml(hours) {
@@ -1314,9 +1352,17 @@ function setupReservationHoursUi(restaurant) {
   const form = document.querySelector("[data-public-reservation-form]");
   if (!form || restaurant.reservationEnabled === false) return;
   const dateInput = form.elements.date;
-  const timeInput = form.elements.time;
+  let timeInput = form.elements.time;
   if (dateInput && !dateInput.min) dateInput.min = new Date().toISOString().slice(0, 10);
-  if (timeInput) timeInput.step = 900;
+  if (timeInput && timeInput.tagName !== "SELECT") {
+    const select = document.createElement("select");
+    select.name = timeInput.name;
+    select.required = timeInput.required;
+    select.className = timeInput.className;
+    timeInput.replaceWith(select);
+    timeInput = select;
+  }
+  const submitButton = form.querySelector('button[type="submit"]');
   let note = form.querySelector("[data-reservation-hours-note]");
   if (!note) {
     note = document.createElement("p");
@@ -1327,11 +1373,15 @@ function setupReservationHoursUi(restaurant) {
   const updateNote = () => {
     if (!dateInput?.value) {
       note.textContent = "Choisissez une date pour afficher les horaires disponibles.";
+      populateReservationTimes(timeInput, [], "Choisissez une date");
+      if (submitButton) submitButton.disabled = true;
       return;
     }
     const date = new Date(`${dateInput.value}T00:00:00`);
     const dayKey = DAYS[(date.getDay() + 6) % 7]?.[0];
     const slots = normalizeHours(restaurant.openingHours)[dayKey] || [];
+    populateReservationTimes(timeInput, slots);
+    if (submitButton) submitButton.disabled = !slots.length;
     note.textContent = slots.length
       ? `Horaires disponibles : ${slots.map((slot) => `${slot.open} - ${slot.close}`).join(" / ")}.`
       : "Le restaurant est fermé ce jour-là. Choisissez une autre date.";
@@ -1339,6 +1389,49 @@ function setupReservationHoursUi(restaurant) {
   dateInput?.addEventListener("change", updateNote);
   timeInput?.addEventListener("change", updateNote);
   updateNote();
+}
+
+function resolveOpeningHours(data, profile) {
+  const candidates = [
+    data.openingHoursByDay,
+    profile.openingHoursByDay,
+    data.publicOpeningHours,
+    profile.publicOpeningHours,
+    data.businessHours,
+    profile.businessHours,
+    data.hours,
+    profile.hours,
+    data.openingHours,
+    profile.openingHours
+  ];
+  const defined = candidates.filter((candidate) => candidate && (Array.isArray(candidate) || typeof candidate === "object"));
+  const withSlots = defined.find((candidate) => hasAnyOpeningSlot(normalizeHours(candidate)));
+  return withSlots || defined[0] || defaultOpeningHours();
+}
+
+function hasAnyOpeningSlot(hours) {
+  return DAYS.some(([key]) => (hours[key] || []).length > 0);
+}
+
+function populateReservationTimes(input, slots, placeholder = "Aucun horaire disponible") {
+  if (!input) return;
+  const options = slots.flatMap((slot) => buildTimeOptions(slot.open, slot.close));
+  input.innerHTML = [
+    `<option value="">${escapeHtml(placeholder)}</option>`,
+    ...options.map((time) => `<option value="${escapeAttr(time)}">${escapeHtml(time)}</option>`)
+  ].join("");
+  input.disabled = options.length === 0;
+}
+
+function buildTimeOptions(open, close) {
+  const start = minutesFromTime(open);
+  const end = minutesFromTime(close);
+  if (end <= start) return [];
+  const result = [];
+  for (let minutes = start; minutes <= end; minutes += 30) {
+    result.push(`${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`);
+  }
+  return result;
 }
 
 function normalizeSlug(value) {
