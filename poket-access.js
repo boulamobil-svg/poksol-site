@@ -311,6 +311,8 @@ async function saveProfile({ final }) {
         { merge: true }
       );
 
+      await syncPublicRestaurantProfile(restaurantId, restaurantPayload);
+
       await setDoc(
         doc(firebaseServices.db, "users", currentUser.uid),
         {
@@ -824,6 +826,48 @@ function openingHoursToList(hoursByDay) {
       dinnerEnd: day.dinnerEnd || ""
     };
   });
+}
+
+async function syncPublicRestaurantProfile(restaurantId, restaurantPayload) {
+  if (!firebaseServices || !restaurantId || !restaurantPayload) return;
+  const { doc, serverTimestamp, setDoc } = firebaseServices.firestoreModule;
+  const profile = restaurantPayload.restaurantProfile || {};
+  const slug = normalizeSlug(restaurantPayload.slug || profile.slug || profile.name || restaurantPayload.name || restaurantId);
+  const openingHoursByDay = restaurantPayload.openingHoursByDay || profile.openingHoursByDay || normalizeOpeningHoursForForm(profile);
+  const publicPayload = {
+    id: restaurantId,
+    restaurantId,
+    slug,
+    name: restaurantPayload.name || profile.name || "",
+    tradeName: restaurantPayload.tradeName || profile.tradeName || restaurantPayload.name || profile.name || "",
+    logoUrl: restaurantPayload.logoUrl || profile.logoUrl || "",
+    coverUrl: restaurantPayload.coverUrl || profile.coverUrl || "",
+    description: restaurantPayload.description || profile.description || "",
+    cuisineType: restaurantPayload.cuisineType || profile.cuisineType || restaurantPayload.businessType || profile.businessType || "",
+    address: restaurantPayload.address || profile.address || "",
+    addressLine1: restaurantPayload.addressLine1 || profile.addressLine1 || "",
+    city: restaurantPayload.city || profile.city || "",
+    postalCode: restaurantPayload.postalCode || profile.postalCode || "",
+    country: restaurantPayload.country || profile.country || "France",
+    phone: restaurantPayload.phone || profile.phone || "",
+    email: restaurantPayload.email || profile.email || "",
+    website: restaurantPayload.website || profile.website || "",
+    instagram: restaurantPayload.instagram || profile.instagram || "",
+    facebook: restaurantPayload.facebook || profile.facebook || "",
+    googleMapsUrl: restaurantPayload.googleMapsUrl || profile.googleMapsUrl || "",
+    publicPageEnabled: restaurantPayload.publicPageEnabled !== false,
+    qrMenuEnabled: restaurantPayload.qrMenuEnabled === true,
+    reservationEnabled: restaurantPayload.reservationEnabled !== false,
+    openingHours: openingHoursByDay || restaurantPayload.openingHours || profile.openingHours || {},
+    updatedAt: serverTimestamp()
+  };
+  const ids = [...new Set([
+    restaurantId,
+    slug,
+    slug.replace(/-/g, "_"),
+    slug.replace(/-/g, "_").toUpperCase()
+  ].filter(Boolean))];
+  await Promise.all(ids.map((id) => setDoc(doc(firebaseServices.db, "publicRestaurants", id), publicPayload, { merge: true })));
 }
 
 function normalizeOpeningHoursForForm(profile) {

@@ -114,18 +114,47 @@ async function getRestaurant(id) {
   });
 }
 
+async function getPublicRestaurantBySlug(slug) {
+  const cleanSlug = normalizeSlug(slug);
+  if (!cleanSlug) return null;
+  const services = await getServices();
+  const { doc, getDoc } = services.firestoreModule;
+  const candidates = uniqueValues([
+    cleanSlug,
+    legacyRestaurantIdFromSlug(cleanSlug),
+    cleanSlug.replace(/-/g, "_"),
+    cleanSlug.toUpperCase()
+  ]);
+  for (const id of candidates) {
+    const snap = await getDoc(doc(services.db, "publicRestaurants", id)).catch(() => null);
+    if (snap?.exists()) return normalizeRestaurant(snap.id, snap.data());
+  }
+  return null;
+}
+
 async function getRestaurantBySlug(slug) {
   const cleanSlug = normalizeSlug(slug);
   if (!cleanSlug) return null;
-  const direct = await getRestaurant(cleanSlug);
-  if (direct) return direct;
+  const publicRestaurant = await getPublicRestaurantBySlug(cleanSlug);
+  if (publicRestaurant) return publicRestaurant;
+  const directIds = uniqueValues([
+    cleanSlug,
+    legacyRestaurantIdFromSlug(cleanSlug),
+    cleanSlug.replace(/-/g, "_"),
+    cleanSlug.toUpperCase()
+  ]);
+  for (const id of directIds) {
+    const direct = await getRestaurant(id).catch(() => null);
+    if (direct) return direct;
+  }
   const services = await getServices();
   const { collection, getDocs, limit, query, where } = services.firestoreModule;
   const snaps = await getDocs(query(
     collection(services.db, "restaurants"),
     where("slug", "==", cleanSlug),
     limit(1)
-  ));
+  )).catch(() => null);
+  if (!snaps) return null;
   if (snaps.empty) return null;
   const snap = snaps.docs[0];
   return getRestaurant(snap.id);
@@ -223,6 +252,7 @@ async function createRestaurantFromForm(form, user) {
   };
 
   await setDoc(restaurantRef, restaurant);
+  await syncPublicRestaurant(slug, restaurant);
   await setDoc(doc(services.db, "restaurants", slug, "members", user.uid), {
     uid: user.uid,
     email: user.email || "",
@@ -351,6 +381,7 @@ async function saveRestaurantProfile(restaurantId, form) {
     ...payload,
     restaurantProfile: payload
   }, { merge: true });
+  await syncPublicRestaurant(restaurantId);
 }
 
 async function saveOpeningHours(restaurantId, form) {
@@ -367,6 +398,7 @@ async function saveOpeningHours(restaurantId, form) {
     openingHours,
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await syncPublicRestaurant(restaurantId);
 }
 
 async function savePublicSettings(restaurantId, form) {
@@ -395,6 +427,7 @@ async function savePublicSettings(restaurantId, form) {
     },
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await syncPublicRestaurant(restaurantId);
 }
 
 async function saveQrMenu(restaurantId, form) {
@@ -415,6 +448,7 @@ async function saveQrMenu(restaurantId, form) {
     qrMenuEnabled: data.get("isActive") === "on",
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await syncPublicRestaurant(restaurantId);
 }
 
 async function listReservations(restaurantId) {
@@ -430,6 +464,65 @@ async function getActiveMenu(restaurantId) {
   const snap = await getDoc(doc(services.db, "restaurants", restaurantId, "menus", "main"));
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() };
+}
+
+async function syncPublicRestaurant(restaurantId, restaurantOverride = null) {
+  if (!restaurantId) return;
+  const services = await getServices();
+  const { doc, getDoc, serverTimestamp, setDoc } = services.firestoreModule;
+  const restaurant = restaurantOverride || await getRestaurant(restaurantId).catch(() => null);
+  if (!restaurant) return;
+  const menuSnap = await getDoc(doc(services.db, "restaurants", restaurant.id || restaurantId, "menus", "main")).catch(() => null);
+  const menu = menuSnap?.exists() ? { id: menuSnap.id, ...menuSnap.data() } : null;
+  const publicData = buildPublicRestaurantPayload(restaurant, menu, serverTimestamp());
+  const ids = uniqueValues([
+    publicData.id,
+    publicData.slug,
+    legacyRestaurantIdFromSlug(publicData.slug),
+    String(publicData.id || "").replace(/-/g, "_")
+  ]).filter(Boolean);
+  await Promise.all(ids.map((id) => setDoc(doc(services.db, "publicRestaurants", id), publicData, { merge: true })));
+}
+
+function buildPublicRestaurantPayload(restaurant, menu, updatedAt) {
+  const normalized = normalizeRestaurant(restaurant.id || restaurant.restaurantId || restaurant.slug, restaurant);
+  const slug = normalizeSlug(normalized.slug || normalized.name || normalized.id);
+  const openingHours = normalizeHours(normalized.openingHours);
+  return {
+    id: normalized.id,
+    restaurantId: normalized.restaurantId || normalized.id,
+    slug,
+    name: normalized.name,
+    tradeName: normalized.tradeName || normalized.name,
+    logoUrl: normalized.logoUrl || "",
+    coverUrl: normalized.coverUrl || "",
+    description: normalized.description || "",
+    cuisineType: normalized.cuisineType || "",
+    address: normalized.address || normalized.addressLine1 || "",
+    addressLine1: normalized.addressLine1 || normalized.address || "",
+    city: normalized.city || "",
+    postalCode: normalized.postalCode || "",
+    country: normalized.country || "France",
+    phone: normalized.phone || "",
+    email: normalized.email || "",
+    website: normalized.website || "",
+    instagram: normalized.instagram || "",
+    facebook: normalized.facebook || "",
+    googleMapsUrl: normalized.googleMapsUrl || "",
+    publicPageEnabled: normalized.publicPageEnabled !== false,
+    qrMenuEnabled: normalized.qrMenuEnabled === true || menu?.isActive === true,
+    reservationEnabled: normalized.reservationEnabled !== false,
+    openingHours,
+    menu: menu ? {
+      title: menu.title || "Menu principal",
+      type: menu.type || "",
+      externalUrl: menu.externalUrl || "",
+      pdfUrl: menu.pdfUrl || "",
+      items: Array.isArray(menu.items) ? menu.items : [],
+      isActive: menu.isActive === true
+    } : null,
+    updatedAt
+  };
 }
 
 async function updateReservationStatus(restaurantId, reservationId, status) {
@@ -699,7 +792,7 @@ function initPublicRestaurantPage() {
     loadedRestaurant = restaurant;
     if (restaurant && restaurant.publicPageEnabled !== false) {
       const menu = await getActiveMenu(restaurant.id).catch(() => null);
-      hydratePublicRestaurant(root, restaurant, menu);
+      hydratePublicRestaurant(root, restaurant, menu || restaurant.menu || null);
     }
   }).catch(() => {});
   const reservationForm = document.querySelector("[data-public-reservation-form]");
@@ -1443,6 +1536,14 @@ function normalizeSlug(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 64);
+}
+
+function legacyRestaurantIdFromSlug(value) {
+  return normalizeSlug(value).replace(/-/g, "_").toUpperCase();
+}
+
+function uniqueValues(values) {
+  return [...new Set(values.filter(Boolean))];
 }
 
 function normalizeCode(value) {

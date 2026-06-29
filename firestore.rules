@@ -99,6 +99,16 @@ service cloud.firestore {
         || isLegacyRestaurantOwner();
     }
 
+    function publicRestaurantPath(restaurantId) {
+      return /databases/$(database)/documents/publicRestaurants/$(restaurantId);
+    }
+
+    function publicRestaurantAllowsReservations(restaurantId) {
+      return exists(publicRestaurantPath(restaurantId))
+        && get(publicRestaurantPath(restaurantId)).data.publicPageEnabled == true
+        && get(publicRestaurantPath(restaurantId)).data.reservationEnabled == true;
+    }
+
     function createsOwnStaffRecord(restaurantId) {
       return signedIn()
         && request.resource.data.uid == request.auth.uid
@@ -146,8 +156,10 @@ service cloud.firestore {
       }
 
       match /reservations/{reservationId} {
-        allow create: if get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.publicPageEnabled == true
-          && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.reservationEnabled == true;
+        allow create: if (
+          get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.publicPageEnabled == true
+          && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.reservationEnabled == true
+        ) || publicRestaurantAllowsReservations(restaurantId);
         allow read: if isRestaurantMember(restaurantId);
         allow update: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]);
         allow delete: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
@@ -209,6 +221,16 @@ service cloud.firestore {
     match /contactMessages/{messageId} {
       allow create: if true;
       allow read, update, delete: if false;
+    }
+
+    match /publicRestaurants/{restaurantId} {
+      allow read: if resource.data.publicPageEnabled == true;
+      allow create, update: if signedIn()
+        && (
+          hasRestaurantRole(request.resource.data.restaurantId, ["owner", "admin", "manager"])
+          || userReferencesRestaurant(request.resource.data.restaurantId)
+        );
+      allow delete: if false;
     }
   }
 }
