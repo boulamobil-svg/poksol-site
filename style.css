@@ -6,17 +6,50 @@
   --poksol-navy: #0A2540;
   --poksol-blue: #1976F3;
   --poksol-green: #42C96F;
+  --poksol-ink: #06192e;
+  --poksol-blue-dark: #0f61d8;
+  --card-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
+  --card-shadow-strong: 0 26px 70px rgba(10, 37, 64, 0.16);
   --surface: #f4f7fb;
   --surface-warm: #fbfaf7;
   --text-muted: #475569;
   --line: #d9e3ef;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: var(--surface);
+  font-family: "Aptos Display", "Bahnschrift", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(25, 118, 243, 0.08), transparent 28rem),
+    var(--surface);
   color: var(--poksol-navy);
+  text-rendering: optimizeLegibility;
+}
+
+body::selection {
+  color: white;
+  background: var(--poksol-blue);
+}
+
+a,
+button,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(66, 201, 111, 0.75);
+  outline-offset: 3px;
 }
 
 .hero {
@@ -45,6 +78,8 @@ body {
   gap: 28px;
   max-width: 1180px;
   margin: 0 auto;
+  position: relative;
+  z-index: 5;
 }
 
 .product-hero-content {
@@ -119,7 +154,8 @@ body {
   padding: 12px 18px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
 }
 
 .nav-links a,
@@ -127,6 +163,29 @@ body {
   color: white;
   text-decoration: none;
   font-weight: 700;
+}
+
+.nav-links a {
+  position: relative;
+  opacity: 0.84;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.nav-links a:hover,
+.nav-links a.is-active {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.nav-links a.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -15px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--poksol-green);
 }
 
 .demo-btn,
@@ -140,6 +199,16 @@ body {
   border-radius: 12px;
   font-weight: 800;
   box-shadow: 0 14px 35px rgba(25, 118, 243, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.demo-btn:hover,
+.primary-btn:hover,
+.product-action:hover,
+.app-link:hover {
+  background: var(--poksol-blue-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 18px 44px rgba(25, 118, 243, 0.42);
 }
 
 .hero-content {
@@ -213,6 +282,13 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.35);
   padding: 15px 24px;
   border-radius: 12px;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.outline-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .badges {
@@ -395,9 +471,9 @@ body {
   align-items: center;
   background: white;
   padding: 34px;
-  border-radius: 8px;
+  border-radius: 24px;
   border: 1px solid var(--line);
-  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
+  box-shadow: var(--card-shadow);
   text-align: left;
 }
 
@@ -409,7 +485,7 @@ body {
 
 .single-product-link:hover {
   transform: translateY(-2px);
-  box-shadow: 0 22px 55px rgba(10, 37, 64, 0.12);
+  box-shadow: var(--card-shadow-strong);
 }
 
 .single-product img,
@@ -447,10 +523,10 @@ body {
 }
 
 .features-list span {
-  background: #edf6ff;
+  background: linear-gradient(135deg, #edf6ff, #f6fbff);
   color: var(--poksol-navy);
   border: 1px solid #d3e5ff;
-  border-radius: 8px;
+  border-radius: 999px;
   padding: 8px 14px;
   font-size: 14px;
   font-weight: 700;
@@ -476,7 +552,7 @@ body {
   background:
     radial-gradient(circle at top right, rgba(66, 201, 111, 0.14), transparent 32%),
     linear-gradient(135deg, #ffffff 0%, #f5f9ff 100%);
-  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
+  box-shadow: var(--card-shadow);
   text-align: left;
 }
 
@@ -530,6 +606,7 @@ body {
   display: grid;
   grid-template-columns: repeat(3, minmax(170px, 1fr));
   gap: 14px;
+  padding-top: 4px;
 }
 
 .product-access-actions .primary-btn,
@@ -558,7 +635,7 @@ body {
   max-width: 980px;
   margin: 30px auto 0;
   padding: 24px;
-  border-radius: 16px;
+  border-radius: 22px;
   background: #f0f8f3;
   border: 1px solid #cbeed8;
   text-align: left;
@@ -811,7 +888,7 @@ body {
   background: white;
   border: 1px solid var(--line);
   border-radius: 22px;
-  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .portal-panel {
@@ -910,6 +987,14 @@ body {
   font-family: inherit;
   font-weight: 800;
   padding: 13px 16px;
+  text-decoration: none;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.ghost-action:hover {
+  transform: translateY(-2px);
+  border-color: #9bc7ff;
+  background: #e4f1ff;
 }
 
 .prepared-notice {
@@ -964,7 +1049,7 @@ body {
   border: 1px solid var(--line);
   border-radius: 22px;
   background: white;
-  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .platform-card + .platform-card,
@@ -1023,6 +1108,19 @@ body {
   font: inherit;
   font-weight: 700;
   padding: 14px 16px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.platform-form input:focus,
+.platform-form textarea:focus,
+.platform-form select:focus,
+.form-grid input:focus,
+.form-grid select:focus,
+.form-grid textarea:focus,
+.hours-row input:focus {
+  border-color: var(--poksol-blue);
+  background: white;
+  box-shadow: 0 0 0 4px rgba(25, 118, 243, 0.12);
 }
 
 .platform-form input[type="checkbox"] {
@@ -1059,6 +1157,13 @@ body {
   border: 1px solid #d3e5ff;
   border-radius: 18px;
   background: #f8fbff;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.restaurant-mini-card:hover {
+  transform: translateY(-2px);
+  border-color: #9bc7ff;
+  box-shadow: 0 14px 34px rgba(10, 37, 64, 0.09);
 }
 
 .restaurant-mini-card strong,
@@ -1132,6 +1237,9 @@ body {
   padding: 12px;
   border-radius: 18px;
   background: #edf6ff;
+  position: sticky;
+  top: 12px;
+  z-index: 4;
 }
 
 .dashboard-tabs button {
@@ -1823,7 +1931,7 @@ body {
   border: 1px solid var(--line);
   border-radius: 24px;
   background: white;
-  box-shadow: 0 18px 45px rgba(10, 37, 64, 0.08);
+  box-shadow: var(--card-shadow);
 }
 
 .access-sidebar {
@@ -1837,6 +1945,13 @@ body {
   border-radius: 18px;
   background: #f5f9ff;
   border: 1px solid #d3e5ff;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.access-user-card:hover {
+  transform: translateY(-2px);
+  border-color: #9bc7ff;
+  box-shadow: 0 14px 34px rgba(10, 37, 64, 0.08);
 }
 
 .access-user-card h2 {
@@ -1881,9 +1996,14 @@ body {
   display: grid;
   gap: 10px;
   margin-top: 18px;
+  counter-reset: access-step;
 }
 
 .access-steps button {
+  counter-increment: access-step;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border: 1px solid transparent;
   border-radius: 14px;
   padding: 13px 14px;
@@ -1893,11 +2013,29 @@ body {
   font: inherit;
   font-weight: 900;
   text-align: left;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.access-steps button::before {
+  content: counter(access-step, decimal-leading-zero);
+  color: var(--poksol-green);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.access-steps button:hover {
+  transform: translateX(2px);
+  border-color: #d3e5ff;
+  background: #edf6ff;
 }
 
 .access-steps button.is-active {
   color: white;
   background: var(--poksol-blue);
+}
+
+.access-steps button.is-active::before {
+  color: white;
 }
 
 .access-form-card {
@@ -1989,6 +2127,7 @@ body {
   color: var(--poksol-navy);
   font: inherit;
   padding: 14px 15px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .wide-field,
@@ -2103,6 +2242,12 @@ body {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: #f8fafc;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.hours-row:focus-within {
+  border-color: #9bc7ff;
+  box-shadow: 0 12px 28px rgba(10, 37, 64, 0.07);
 }
 
 .day-toggle {
@@ -2161,6 +2306,13 @@ body {
   font: inherit;
   font-weight: 900;
   padding: 15px 24px;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.outline-dark-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--poksol-blue);
+  background: #f8fbff;
 }
 
 .is-hidden {
@@ -2179,7 +2331,21 @@ body {
   }
 
   .nav-links {
-    display: none;
+    order: 3;
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    border-radius: 20px;
+  }
+
+  .nav-links a {
+    padding: 6px 8px;
+  }
+
+  .nav-links a.is-active::after {
+    bottom: -5px;
   }
 
   .hero-content,
@@ -2301,6 +2467,7 @@ body {
   .dashboard-tabs {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
+    position: static;
   }
 
   .admin-public-page-card,
@@ -2371,5 +2538,14 @@ body {
 
   .access-form-actions {
     justify-content: center;
+  }
+
+  .demo-btn,
+  .primary-btn,
+  .outline-btn,
+  .outline-dark-btn,
+  .product-action,
+  .ghost-action {
+    width: 100%;
   }
 }
