@@ -1,0 +1,15 @@
+﻿{
+    "releaseId":  "1.0.6+18",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  18,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+18.apk",
+    "apkSha256":  "5569e66837578d624685a7050b1edb575b22dbd0bc5b7aef9ed8192f9fdf32dd",
+    "apkFileSize":  89798200,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+18 : simplification securisee de l impression via Firestore relay, suppression du relais LAN/P2P applicatif, demarrage plus rapide de la queue impression et cloture paiement plus fluide.",
+    "publishedAt":  "2026-06-30T07:43:34Z",
+    "updatedAt":  "2026-06-30T07:43:34Z"
+}
