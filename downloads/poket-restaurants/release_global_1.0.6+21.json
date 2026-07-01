@@ -1,0 +1,15 @@
+﻿{
+    "releaseId":  "1.0.6+21",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  21,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+21.apk",
+    "apkSha256":  "faedd51c6dbf94c81ebe4515295526e2156110086ba55a1e5c01b7467f639727",
+    "apkFileSize":  90371290,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+21 : correctif categories sans imprimante production, elles ne bloquent plus l envoi ni la cloture du ticket; inclut aussi la transaction compte client.",
+    "publishedAt":  "2026-07-01T16:52:35Z",
+    "updatedAt":  "2026-07-01T16:52:35Z"
+}
