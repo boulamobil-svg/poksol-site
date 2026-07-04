@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+25",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  25,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+25.apk",
+    "apkSha256":  "3f667b8128723c61b0cea93bc273c9829617e0b3ca41099137a4541d5accbe34",
+    "apkFileSize":  90420442,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+25 : correctif diagnostic impression, file impression reactive apres reconnexion, message erreur visible au clic Envoyer.",
+    "publishedAt":  "2026-07-04T18:35:23Z",
+    "updatedAt":  "2026-07-04T18:35:23Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+25.zip",
+    "webSha256":  "90d5732906ff5dba99b00db9cfd069f7934cee065bd5aa46894ec4cd762e7d9f",
+    "webFileSize":  14450203,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+25.zip",
+    "windowsSha256":  "d9d01531bac4c55c30e7091b662a256eab8f5a51b0a9bdf3e56a6135a2d4b4a3",
+    "windowsFileSize":  21966489
+}
