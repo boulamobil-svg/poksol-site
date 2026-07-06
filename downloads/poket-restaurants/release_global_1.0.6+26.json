@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+26",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  26,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+26.apk",
+    "apkSha256":  "78aedc5b34bc3ee2755fa174f88bba6d4c821fc2ad20f725066707f9d6ff5d36",
+    "apkFileSize":  90567898,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+26 : bouton Reclamer la suite et ticket cuisine de reclamation suite.",
+    "publishedAt":  "2026-07-06T11:22:48Z",
+    "updatedAt":  "2026-07-06T11:22:48Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+26.zip",
+    "webSha256":  "1646f1a2295e4f8f72ab950a91ad759f3ecb61572528d166e286516a5ff6b85f",
+    "webFileSize":  14451591,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+26.zip",
+    "windowsSha256":  "b7c192b8ea875fbcd2ddf4a74ff0329ec03ea181fcfb5b03bba8cf4b917e1cd6",
+    "windowsFileSize":  21968744
+}
