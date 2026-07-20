@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+27",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  27,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+27.apk",
+    "apkSha256":  "061d6e71905ffd409ea104d618211e85452b2b72fb1c8dad3c2aa8505aff997b",
+    "apkFileSize":  92698610,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+27 : creation de devis, export PDF et reprise en commande.",
+    "publishedAt":  "2026-07-20T15:17:28Z",
+    "updatedAt":  "2026-07-20T15:17:28Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+27.zip",
+    "webSha256":  "102f175e29c92ace90b1a797e89894a37f36e81cb1b5eba3913fd3701a7f88ef",
+    "webFileSize":  14644727,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+27.zip",
+    "windowsSha256":  "4f8cc43d87fefa1542e45407b3c1c8762a8e4488401e8b1c1e2c4ff17b02e82b",
+    "windowsFileSize":  22352453
+}
