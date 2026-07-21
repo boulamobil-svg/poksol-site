@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+28",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  28,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+28.apk",
+    "apkSha256":  "63687d898f62ce305e2fc08ea3837b5a4ccb0e50e9d2b59e7381892216d37171",
+    "apkFileSize":  96057442,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+28 : fiabilisation des impressions differees/retry, verrouillage des lignes en impression et tickets caisse plus clairs apres annulation.",
+    "publishedAt":  "2026-07-21T15:52:01Z",
+    "updatedAt":  "2026-07-21T15:52:01Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+28.zip",
+    "webSha256":  "df845ec5045f93d598850e2ceae826b1ad98a2745535580b36b811360fe31489",
+    "webFileSize":  14751998,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+28.zip",
+    "windowsSha256":  "620ca2642339bec09962151cfa33be0f39747d113c2669655a71f87d3c8db19b",
+    "windowsFileSize":  22748065
+}
