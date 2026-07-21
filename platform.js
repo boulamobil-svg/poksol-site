@@ -9,7 +9,7 @@ const firebaseConfig = {
 
 const DOWNLOADS = {
   web: "/apps/poket-restaurants/",
-  android: "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+28.apk",
+  android: "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+29.apk",
   windows: "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+28.zip"
 };
 
