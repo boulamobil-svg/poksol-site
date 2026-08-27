@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+32",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  32,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+32.apk",
+    "apkSha256":  "58320ea4bd017096f918039f325e128b168bad0993946cead3277f73116b91f7",
+    "apkFileSize":  96073826,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+32 : devis PDF, le logo restaurant remplace le nom quand logoUrl est renseigne.",
+    "publishedAt":  "2026-08-27T20:32:09Z",
+    "updatedAt":  "2026-08-27T20:32:09Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+32.zip",
+    "webSha256":  "7039175eeb76d369c0602692076752cb2cdaa884cf75690ab60cabfe83d2511b",
+    "webFileSize":  14772881,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+32.zip",
+    "windowsSha256":  "0e33a5d64891835991f88060a4c4290568fe1e60912d89895ea7927ecea7a98a",
+    "windowsFileSize":  22750493
+}
