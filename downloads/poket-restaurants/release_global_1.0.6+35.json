@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+35",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  35,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+35.apk",
+    "apkSha256":  "162269887165d6c8ecf7bd217a947fb0a700c340f3d4861bce7363bd0eede2d4",
+    "apkFileSize":  96090210,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+35 : apercu caisse client sans lignes annulation article.",
+    "publishedAt":  "2026-09-03T22:17:56Z",
+    "updatedAt":  "2026-09-03T22:17:56Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+35.zip",
+    "webSha256":  "1c8c7221811380a77696e99387b482183a522c87b77f9c8f554db49fec98d0c9",
+    "webFileSize":  14775927,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+35.zip",
+    "windowsSha256":  "ec478afa83feee5ec7e8ccaeeadde62f2979514646360973d42dd5b02775c323",
+    "windowsFileSize":  22762680
+}
