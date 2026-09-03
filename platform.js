@@ -1,4 +1,4 @@
-const firebaseConfig = {
+﻿const firebaseConfig = {
   apiKey: "AIzaSyCRhBXuuJhbSDo9e4kQEEvc1x28HfxAi_E",
   authDomain: "restaurantpos-7a4f0d11.firebaseapp.com",
   projectId: "restaurantpos-7a4f0d11",
@@ -9,8 +9,8 @@ const firebaseConfig = {
 
 const DOWNLOADS = {
   web: "/apps/poket-restaurants/",
-  android: "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+29.apk",
-  windows: "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+28.zip"
+  android: "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+34.apk",
+  windows: "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+34.zip"
 };
 
 const DAYS = [
@@ -585,7 +585,7 @@ async function submitReservation(restaurant, form) {
     throw new Error("Nom, telephone, date et heure sont obligatoires.");
   }
   if (!isReservationWithinOpeningHours(restaurant.openingHours, payload.date, payload.time)) {
-    throw new Error("Ce créneau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
+    throw new Error("Ce crÃ©neau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
   }
   await addDoc(collection(services.db, "restaurants", restaurant.id, "reservations"), payload);
 }
@@ -1477,7 +1477,7 @@ function setupReservationHoursUi(restaurant) {
     if (submitButton) submitButton.disabled = !slots.length;
     note.textContent = slots.length
       ? `Horaires disponibles : ${slots.map((slot) => `${slot.open} - ${slot.close}`).join(" / ")}.`
-      : "Le restaurant est fermé ce jour-là. Choisissez une autre date.";
+      : "Le restaurant est fermÃ© ce jour-lÃ . Choisissez une autre date.";
   };
   dateInput?.addEventListener("change", updateNote);
   timeInput?.addEventListener("change", updateNote);
@@ -1596,3 +1596,4 @@ initAccountPage();
 initDashboardPage();
 initPublicRestaurantPage();
 initContactForms();
+

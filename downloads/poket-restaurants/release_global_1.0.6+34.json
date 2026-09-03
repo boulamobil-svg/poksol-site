@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+34",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  34,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+34.apk",
+    "apkSha256":  "310d960a946827925e08b8fa549c2470889c91a129ca88192564b9c94b6cc3ec",
+    "apkFileSize":  96073826,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+34 : correction apostrophes PDF des devis.",
+    "publishedAt":  "2026-09-03T17:46:09Z",
+    "updatedAt":  "2026-09-03T17:46:09Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+34.zip",
+    "webSha256":  "e343773bf518e642e8e0295dba441a9cb8badec7cbd47909c693773184e23dab",
+    "webFileSize":  14774128,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+34.zip",
+    "windowsSha256":  "18b1ac87a2e3c7d85f92c90519288efb0c0be899ff19c1c37cec74e7fa564dbb",
+    "windowsFileSize":  22752381
+}
