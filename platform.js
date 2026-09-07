@@ -980,6 +980,12 @@ function initPublicRestaurantPage() {
 function initPublicMenuPage() {
   const root = document.querySelector("[data-public-menu-page]");
   if (!root) return;
+  document.querySelectorAll("[data-menu-drawer-toggle]").forEach((button) => {
+    button.addEventListener("click", () => toggleMenuDrawer(true));
+  });
+  document.querySelectorAll("[data-menu-drawer-close]").forEach((button) => {
+    button.addEventListener("click", () => toggleMenuDrawer(false));
+  });
   const slug = root.dataset.restaurantSlug || new URLSearchParams(window.location.search).get("slug") || "chez-marwan";
   getRestaurantBySlug(slug).then((restaurant) => {
     if (!restaurant || restaurant.publicPageEnabled === false) {
@@ -1088,6 +1094,7 @@ function hydratePublicMenuPage(root, restaurant, menu) {
   if (backLink) backLink.href = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
   if (logo) logo.src = restaurant.logoUrl || "../poksol_icon.svg";
   renderPublicMenuContent(content, restaurant, menu);
+  hydrateMenuCategoryNavigation(menu);
 }
 
 function renderPublicMenuContent(menuContainer, restaurant, menu) {
@@ -1100,8 +1107,10 @@ function renderPublicMenuContent(menuContainer, restaurant, menu) {
     menuContainer.innerHTML = publicMenuEmptyHtml("Menu bientot disponible");
   } else if (menu?.categories?.length) {
     menuContainer.classList.add("public-menu-category-list");
-    menuContainer.innerHTML = menu.categories.map((category) => `
-      <section class="public-menu-category">
+    menuContainer.innerHTML = menu.categories.map((category, index) => {
+      const categoryId = menuCategoryDomId(category, index);
+      return `
+      <section class="public-menu-category" id="${escapeAttr(categoryId)}" data-menu-category-section="${escapeAttr(categoryId)}">
         <div class="public-menu-category-heading">
           <span>${escapeHtml(category.displayName || category.name || "Menu")}</span>
           ${category.description ? `<p>${escapeHtml(category.description)}</p>` : ""}
@@ -1120,7 +1129,8 @@ function renderPublicMenuContent(menuContainer, restaurant, menu) {
           `).join("")}
         </div>
       </section>
-    `).join("");
+    `;
+    }).join("");
   } else if (menuContainer && menu?.items?.length) {
     menuContainer.classList.remove("public-menu-category-list");
     menuContainer.innerHTML = menu.items.map((item) => `
@@ -1135,6 +1145,33 @@ function renderPublicMenuContent(menuContainer, restaurant, menu) {
       </article>
     `).join("");
   }
+}
+
+function hydrateMenuCategoryNavigation(menu) {
+  const categories = Array.isArray(menu?.categories) ? menu.categories : [];
+  const strip = document.querySelector("[data-menu-category-strip]");
+  const drawerList = document.querySelector("[data-menu-drawer-list]");
+  const html = categories.map((category, index) => {
+    const categoryId = menuCategoryDomId(category, index);
+    const label = category.displayName || category.name || "Menu";
+    return `<a href="#${escapeAttr(categoryId)}" data-menu-category-jump>${escapeHtml(label)}</a>`;
+  }).join("");
+  if (strip) {
+    strip.innerHTML = html;
+    strip.hidden = !categories.length;
+  }
+  if (drawerList) drawerList.innerHTML = html || `<span>Aucune categorie publiee.</span>`;
+  document.querySelectorAll("[data-menu-category-jump]").forEach((link) => {
+    link.addEventListener("click", () => toggleMenuDrawer(false));
+  });
+}
+
+function toggleMenuDrawer(open) {
+  const drawer = document.querySelector("[data-menu-category-drawer]");
+  if (!drawer) return;
+  drawer.classList.toggle("is-open", open);
+  drawer.setAttribute("aria-hidden", open ? "false" : "true");
+  document.body.classList.toggle("menu-drawer-open", open);
 }
 
 function publicMenuEmptyHtml(title) {
@@ -1156,6 +1193,10 @@ function publicMenuUrl(restaurant) {
 
 function displayMenuItemPrice(item = {}) {
   return item.priceLabel || formatPrice(firstText(item.price, item.priceOnSite, item.priceTakeaway, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount));
+}
+
+function menuCategoryDomId(category = {}, index = 0) {
+  return `categorie-${normalizeSlug(category.displayName || category.name || category.id || index) || index}`;
 }
 
 function accountSignedOutHtml() {

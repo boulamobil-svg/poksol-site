@@ -4,11 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Menu restaurant | Poksol</title>
-  <link rel="stylesheet" href="../style.css?v=20260907-14" />
+  <link rel="stylesheet" href="../style.css?v=20260907-15" />
 </head>
 <body class="restaurant-public-body menu-page-body" data-public-menu-page>
   <header class="menu-page-header">
     <nav class="menu-page-nav">
+      <button class="menu-page-menu-button button-reset" type="button" data-menu-drawer-toggle aria-label="Afficher les categories">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
       <a href="../index.html" class="restaurant-powered-brand">
         <img src="../poksol_icon.svg" alt="Poksol" />
         <span>Propulse par <strong>POKSOL</strong></span>
@@ -24,6 +29,8 @@
     </section>
   </header>
 
+  <nav class="menu-category-strip" aria-label="Categories du menu" data-menu-category-strip></nav>
+
   <main class="menu-page-main">
     <section class="public-menu-category-list" data-menu-page-content>
       <article class="menu-item-card">
@@ -37,7 +44,18 @@
     </section>
   </main>
 
+  <aside class="menu-category-drawer" data-menu-category-drawer aria-hidden="true">
+    <button class="menu-drawer-backdrop button-reset" type="button" data-menu-drawer-close aria-label="Fermer"></button>
+    <div class="menu-drawer-panel">
+      <div class="menu-drawer-head">
+        <strong>Categories</strong>
+        <button class="ghost-action" type="button" data-menu-drawer-close>Fermer</button>
+      </div>
+      <div class="menu-drawer-list" data-menu-drawer-list></div>
+    </div>
+  </aside>
+
   <script src="../app.js?v=20260628-4"></script>
-  <script type="module" src="../platform.js?v=20260907-14"></script>
+  <script type="module" src="../platform.js?v=20260907-15"></script>
 </body>
 </html>
