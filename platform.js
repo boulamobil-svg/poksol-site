@@ -955,7 +955,8 @@ function initPublicRestaurantPage() {
   getRestaurantBySlug(slug).then(async (restaurant) => {
     loadedRestaurant = restaurant;
     if (restaurant && restaurant.publicPageEnabled !== false) {
-      const menu = await getActiveMenu(restaurant.id).catch(() => null);
+      const embeddedMenu = restaurant.menu?.categories?.length ? restaurant.menu : null;
+      const menu = embeddedMenu || await getActiveMenu(restaurant.restaurantId || restaurant.id).catch(() => null);
       hydratePublicRestaurant(root, restaurant, menu || restaurant.menu || null);
     }
   }).catch(() => {});
