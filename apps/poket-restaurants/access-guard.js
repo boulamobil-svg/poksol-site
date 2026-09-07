@@ -7,6 +7,14 @@
     try {
       const session = JSON.parse(window.localStorage.getItem(sessionKey) || "null");
       const profile = JSON.parse(window.localStorage.getItem(profileKey) || "null");
+      if (
+        session &&
+        session.active === true &&
+        session.profileComplete === true &&
+        session.restaurantId
+      ) {
+        return true;
+      }
       return Boolean(
         session &&
         session.active === true &&

@@ -117,6 +117,17 @@ service cloud.firestore {
         && request.resource.data.role in ["owner", "admin", "manager", "staff"];
     }
 
+    function acceptsInviteOnly() {
+      return signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "acceptedBy",
+          "lastAcceptedBy",
+          "lastAcceptedAt",
+          "updatedAt"
+        ])
+        && request.resource.data.lastAcceptedBy == request.auth.uid;
+    }
+
     match /users/{uid} {
       allow read, create, update: if isSelf(uid);
       allow delete: if false;
@@ -195,10 +206,7 @@ service cloud.firestore {
       allow update: if signedIn()
         && (
           hasRestaurantRole(resource.data.restaurantId, ["owner", "admin"])
-          || (
-            request.resource.data.status == "accepted"
-            && request.resource.data.acceptedByUid == request.auth.uid
-          )
+          || acceptsInviteOnly()
         );
       allow delete: if false;
     }
@@ -210,10 +218,7 @@ service cloud.firestore {
       allow update: if signedIn()
         && (
           hasRestaurantRole(resource.data.restaurantId, ["owner", "admin"])
-          || (
-            request.resource.data.status == "accepted"
-            && request.resource.data.acceptedByUid == request.auth.uid
-          )
+          || acceptsInviteOnly()
         );
       allow delete: if false;
     }

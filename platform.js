@@ -297,7 +297,7 @@ async function joinRestaurantWithCode(code, user) {
   if (!inviteSnap.exists()) throw new Error("Invitation introuvable.");
 
   const invite = inviteSnap.data();
-  if (["accepted", "revoked", "expired"].includes(invite.status) || invite.active === false) {
+  if (["revoked", "expired"].includes(invite.status) || invite.active === false) {
     throw new Error("Invitation inactive ou expiree.");
   }
   if (invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date()) {
@@ -310,6 +310,20 @@ async function joinRestaurantWithCode(code, user) {
   if (!restaurantId) throw new Error("Invitation incomplete : restaurant manquant.");
 
   const role = invite.role || "staff";
+  const staffPayload = {
+    uid: user.uid,
+    userId: user.uid,
+    restaurantId,
+    email: user.email || "",
+    displayName: user.displayName || "",
+    role,
+    active: true,
+    status: "active",
+    inviteCode: normalizedCode,
+    joinedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+  await setDoc(doc(services.db, "restaurants", restaurantId, "staff", user.uid), staffPayload, { merge: true });
   await setDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid), {
     uid: user.uid,
     email: user.email || "",
@@ -319,21 +333,27 @@ async function joinRestaurantWithCode(code, user) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await setDoc(doc(services.db, "restaurants", restaurantId, "staff_users", user.uid), {
+    ...staffPayload,
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
   await setDoc(doc(services.db, "users", user.uid), {
     uid: user.uid,
     email: user.email || "",
     displayName: user.displayName || "",
     activeRestaurantId: restaurantId,
     restaurantIds: arrayUnion(restaurantId),
+    joinedInviteCode: normalizedCode,
     updatedAt: serverTimestamp()
   }, { merge: true });
   await updateDoc(inviteRef, {
-    status: "accepted",
-    acceptedAt: serverTimestamp(),
-    acceptedByUid: user.uid,
+    acceptedBy: arrayUnion(user.uid),
+    lastAcceptedBy: user.uid,
+    lastAcceptedAt: serverTimestamp(),
     updatedAt: serverTimestamp()
-  });
+  }).catch(() => {});
   localStorage.setItem("poksolActiveRestaurantId", restaurantId);
+  saveAccessSessionForRestaurant(user, restaurantId, normalizedCode, role);
   return getRestaurant(restaurantId);
 }
 
@@ -1439,6 +1459,20 @@ function isReservationWithinOpeningHours(hours, dateValue, timeValue) {
 function minutesFromTime(value) {
   const [hours, minutes] = normalizeTime(value).split(":").map(Number);
   return (hours || 0) * 60 + (minutes || 0);
+}
+
+function saveAccessSessionForRestaurant(user, restaurantId, inviteCode = "", role = "") {
+  localStorage.setItem("poksolAccessSession", JSON.stringify({
+    active: true,
+    userId: user?.uid || "",
+    email: user?.email || "",
+    restaurantId,
+    profileComplete: true,
+    source: inviteCode ? "invite" : "account",
+    inviteCode,
+    role,
+    updatedAt: new Date().toISOString()
+  }));
 }
 
 function setupReservationHoursUi(restaurant) {

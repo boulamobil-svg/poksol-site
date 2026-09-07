@@ -621,8 +621,12 @@ async function acceptInviteCode(inviteCode) {
       arrayUnion
     } = firebaseServices.firestoreModule;
 
-    const inviteRef = doc(firebaseServices.db, INVITE_COLLECTION, code);
-    const inviteSnapshot = await getDoc(inviteRef);
+    let inviteRef = doc(firebaseServices.db, INVITE_COLLECTION, code);
+    let inviteSnapshot = await getDoc(inviteRef);
+    if (!inviteSnapshot.exists()) {
+      inviteRef = doc(firebaseServices.db, "invitations", code);
+      inviteSnapshot = await getDoc(inviteRef);
+    }
     if (!inviteSnapshot.exists()) {
       inviteStatus.textContent = "Invitation introuvable ou expiree.";
       return false;
@@ -731,7 +735,12 @@ async function acceptInviteCode(inviteCode) {
       saveLocalProfile(profile);
       hydrateForm(profile);
     }
-    saveSession(Boolean(profile && validateProfile(profile).minimumOk));
+    saveSession(true, {
+      restaurantId,
+      source: "invite",
+      inviteCode: code,
+      role
+    });
     inviteStatus.textContent = `Restaurant rejoint : ${profile?.name || invite.restaurantName || restaurantId}.`;
     if (stayOnAccessPage) {
       statusBox.textContent = "Restaurant existant associe a votre compte. Vous pouvez maintenant verifier ou modifier ses informations.";
@@ -924,14 +933,15 @@ function updateSummary() {
   `;
 }
 
-function saveSession(profileComplete) {
+function saveSession(profileComplete, extra = {}) {
   localStorage.setItem(ACCESS_SESSION_KEY, JSON.stringify({
     active: true,
     userId: currentUser?.uid || "preview-user",
     email: currentUser?.email || "",
     restaurantId: restaurantContext.restaurantId || "",
     profileComplete,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    ...extra
   }));
 }
 
