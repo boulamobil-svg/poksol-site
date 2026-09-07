@@ -791,16 +791,41 @@ async function renderDashboard(root, user, restaurantId) {
   }
   localStorage.setItem("poksolActiveRestaurantId", restaurant.id);
   root.dataset.restaurantId = restaurant.id;
-  const services = await getServices();
-  const { doc, getDoc } = services.firestoreModule;
-  const memberSnap = await getDoc(doc(services.db, "restaurants", restaurant.id, "members", user.uid)).catch(() => null);
-  const role = memberSnap?.exists() ? memberSnap.data().role : restaurant.ownerUid === user.uid ? "owner" : "staff";
+  const role = await resolveRestaurantRole(restaurant, user);
   const [reservations, members, menu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listMembers(restaurant.id).catch(() => []),
     getActiveMenu(restaurant.id).catch(() => null)
   ]);
   root.innerHTML = dashboardHtml(restaurant, role, reservations, members, menu);
+}
+
+async function resolveRestaurantRole(restaurant, user) {
+  if (!restaurant || !user) return "staff";
+  const services = await getServices();
+  const { doc, getDoc, serverTimestamp, setDoc } = services.firestoreModule;
+  const restaurantId = restaurant.id;
+  const ownerLike = restaurant.ownerUid === user.uid || restaurant.createdBy === user.uid;
+  const memberSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid)).catch(() => null);
+  const memberRole = memberSnap?.exists() ? normalizeRole(memberSnap.data().role) : "";
+  if (memberRole) return memberRole;
+  if (ownerLike) {
+    await setDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid), {
+      uid: user.uid,
+      email: user.email || "",
+      displayName: user.displayName || "",
+      role: "owner",
+      status: "active",
+      updatedAt: serverTimestamp()
+    }, { merge: true }).catch(() => {});
+    return "owner";
+  }
+  const staffSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "staff", user.uid)).catch(() => null);
+  const staffRole = staffSnap?.exists() ? normalizeRole(staffSnap.data().role) : "";
+  if (staffRole) return staffRole;
+  const staffUserSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "staff_users", user.uid)).catch(() => null);
+  const staffUserRole = staffUserSnap?.exists() ? normalizeRole(staffUserSnap.data().role) : "";
+  return staffUserRole || "staff";
 }
 
 function initPublicRestaurantPage() {
@@ -1582,6 +1607,11 @@ function uniqueValues(values) {
 
 function normalizeCode(value) {
   return (value || "").toString().trim().replace(/[^a-zA-Z0-9_-]/g, "").toUpperCase();
+}
+
+function normalizeRole(value) {
+  const role = String(value || "").trim().toLowerCase();
+  return ["owner", "admin", "manager", "staff"].includes(role) ? role : "";
 }
 
 function text(data, key) {
