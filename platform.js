@@ -180,7 +180,7 @@ async function listUserRestaurants(uid) {
     if (!restaurant) continue;
     const memberSnap = await getDoc(doc(services.db, "restaurants", id, "members", uid));
     const memberRole = memberSnap.exists() ? normalizeRole(memberSnap.data().role) : "";
-    const role = restaurant.ownerUid === uid || restaurant.createdBy === uid ? "owner" : memberRole || "staff";
+    const role = highestRole([restaurant.ownerUid === uid || restaurant.createdBy === uid ? "owner" : "", memberRole]) || "staff";
     restaurants.push({ ...restaurant, role });
   }
   return restaurants;
@@ -558,8 +558,27 @@ async function updateReservationStatus(restaurantId, reservationId, status) {
 async function listMembers(restaurantId) {
   const services = await getServices();
   const { collection, getDocs } = services.firestoreModule;
-  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "members"));
-  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  const [membersSnap, staffSnap, staffUsersSnap] = await Promise.all([
+    getDocs(collection(services.db, "restaurants", restaurantId, "members")).catch(() => null),
+    getDocs(collection(services.db, "restaurants", restaurantId, "staff")).catch(() => null),
+    getDocs(collection(services.db, "restaurants", restaurantId, "staff_users")).catch(() => null)
+  ]);
+  const byUid = new Map();
+  [membersSnap, staffSnap, staffUsersSnap].forEach((snap) => {
+    snap?.docs.forEach((docSnap) => {
+      const data = { id: docSnap.id, ...docSnap.data() };
+      const uid = data.uid || data.userId || docSnap.id;
+      const existing = byUid.get(uid) || {};
+      byUid.set(uid, {
+        ...existing,
+        ...data,
+        uid,
+        role: highestRole([existing.role, data.role]) || data.role || existing.role || "staff",
+        status: data.status || existing.status || (data.active === false ? "inactive" : "active")
+      });
+    });
+  });
+  return [...byUid.values()];
 }
 
 async function createInvitation(restaurantId, form, user) {
@@ -820,13 +839,11 @@ async function resolveRestaurantRole(restaurant, user) {
   }
   const memberSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid)).catch(() => null);
   const memberRole = memberSnap?.exists() ? normalizeRole(memberSnap.data().role) : "";
-  if (memberRole) return memberRole;
   const staffSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "staff", user.uid)).catch(() => null);
   const staffRole = staffSnap?.exists() ? normalizeRole(staffSnap.data().role) : "";
-  if (staffRole) return staffRole;
   const staffUserSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "staff_users", user.uid)).catch(() => null);
   const staffUserRole = staffUserSnap?.exists() ? normalizeRole(staffUserSnap.data().role) : "";
-  return staffUserRole || "staff";
+  return highestRole([memberRole, staffRole, staffUserRole]) || "staff";
 }
 
 function initPublicRestaurantPage() {
@@ -1613,6 +1630,19 @@ function normalizeCode(value) {
 function normalizeRole(value) {
   const role = String(value || "").trim().toLowerCase();
   return ["owner", "admin", "manager", "staff"].includes(role) ? role : "";
+}
+
+function highestRole(values) {
+  const priority = {
+    owner: 4,
+    admin: 3,
+    manager: 2,
+    staff: 1
+  };
+  return values
+    .map(normalizeRole)
+    .filter(Boolean)
+    .sort((a, b) => priority[b] - priority[a])[0] || "";
 }
 
 function text(data, key) {
