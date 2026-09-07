@@ -618,22 +618,37 @@ async function submitReservation(restaurant, form) {
   const data = new FormData(form);
   if (!restaurant?.id) throw new Error("Restaurant introuvable.");
   if (restaurant.reservationEnabled === false) throw new Error("Les reservations ne sont pas actives pour ce restaurant.");
+  const date = text(data, "date");
+  const time = text(data, "time");
+  const customerName = text(data, "name");
+  const customerPhone = text(data, "phone");
+  if (!customerName || !customerPhone || !date || !time) {
+    throw new Error("Nom, telephone, date et heure sont obligatoires.");
+  }
+  const reservedAt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(reservedAt.getTime())) {
+    throw new Error("Date ou heure invalide.");
+  }
   const payload = {
     restaurantId: restaurant.id,
-    customerName: text(data, "name"),
-    customerPhone: text(data, "phone"),
+    customerName,
+    phone: customerPhone,
+    customerPhone,
     customerEmail: text(data, "email"),
-    date: text(data, "date"),
-    time: text(data, "time"),
+    date,
+    time,
     guests: Number(text(data, "guests") || 1),
+    notes: text(data, "message"),
     message: text(data, "message"),
     status: "pending",
+    reservedAt: services.firestoreModule.Timestamp.fromDate(reservedAt),
+    source: "public_site",
+    reservationSource: "poksol_public_page",
+    channel: "web",
+    origin: window.location.href,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
-  if (!payload.customerName || !payload.customerPhone || !payload.date || !payload.time) {
-    throw new Error("Nom, telephone, date et heure sont obligatoires.");
-  }
   if (!isReservationWithinOpeningHours(restaurant.openingHours, payload.date, payload.time)) {
     throw new Error("Ce crÃ©neau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
   }
@@ -876,7 +891,7 @@ function initPublicRestaurantPage() {
       try {
         if (!loadedRestaurant) loadedRestaurant = await getRestaurantBySlug(slug);
         await submitReservation(loadedRestaurant || { id: slug, reservationEnabled: true }, reservationForm);
-        status.textContent = "Demande envoyee dans l'application du restaurant.";
+        status.textContent = "Demande envoyee. Le restaurant vous recontactera.";
         reservationForm.reset();
       } catch (error) {
         status.textContent = error.message || "Reservation impossible pour le moment.";
