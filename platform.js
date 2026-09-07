@@ -876,7 +876,7 @@ function initPublicRestaurantPage() {
       try {
         if (!loadedRestaurant) loadedRestaurant = await getRestaurantBySlug(slug);
         await submitReservation(loadedRestaurant || { id: slug, reservationEnabled: true }, reservationForm);
-        status.textContent = "Demande envoyee. Le restaurant vous recontactera.";
+        status.textContent = "Demande envoyee dans l'application du restaurant.";
         reservationForm.reset();
       } catch (error) {
         status.textContent = error.message || "Reservation impossible pour le moment.";
