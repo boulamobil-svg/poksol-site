@@ -634,20 +634,10 @@ async function submitReservation(restaurant, form) {
     restaurantId,
     customerName,
     phone: customerPhone,
-    customerPhone,
-    customerEmail: text(data, "email"),
-    date,
-    time,
-    dateKey: date,
-    reservationDate: date,
-    reservationTime: time,
     guests: Number(text(data, "guests") || 1),
     notes: text(data, "message"),
-    message: text(data, "message"),
     status: "planned",
-    publicStatus: "pending",
     reservedAt: services.firestoreModule.Timestamp.fromDate(reservedAt),
-    reservedAtLocal: `${date}T${time}:00`,
     source: "public_site",
     reservationSource: "poksol_public_page",
     channel: "web",
@@ -655,7 +645,7 @@ async function submitReservation(restaurant, form) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
-  if (!isReservationWithinOpeningHours(restaurant.openingHours, payload.date, payload.time)) {
+  if (!isReservationWithinOpeningHours(restaurant.openingHours, date, time)) {
     throw new Error("Ce crÃ©neau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
   }
   await addDoc(collection(services.db, "restaurants", restaurantId, "reservations"), payload);
