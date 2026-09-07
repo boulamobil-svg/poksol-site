@@ -179,7 +179,8 @@ async function listUserRestaurants(uid) {
     const restaurant = await getRestaurant(id);
     if (!restaurant) continue;
     const memberSnap = await getDoc(doc(services.db, "restaurants", id, "members", uid));
-    const role = memberSnap.exists() ? memberSnap.data().role : restaurant.ownerUid === uid ? "owner" : "staff";
+    const memberRole = memberSnap.exists() ? normalizeRole(memberSnap.data().role) : "";
+    const role = restaurant.ownerUid === uid || restaurant.createdBy === uid ? "owner" : memberRole || "staff";
     restaurants.push({ ...restaurant, role });
   }
   return restaurants;
@@ -806,9 +807,6 @@ async function resolveRestaurantRole(restaurant, user) {
   const { doc, getDoc, serverTimestamp, setDoc } = services.firestoreModule;
   const restaurantId = restaurant.id;
   const ownerLike = restaurant.ownerUid === user.uid || restaurant.createdBy === user.uid;
-  const memberSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid)).catch(() => null);
-  const memberRole = memberSnap?.exists() ? normalizeRole(memberSnap.data().role) : "";
-  if (memberRole) return memberRole;
   if (ownerLike) {
     await setDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid), {
       uid: user.uid,
@@ -820,6 +818,9 @@ async function resolveRestaurantRole(restaurant, user) {
     }, { merge: true }).catch(() => {});
     return "owner";
   }
+  const memberSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid)).catch(() => null);
+  const memberRole = memberSnap?.exists() ? normalizeRole(memberSnap.data().role) : "";
+  if (memberRole) return memberRole;
   const staffSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "staff", user.uid)).catch(() => null);
   const staffRole = staffSnap?.exists() ? normalizeRole(staffSnap.data().role) : "";
   if (staffRole) return staffRole;
