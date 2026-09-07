@@ -409,14 +409,22 @@ async function saveOpeningHours(restaurantId, form) {
   const services = await getServices();
   const { doc, serverTimestamp, setDoc } = services.firestoreModule;
   const data = new FormData(form);
-  const openingHours = {};
+  const openingHoursByDay = {};
   DAYS.forEach(([key]) => {
-    openingHours[key] = data.get(`${key}.closed`) === "on"
-      ? []
-      : [{ open: text(data, `${key}.open`) || "09:00", close: text(data, `${key}.close`) || "22:00" }];
+    const lunchEnabled = data.get(`${key}.lunchEnabled`) === "on";
+    const dinnerEnabled = data.get(`${key}.dinnerEnabled`) === "on";
+    openingHoursByDay[key] = {
+      open: lunchEnabled || dinnerEnabled,
+      lunchStart: lunchEnabled ? text(data, `${key}.lunchStart`) || "12:00" : "",
+      lunchEnd: lunchEnabled ? text(data, `${key}.lunchEnd`) || "14:30" : "",
+      dinnerStart: dinnerEnabled ? text(data, `${key}.dinnerStart`) || "19:00" : "",
+      dinnerEnd: dinnerEnabled ? text(data, `${key}.dinnerEnd`) || "22:30" : ""
+    };
   });
+  const openingHours = openingHoursToList(openingHoursByDay);
   await setDoc(doc(services.db, "restaurants", restaurantId), {
     openingHours,
+    openingHoursByDay,
     updatedAt: serverTimestamp()
   }, { merge: true });
   await syncPublicRestaurant(restaurantId);
@@ -509,6 +517,7 @@ function buildPublicRestaurantPayload(restaurant, menu, updatedAt) {
   const normalized = normalizeRestaurant(restaurant.id || restaurant.restaurantId || restaurant.slug, restaurant);
   const slug = normalizeSlug(normalized.slug || normalized.name || normalized.id);
   const openingHours = normalizeHours(normalized.openingHours);
+  const openingHoursByDay = resolveOpeningHoursByDay(normalized.openingHours, restaurant);
   return {
     id: normalized.id,
     restaurantId: normalized.restaurantId || normalized.id,
@@ -534,6 +543,7 @@ function buildPublicRestaurantPayload(restaurant, menu, updatedAt) {
     qrMenuEnabled: normalized.qrMenuEnabled === true || menu?.isActive === true,
     reservationEnabled: normalized.reservationEnabled !== false,
     openingHours,
+    openingHoursByDay,
     menu: menu ? {
       title: menu.title || "Menu principal",
       type: menu.type || "",
@@ -1155,18 +1165,23 @@ function profileFormHtml(restaurant, canEdit) {
 }
 
 function hoursFormHtml(restaurant, canEdit) {
-  const hours = normalizeHours(restaurant.openingHours);
+  const services = resolveOpeningHoursByDay(restaurant.openingHours, restaurant);
   return `
     <form class="platform-form" data-dashboard-hours-form>
       <div class="weekly-hours">
         ${DAYS.map(([key, label]) => {
-          const first = hours[key]?.[0] || {};
-          const closed = !hours[key] || hours[key].length === 0;
+          const day = services[key] || {};
+          const lunchEnabled = !!(day.lunchStart && day.lunchEnd);
+          const dinnerEnabled = !!(day.dinnerStart && day.dinnerEnd);
           return `
             <div class="weekly-hour-row">
-              <label class="day-toggle"><input type="checkbox" name="${key}.closed" ${closed ? "checked" : ""} ${disabled(canEdit)} /> ${label} ferme</label>
-              <label>Ouverture<input type="time" name="${key}.open" value="${escapeAttr(first.open || "09:00")}" ${disabled(canEdit)} /></label>
-              <label>Fermeture<input type="time" name="${key}.close" value="${escapeAttr(first.close || "22:00")}" ${disabled(canEdit)} /></label>
+              <strong>${label}</strong>
+              <label class="day-toggle"><input type="checkbox" name="${key}.lunchEnabled" ${lunchEnabled ? "checked" : ""} ${disabled(canEdit)} /> Service midi</label>
+              <label>Debut midi<input type="time" name="${key}.lunchStart" value="${escapeAttr(day.lunchStart || "12:00")}" ${disabled(canEdit)} /></label>
+              <label>Fin midi<input type="time" name="${key}.lunchEnd" value="${escapeAttr(day.lunchEnd || "14:30")}" ${disabled(canEdit)} /></label>
+              <label class="day-toggle"><input type="checkbox" name="${key}.dinnerEnabled" ${dinnerEnabled ? "checked" : ""} ${disabled(canEdit)} /> Service soir</label>
+              <label>Debut soir<input type="time" name="${key}.dinnerStart" value="${escapeAttr(day.dinnerStart || "19:00")}" ${disabled(canEdit)} /></label>
+              <label>Fin soir<input type="time" name="${key}.dinnerEnd" value="${escapeAttr(day.dinnerEnd || "22:30")}" ${disabled(canEdit)} /></label>
             </div>
           `;
         }).join("")}
@@ -1486,6 +1501,20 @@ function hoursHtml(hours) {
   }).join("");
 }
 
+function openingHoursToList(hoursByDay) {
+  return DAYS.map(([key], index) => {
+    const day = hoursByDay[key] || {};
+    return {
+      day: index + 1,
+      isOpen: day.open !== false,
+      lunchStart: normalizeTime(day.lunchStart),
+      lunchEnd: normalizeTime(day.lunchEnd),
+      dinnerStart: normalizeTime(day.dinnerStart),
+      dinnerEnd: normalizeTime(day.dinnerEnd)
+    };
+  });
+}
+
 function isReservationWithinOpeningHours(hours, dateValue, timeValue) {
   const date = new Date(`${dateValue}T00:00:00`);
   if (Number.isNaN(date.getTime())) return false;
@@ -1532,6 +1561,9 @@ function setupReservationHoursUi(restaurant) {
     timeInput.replaceWith(select);
     timeInput = select;
   }
+  timeInput?.addEventListener("change", () => {
+    form.dataset.selectedTime = timeInput.value || "";
+  });
   const submitButton = form.querySelector('button[type="submit"]');
   let note = form.querySelector("[data-reservation-hours-note]");
   if (!note) {
@@ -1550,14 +1582,14 @@ function setupReservationHoursUi(restaurant) {
     const date = new Date(`${dateInput.value}T00:00:00`);
     const dayKey = DAYS[(date.getDay() + 6) % 7]?.[0];
     const slots = normalizeHours(restaurant.openingHours)[dayKey] || [];
-    populateReservationTimes(timeInput, slots);
+    populateReservationTimes(timeInput, slots, "Choisissez une heure");
     if (submitButton) submitButton.disabled = !slots.length;
     note.textContent = slots.length
       ? `Horaires disponibles : ${slots.map((slot) => `${slot.open} - ${slot.close}`).join(" / ")}.`
       : "Le restaurant est fermÃ© ce jour-lÃ . Choisissez une autre date.";
   };
   dateInput?.addEventListener("change", updateNote);
-  timeInput?.addEventListener("change", updateNote);
+  dateInput?.addEventListener("input", updateNote);
   updateNote();
 }
 
@@ -1579,17 +1611,77 @@ function resolveOpeningHours(data, profile) {
   return withSlots || defined[0] || defaultOpeningHours();
 }
 
+function resolveOpeningHoursByDay(hours, restaurant = {}) {
+  const profile = restaurant.restaurantProfile || {};
+  const explicit = restaurant.openingHoursByDay || profile.openingHoursByDay;
+  if (explicit && !Array.isArray(explicit)) return normalizeOpeningHoursByDay(explicit);
+  const source = explicit || hours || restaurant.openingHours || profile.openingHours || defaultOpeningHours();
+  return normalizeOpeningHoursByDay(source);
+}
+
+function normalizeOpeningHoursByDay(source) {
+  if (!source) return emptyOpeningHoursByDay();
+  if (!Array.isArray(source)) {
+    return DAYS.reduce((acc, [key]) => {
+      acc[key] = normalizeDayServices(source[key]);
+      return acc;
+    }, emptyOpeningHoursByDay());
+  }
+  return source.reduce((acc, item) => {
+    const key = dayKeyFromValue(item.day ?? item.dayKey ?? item.weekday);
+    if (key) acc[key] = normalizeDayServices(item);
+    return acc;
+  }, emptyOpeningHoursByDay());
+}
+
+function emptyOpeningHoursByDay() {
+  return DAYS.reduce((acc, [key]) => {
+    acc[key] = { open: false, lunchStart: "", lunchEnd: "", dinnerStart: "", dinnerEnd: "" };
+    return acc;
+  }, {});
+}
+
+function normalizeDayServices(day) {
+  const empty = { open: false, lunchStart: "", lunchEnd: "", dinnerStart: "", dinnerEnd: "" };
+  if (!day) return empty;
+  if (day.open === false || day.isOpen === false || day.closed === true) return empty;
+  const lunchStart = normalizeTime(day.lunchStart || day.midiStart || day.noonStart || day.lunch?.start || day.lunch?.open || day.lunch?.from);
+  const lunchEnd = normalizeTime(day.lunchEnd || day.midiEnd || day.noonEnd || day.lunch?.end || day.lunch?.close || day.lunch?.to);
+  const dinnerStart = normalizeTime(day.dinnerStart || day.soirStart || day.eveningStart || day.dinner?.start || day.dinner?.open || day.dinner?.from);
+  const dinnerEnd = normalizeTime(day.dinnerEnd || day.soirEnd || day.eveningEnd || day.dinner?.end || day.dinner?.close || day.dinner?.to);
+  if (lunchStart && lunchEnd || dinnerStart && dinnerEnd) {
+    return { open: true, lunchStart, lunchEnd, dinnerStart, dinnerEnd };
+  }
+  const slots = normalizeDaySlots(day);
+  const inferred = { ...empty };
+  slots.forEach((slot) => {
+    const openMinutes = minutesFromTime(slot.open);
+    if (openMinutes < 17 * 60 && !inferred.lunchStart) {
+      inferred.lunchStart = slot.open;
+      inferred.lunchEnd = slot.close;
+    } else if (!inferred.dinnerStart) {
+      inferred.dinnerStart = slot.open;
+      inferred.dinnerEnd = slot.close;
+    }
+  });
+  inferred.open = !!(inferred.lunchStart && inferred.lunchEnd || inferred.dinnerStart && inferred.dinnerEnd);
+  return inferred;
+}
+
 function hasAnyOpeningSlot(hours) {
   return DAYS.some(([key]) => (hours[key] || []).length > 0);
 }
 
 function populateReservationTimes(input, slots, placeholder = "Aucun horaire disponible") {
   if (!input) return;
+  const selectedTime = input.form?.dataset.selectedTime || input.value;
   const options = slots.flatMap((slot) => buildTimeOptions(slot.open, slot.close));
   input.innerHTML = [
     `<option value="">${escapeHtml(placeholder)}</option>`,
     ...options.map((time) => `<option value="${escapeAttr(time)}">${escapeHtml(time)}</option>`)
   ].join("");
+  if (options.includes(selectedTime)) input.value = selectedTime;
+  else if (input.form) input.form.dataset.selectedTime = "";
   input.disabled = options.length === 0;
 }
 

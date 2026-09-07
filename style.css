@@ -1307,12 +1307,17 @@ select:focus-visible {
 
 .weekly-hour-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(140px, 0.7fr));
+  grid-template-columns: minmax(110px, 0.8fr) minmax(130px, 1fr) repeat(2, minmax(120px, 0.8fr));
   gap: 12px;
   align-items: end;
   padding: 14px;
   border-radius: 16px;
   background: #f8fbff;
+}
+
+.weekly-hour-row > strong {
+  align-self: center;
+  color: var(--poksol-navy);
 }
 
 .toggle-grid {
@@ -1816,6 +1821,7 @@ select:focus-visible {
 }
 
 .reservation-form input,
+.reservation-form select,
 .reservation-form textarea {
   width: 100%;
   border: 1px solid #d9c8af;
