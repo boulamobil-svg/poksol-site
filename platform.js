@@ -977,6 +977,21 @@ function initPublicRestaurantPage() {
   }
 }
 
+function initPublicMenuPage() {
+  const root = document.querySelector("[data-public-menu-page]");
+  if (!root) return;
+  const slug = root.dataset.restaurantSlug || new URLSearchParams(window.location.search).get("slug") || "chez-marwan";
+  getRestaurantBySlug(slug).then((restaurant) => {
+    if (!restaurant || restaurant.publicPageEnabled === false) {
+      root.innerHTML = publicMenuEmptyHtml("Menu indisponible");
+      return;
+    }
+    hydratePublicMenuPage(root, restaurant, restaurant.menu || null);
+  }).catch(() => {
+    root.innerHTML = publicMenuEmptyHtml("Menu indisponible");
+  });
+}
+
 function initContactForms() {
   document.querySelectorAll("[data-contact-form]").forEach((form) => {
     form.addEventListener("submit", async (event) => {
@@ -1013,21 +1028,22 @@ function hydratePublicRestaurant(root, restaurant, menu) {
   const menuLink = document.querySelector("[data-public-menu-link]");
   const menuHasContent = !!(menu?.categories?.length || menu?.items?.length || menu?.externalUrl || menu?.pdfUrl);
   const menuIsVisible = menu?.isActive === true || restaurant.qrMenuEnabled === true && menuHasContent;
+  const menuPageUrl = publicMenuUrl(restaurant);
   if (menuLink) {
     const menuUrl = menu?.type === "external_link" && menu?.externalUrl
       ? menu.externalUrl
       : menu?.type === "pdf" && menu?.pdfUrl
         ? menu.pdfUrl
-        : "#menu";
+        : menuPageUrl;
     menuLink.href = menuUrl;
-    if (menuUrl !== "#menu") {
+    if (menuUrl !== menuPageUrl) {
       menuLink.target = "_blank";
       menuLink.rel = "noopener noreferrer";
     } else {
       menuLink.removeAttribute("target");
       menuLink.removeAttribute("rel");
     }
-    menuLink.textContent = menuIsVisible ? "Ouvrir le menu QR" : "Menu bientot disponible";
+    menuLink.textContent = menuIsVisible ? "Afficher le menu" : "Menu bientot disponible";
   }
   const menuContainer = document.querySelector("[data-public-menu-items]");
   if (menuContainer && !menuIsVisible) {
@@ -1042,7 +1058,47 @@ function hydratePublicRestaurant(root, restaurant, menu) {
         </div>
       </article>
     `;
-  } else if (menuContainer && menu?.categories?.length) {
+  } else if (menuContainer) {
+    menuContainer.classList.remove("public-menu-category-list");
+    menuContainer.innerHTML = `
+      <article class="menu-standalone-cta">
+        <div>
+          <span>Menu QR</span>
+          <h3>Consulter le menu complet</h3>
+          <p>Le menu s'ouvre sur une page dediee, plus confortable sur smartphone.</p>
+        </div>
+        <a class="primary-btn" href="${escapeAttr(menuPageUrl)}">Afficher le menu</a>
+      </article>
+    `;
+  }
+  if (restaurant.reservationEnabled === false) {
+    const reservation = document.querySelector("[data-public-reservation-form]");
+    if (reservation) reservation.innerHTML = `<p class="alert-note">Les reservations en ligne ne sont pas encore activees pour ce restaurant.</p>`;
+  }
+}
+
+function hydratePublicMenuPage(root, restaurant, menu) {
+  const title = root.querySelector("[data-menu-page-title]");
+  const subtitle = root.querySelector("[data-menu-page-subtitle]");
+  const backLink = root.querySelector("[data-menu-page-back]");
+  const logo = root.querySelector("[data-menu-page-logo]");
+  const content = root.querySelector("[data-menu-page-content]");
+  if (title) title.textContent = restaurant.name || "Menu";
+  if (subtitle) subtitle.textContent = menu?.title || "Menu";
+  if (backLink) backLink.href = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
+  if (logo) logo.src = restaurant.logoUrl || "../poksol_icon.svg";
+  renderPublicMenuContent(content, restaurant, menu);
+}
+
+function renderPublicMenuContent(menuContainer, restaurant, menu) {
+  const menuHasContent = !!(menu?.categories?.length || menu?.items?.length);
+  const menuIsVisible = menu?.isActive === true || restaurant.qrMenuEnabled === true && menuHasContent;
+  const fallbackLogo = restaurant.logoUrl || "../poksol_icon.svg";
+  if (!menuContainer) return;
+  if (!menuIsVisible) {
+    menuContainer.classList.remove("public-menu-category-list");
+    menuContainer.innerHTML = publicMenuEmptyHtml("Menu bientot disponible");
+  } else if (menu?.categories?.length) {
     menuContainer.classList.add("public-menu-category-list");
     menuContainer.innerHTML = menu.categories.map((category) => `
       <section class="public-menu-category">
@@ -1053,12 +1109,12 @@ function hydratePublicRestaurant(root, restaurant, menu) {
         <div class="menu-grid">
           ${category.items.map((item) => `
             <article class="menu-item-card menu-item-card-live">
-              ${item.imageUrl ? `<img class="menu-photo" src="${escapeAttr(item.imageUrl)}" alt="${escapeAttr(item.displayName || item.name)}" loading="lazy" />` : `<div class="menu-photo menu-photo-empty"></div>`}
+              <img class="menu-photo ${item.imageUrl ? "" : "menu-photo-logo"}" src="${escapeAttr(item.imageUrl || fallbackLogo)}" alt="${escapeAttr(item.displayName || item.name)}" loading="lazy" />
               <div>
                 <span>${escapeHtml(category.displayName || category.name || "Menu")}</span>
                 <h3>${escapeHtml(item.displayName || item.name)}</h3>
                 <p>${escapeHtml(item.description || "")}</p>
-                <strong>${escapeHtml(item.priceLabel || item.price || "")}</strong>
+                <strong>${escapeHtml(displayMenuItemPrice(item))}</strong>
               </div>
             </article>
           `).join("")}
@@ -1069,19 +1125,37 @@ function hydratePublicRestaurant(root, restaurant, menu) {
     menuContainer.classList.remove("public-menu-category-list");
     menuContainer.innerHTML = menu.items.map((item) => `
       <article class="menu-item-card menu-item-card-live">
+        <img class="menu-photo menu-photo-logo" src="${escapeAttr(fallbackLogo)}" alt="${escapeAttr(item.name)}" loading="lazy" />
         <div>
           <span>${escapeHtml(item.category || "Menu")}</span>
           <h3>${escapeHtml(item.name)}</h3>
           <p>${escapeHtml(item.description || "")}</p>
-          <strong>${escapeHtml(item.price || "")}</strong>
+          <strong>${escapeHtml(displayMenuItemPrice(item))}</strong>
         </div>
       </article>
     `).join("");
   }
-  if (restaurant.reservationEnabled === false) {
-    const reservation = document.querySelector("[data-public-reservation-form]");
-    if (reservation) reservation.innerHTML = `<p class="alert-note">Les reservations en ligne ne sont pas encore activees pour ce restaurant.</p>`;
-  }
+}
+
+function publicMenuEmptyHtml(title) {
+  return `
+    <article class="menu-item-card">
+      <div>
+        <span>Menu</span>
+        <h3>${escapeHtml(title)}</h3>
+        <p>Le restaurant n'a pas encore publie son menu en ligne.</p>
+        <strong></strong>
+      </div>
+    </article>
+  `;
+}
+
+function publicMenuUrl(restaurant) {
+  return `${window.location.origin}/restaurants/menu.html?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
+}
+
+function displayMenuItemPrice(item = {}) {
+  return item.priceLabel || formatPrice(firstText(item.price, item.priceOnSite, item.priceTakeaway, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount));
 }
 
 function accountSignedOutHtml() {
@@ -1358,7 +1432,7 @@ function publicSettingsHtml(restaurant, publicUrl, canEdit) {
 }
 
 function menuFormHtml(restaurant, menu, canEdit) {
-  const qrUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}#menu`;
+  const qrUrl = publicMenuUrl(restaurant);
   const qrImage = `https://quickchart.io/qr?size=180&text=${encodeURIComponent(qrUrl)}`;
   const hasCatalog = Array.isArray(menu?.categories) && menu.categories.length > 0;
   const menuType = ["external_link", "pdf", "catalog"].includes(menu?.type) ? menu.type : "catalog";
@@ -1551,7 +1625,7 @@ function normalizeCatalogCategory(category = {}) {
 function normalizeCatalogItem(item = {}) {
   const name = firstText(item.name, item.label, item.title, item.itemName, item.productName, item.designation, item.id);
   const publicDisplayName = firstText(item.publicDisplayName, item.menuDisplayName, item.displayName);
-  const price = firstText(item.price, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount);
+  const price = firstText(item.price, item.priceOnSite, item.priceTakeaway, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount);
   return {
     ...item,
     id: item.id || "",
@@ -2049,6 +2123,7 @@ function escapeAttr(value = "") {
 initAccountPage();
 initDashboardPage();
 initPublicRestaurantPage();
+initPublicMenuPage();
 initContactForms();
 
 

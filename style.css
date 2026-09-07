@@ -1862,6 +1862,85 @@ select:focus-visible {
   font-weight: 900;
 }
 
+.menu-standalone-cta {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  padding: 20px;
+  border-radius: 22px;
+  background: #fffaf3;
+  border: 1px solid #ead8c0;
+}
+
+.menu-standalone-cta span {
+  color: var(--poksol-green);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.menu-standalone-cta h3 {
+  margin: 8px 0;
+  color: var(--poksol-navy);
+  font-size: 24px;
+}
+
+.menu-standalone-cta p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.menu-page-body {
+  min-height: 100vh;
+  background: #fffaf3;
+}
+
+.menu-page-header {
+  padding: 18px max(18px, 5vw) 28px;
+  color: white;
+  background: linear-gradient(135deg, var(--poksol-navy), #14395b);
+}
+
+.menu-page-nav {
+  max-width: 980px;
+  margin: 0 auto 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.menu-page-identity {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.menu-page-identity img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  padding: 10px;
+  border-radius: 18px;
+  background: white;
+}
+
+.menu-page-identity h1 {
+  margin: 2px 0 0;
+  font-size: clamp(34px, 8vw, 64px);
+  line-height: 1;
+}
+
+.menu-page-main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px max(16px, 4vw) 44px;
+}
+
 .restaurant-layout {
   max-width: 1180px;
   margin: 0 auto;
@@ -1966,7 +2045,11 @@ select:focus-visible {
 }
 
 .menu-item-card strong {
+  display: block;
+  margin-top: 12px;
   color: var(--poksol-blue);
+  font-size: 18px;
+  font-weight: 900;
 }
 
 .menu-photo {
@@ -1983,6 +2066,12 @@ select:focus-visible {
   width: 100%;
   height: 100%;
   background: linear-gradient(135deg, #f1b36f, #fff2da);
+}
+
+.menu-photo-logo {
+  object-fit: contain;
+  padding: 32px;
+  background: #f7fbff;
 }
 
 .placeholder-one {
@@ -2705,6 +2794,55 @@ select:focus-visible {
   .restaurant-quick-actions,
   .reservation-form {
     grid-template-columns: 1fr;
+  }
+
+  .menu-standalone-cta,
+  .menu-page-nav,
+  .menu-page-identity {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .menu-standalone-cta .primary-btn,
+  .menu-page-nav .outline-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .menu-page-header {
+    padding-bottom: 22px;
+  }
+
+  .menu-page-main {
+    padding-top: 18px;
+  }
+
+  .menu-page-main .public-menu-category-list {
+    gap: 24px;
+  }
+
+  .menu-page-main .menu-item-card {
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    min-height: 136px;
+  }
+
+  .menu-page-main .menu-photo {
+    height: 100%;
+    min-height: 136px;
+  }
+
+  .menu-page-main .menu-photo-logo {
+    padding: 18px;
+  }
+
+  .menu-page-main .menu-item-card h3 {
+    font-size: 18px;
+  }
+
+  .menu-page-main .menu-item-card p {
+    font-size: 14px;
   }
 
   .catalog-category-head,
