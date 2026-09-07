@@ -500,7 +500,6 @@ async function saveQrMenu(restaurantId, form, menu = null) {
     })
   ]);
 
-  const structuredItems = parseMenuItems(text(data, "structuredItems"));
   await setDoc(doc(services.db, "restaurants", restaurantId), {
     qrMenuEnabled: data.get("isActive") === "on",
     updatedAt: serverTimestamp()
@@ -510,7 +509,6 @@ async function saveQrMenu(restaurantId, form, menu = null) {
     type: text(data, "type") || "catalog",
     externalUrl: text(data, "externalUrl"),
     pdfUrl: text(data, "pdfUrl"),
-    items: structuredItems,
     isActive: data.get("isActive") === "on",
     updatedAt: serverTimestamp()
   }, { merge: true });
@@ -1012,14 +1010,25 @@ function hydratePublicRestaurant(root, restaurant, menu) {
   if (hours) hours.innerHTML = hoursHtml(restaurant.openingHours);
   setupReservationHoursUi(restaurant);
   const menuLink = document.querySelector("[data-public-menu-link]");
+  const menuHasContent = !!(menu?.categories?.length || menu?.items?.length || menu?.externalUrl || menu?.pdfUrl);
+  const menuIsVisible = menu?.isActive === true || restaurant.qrMenuEnabled === true && menuHasContent;
   if (menuLink) {
-    const menuUrl = menu?.externalUrl || menu?.pdfUrl || "#menu";
+    const menuUrl = menu?.type === "external_link" && menu?.externalUrl
+      ? menu.externalUrl
+      : menu?.type === "pdf" && menu?.pdfUrl
+        ? menu.pdfUrl
+        : "#menu";
     menuLink.href = menuUrl;
-    if (menuUrl !== "#menu") menuLink.target = "_blank";
-    menuLink.textContent = restaurant.qrMenuEnabled ? "Ouvrir le menu QR" : "Menu bientot disponible";
+    if (menuUrl !== "#menu") {
+      menuLink.target = "_blank";
+      menuLink.rel = "noopener noreferrer";
+    } else {
+      menuLink.removeAttribute("target");
+      menuLink.removeAttribute("rel");
+    }
+    menuLink.textContent = menuIsVisible ? "Ouvrir le menu QR" : "Menu bientot disponible";
   }
   const menuContainer = document.querySelector("[data-public-menu-items]");
-  const menuIsVisible = restaurant.qrMenuEnabled === true && menu?.isActive !== false;
   if (menuContainer && !menuIsVisible) {
     menuContainer.classList.remove("public-menu-category-list");
     menuContainer.innerHTML = `
@@ -1350,10 +1359,8 @@ function publicSettingsHtml(restaurant, publicUrl, canEdit) {
 function menuFormHtml(restaurant, menu, canEdit) {
   const qrUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}#menu`;
   const qrImage = `https://quickchart.io/qr?size=180&text=${encodeURIComponent(qrUrl)}`;
-  const structuredText = Array.isArray(menu?.items)
-    ? menu.items.map((item) => [item.category, item.name, item.description, item.price].filter(Boolean).join(" | ")).join("\n")
-    : "";
   const hasCatalog = Array.isArray(menu?.categories) && menu.categories.length > 0;
+  const menuType = ["external_link", "pdf", "catalog"].includes(menu?.type) ? menu.type : "catalog";
   return `
     <form class="platform-form" data-dashboard-menu-form>
       <div class="qr-menu-preview">
@@ -1369,14 +1376,12 @@ function menuFormHtml(restaurant, menu, canEdit) {
           <select name="type" ${disabled(canEdit)}>
             <option value="external_link" ${menu?.type === "external_link" ? "selected" : ""}>Lien externe</option>
             <option value="pdf" ${menu?.type === "pdf" ? "selected" : ""}>PDF</option>
-            <option value="catalog" ${!menu?.type || menu?.type === "catalog" ? "selected" : ""}>Catalogue Poket</option>
-            <option value="structured" ${menu?.type === "structured" ? "selected" : ""}>Structure Poksol</option>
+            <option value="catalog" ${menuType === "catalog" ? "selected" : ""}>Catalogue Poket</option>
           </select>
         </label>
         <label>URL externe<input name="externalUrl" value="${escapeAttr(menu?.externalUrl || "")}" placeholder="https://..." ${disabled(canEdit)} /></label>
         <label>PDF URL<input name="pdfUrl" value="${escapeAttr(menu?.pdfUrl || "")}" placeholder="https://..." ${disabled(canEdit)} /></label>
         <label><input type="checkbox" name="isActive" ${restaurant.qrMenuEnabled || menu?.isActive ? "checked" : ""} ${disabled(canEdit)} /> Menu actif</label>
-        <label class="wide-field">Menu structure<textarea name="structuredItems" rows="7" placeholder="Categorie | Nom du plat | Description | Prix" ${disabled(canEdit)}>${escapeHtml(structuredText)}</textarea></label>
       </div>
       <section class="catalog-menu-editor">
         <div class="section-title-row">
@@ -1395,23 +1400,30 @@ function menuFormHtml(restaurant, menu, canEdit) {
 }
 
 function catalogCategoryEditorHtml(category, canEdit) {
+  const visibleItems = category.items.filter((item) => item.publicVisible).length;
   return `
-    <article class="catalog-category-editor">
-      <div class="catalog-category-head">
-        <label class="inline-toggle">
-          <input type="checkbox" name="category.${escapeAttr(category.id)}.publicVisible" ${category.publicVisible ? "checked" : ""} ${disabled(canEdit)} />
-          Afficher la categorie
-        </label>
-        <strong>${escapeHtml(category.name || category.id)}</strong>
+    <details class="catalog-category-editor">
+      <summary class="catalog-category-summary">
+        <span class="catalog-category-chevron" aria-hidden="true"></span>
+        <span class="catalog-category-name">${escapeHtml(category.name || category.id)}</span>
+        <span class="catalog-category-count">${category.items.length} article${category.items.length > 1 ? "s" : ""} - ${visibleItems} affiche${visibleItems > 1 ? "s" : ""}</span>
+      </summary>
+      <div class="catalog-category-body">
+        <div class="catalog-category-head">
+          <label class="inline-toggle">
+            <input type="checkbox" name="category.${escapeAttr(category.id)}.publicVisible" ${category.publicVisible ? "checked" : ""} ${disabled(canEdit)} />
+            Afficher la categorie
+          </label>
+        </div>
+        <div class="form-grid compact-form-grid">
+          <label>Nom d'affichage<input name="category.${escapeAttr(category.id)}.publicDisplayName" value="${escapeAttr(category.displayName !== category.name ? category.displayName : "")}" placeholder="${escapeAttr(category.name || "Nom catalogue")}" ${disabled(canEdit)} /></label>
+          <label class="wide-field">Description categorie<textarea name="category.${escapeAttr(category.id)}.publicDescription" rows="2" ${disabled(canEdit)}>${escapeHtml(category.description || "")}</textarea></label>
+        </div>
+        <div class="catalog-items-editor">
+          ${category.items.length ? category.items.map((item) => catalogItemEditorHtml(item, canEdit)).join("") : emptyHtml("Aucun article dans cette categorie.")}
+        </div>
       </div>
-      <div class="form-grid compact-form-grid">
-        <label>Nom d'affichage<input name="category.${escapeAttr(category.id)}.publicDisplayName" value="${escapeAttr(category.displayName !== category.name ? category.displayName : "")}" placeholder="${escapeAttr(category.name || "Nom catalogue")}" ${disabled(canEdit)} /></label>
-        <label class="wide-field">Description categorie<textarea name="category.${escapeAttr(category.id)}.publicDescription" rows="2" ${disabled(canEdit)}>${escapeHtml(category.description || "")}</textarea></label>
-      </div>
-      <div class="catalog-items-editor">
-        ${category.items.length ? category.items.map((item) => catalogItemEditorHtml(item, canEdit)).join("") : emptyHtml("Aucun article dans cette categorie.")}
-      </div>
-    </article>
+    </details>
   `;
 }
 
