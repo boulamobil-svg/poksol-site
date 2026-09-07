@@ -629,19 +629,25 @@ async function submitReservation(restaurant, form) {
   if (Number.isNaN(reservedAt.getTime())) {
     throw new Error("Date ou heure invalide.");
   }
+  const restaurantId = restaurant.restaurantId || restaurant.id;
   const payload = {
-    restaurantId: restaurant.id,
+    restaurantId,
     customerName,
     phone: customerPhone,
     customerPhone,
     customerEmail: text(data, "email"),
     date,
     time,
+    dateKey: date,
+    reservationDate: date,
+    reservationTime: time,
     guests: Number(text(data, "guests") || 1),
     notes: text(data, "message"),
     message: text(data, "message"),
-    status: "pending",
+    status: "planned",
+    publicStatus: "pending",
     reservedAt: services.firestoreModule.Timestamp.fromDate(reservedAt),
+    reservedAtLocal: `${date}T${time}:00`,
     source: "public_site",
     reservationSource: "poksol_public_page",
     channel: "web",
@@ -652,7 +658,7 @@ async function submitReservation(restaurant, form) {
   if (!isReservationWithinOpeningHours(restaurant.openingHours, payload.date, payload.time)) {
     throw new Error("Ce crÃ©neau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
   }
-  await addDoc(collection(services.db, "restaurants", restaurant.id, "reservations"), payload);
+  await addDoc(collection(services.db, "restaurants", restaurantId, "reservations"), payload);
 }
 
 async function submitContact(form) {
@@ -1351,10 +1357,11 @@ function statusCardHtml(label, value) {
 }
 
 function statusSelectHtml(reservation) {
+  const selectedStatus = reservation.status === "pending" ? "planned" : reservation.status;
   return `
     <select data-reservation-status="${escapeAttr(reservation.id)}">
-      ${["pending", "confirmed", "refused", "cancelled"].map((status) => `
-        <option value="${status}" ${reservation.status === status ? "selected" : ""}>${status}</option>
+      ${["planned", "arrived", "cancelled", "pending", "confirmed", "refused"].map((status) => `
+        <option value="${status}" ${selectedStatus === status ? "selected" : ""}>${status}</option>
       `).join("")}
     </select>
   `;
