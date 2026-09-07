@@ -252,7 +252,6 @@ async function createRestaurantFromForm(form, user) {
   };
 
   await setDoc(restaurantRef, restaurant);
-  await syncPublicRestaurant(slug, restaurant);
   await setDoc(doc(services.db, "restaurants", slug, "members", user.uid), {
     uid: user.uid,
     email: user.email || "",
@@ -271,6 +270,7 @@ async function createRestaurantFromForm(form, user) {
     restaurantIds: arrayUnion(slug),
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await syncPublicRestaurant(slug, restaurant);
   localStorage.setItem("poksolActiveRestaurantId", slug);
   return restaurant;
 }

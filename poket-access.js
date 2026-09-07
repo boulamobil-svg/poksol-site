@@ -311,8 +311,6 @@ async function saveProfile({ final }) {
         { merge: true }
       );
 
-      await syncPublicRestaurantProfile(restaurantId, restaurantPayload);
-
       await setDoc(
         doc(firebaseServices.db, "users", currentUser.uid),
         {
@@ -347,6 +345,7 @@ async function saveProfile({ final }) {
         memberPayload,
         { merge: true }
       );
+      await syncPublicRestaurantProfile(restaurantId, restaurantPayload).catch(() => {});
       restaurantContext = {
         restaurantId,
         mode: "existing",
