@@ -459,25 +459,72 @@ async function savePublicSettings(restaurantId, form) {
   await syncPublicRestaurant(restaurantId);
 }
 
-async function saveQrMenu(restaurantId, form) {
+async function saveQrMenu(restaurantId, form, menu = null) {
   const services = await getServices();
   const { doc, serverTimestamp, setDoc } = services.firestoreModule;
   const data = new FormData(form);
+  const catalogMenu = menu?.categories ? menu : await listCatalogMenu(restaurantId).catch(() => null);
+  const categoryIds = new Set(catalogMenu?.categories?.map((category) => category.id) || []);
+  const itemRefs = [];
+  catalogMenu?.categories?.forEach((category) => {
+    category.items.forEach((item) => itemRefs.push({ categoryId: category.id, itemId: item.id }));
+  });
+
+  await Promise.all([
+    ...[...categoryIds].map((categoryId) => setDoc(
+      doc(services.db, "restaurants", restaurantId, "catalog_categories", categoryId),
+      {
+        publicVisible: data.get(`category.${categoryId}.publicVisible`) === "on",
+        publicDisplayName: text(data, `category.${categoryId}.publicDisplayName`),
+        publicDescription: text(data, `category.${categoryId}.publicDescription`),
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    )),
+    ...itemRefs.map(async ({ categoryId, itemId }) => {
+      const itemField = `item.${categoryId}.${itemId}`;
+      const file = form.querySelector(`[name="${CSS.escape(itemField)}.imageFile"]`)?.files?.[0];
+      const imageUrl = file ? await uploadCatalogItemImage(restaurantId, categoryId, itemId, file) : "";
+      await setDoc(
+        doc(services.db, "restaurants", restaurantId, "catalog_categories", categoryId, "items", itemId),
+        {
+          publicVisible: data.get(`${itemField}.publicVisible`) === "on",
+          publicDisplayName: text(data, `${itemField}.publicDisplayName`),
+          publicDescription: text(data, `${itemField}.publicDescription`),
+          imageUrl: imageUrl || text(data, `${itemField}.imageUrl`),
+          ...(imageUrl ? { imageUrl } : {}),
+          updatedAt: serverTimestamp()
+        },
+        { merge: true }
+      );
+    })
+  ]);
+
   const structuredItems = parseMenuItems(text(data, "structuredItems"));
-  await setDoc(doc(services.db, "restaurants", restaurantId, "menus", "main"), {
-    title: text(data, "title") || "Menu principal",
-    type: text(data, "type") || "external_link",
-    pdfUrl: text(data, "pdfUrl"),
-    externalUrl: text(data, "externalUrl"),
-    items: structuredItems,
-    isActive: data.get("isActive") === "on",
-    updatedAt: serverTimestamp()
-  }, { merge: true });
   await setDoc(doc(services.db, "restaurants", restaurantId), {
     qrMenuEnabled: data.get("isActive") === "on",
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await setDoc(doc(services.db, "restaurants", restaurantId, "menus", "main"), {
+    title: text(data, "title") || "Menu principal",
+    type: text(data, "type") || "catalog",
+    externalUrl: text(data, "externalUrl"),
+    pdfUrl: text(data, "pdfUrl"),
+    items: structuredItems,
+    isActive: data.get("isActive") === "on",
+    updatedAt: serverTimestamp()
+  }, { merge: true });
   await syncPublicRestaurant(restaurantId);
+}
+
+async function uploadCatalogItemImage(restaurantId, categoryId, itemId, file) {
+  const services = await getServices();
+  const { getDownloadURL, ref, uploadBytes } = services.storageModule;
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `restaurants/${restaurantId}/catalog/${categoryId}/${itemId}.${extension}`;
+  const imageRef = ref(services.storage, path);
+  await uploadBytes(imageRef, file, { contentType: file.type || "application/octet-stream" });
+  return getDownloadURL(imageRef);
 }
 
 async function listReservations(restaurantId) {
@@ -495,6 +542,32 @@ async function getActiveMenu(restaurantId) {
   return { id: snap.id, ...snap.data() };
 }
 
+async function listCatalogMenu(restaurantId, options = {}) {
+  const services = await getServices();
+  const { collection, getDocs } = services.firestoreModule;
+  const categorySnaps = await getDocs(collection(services.db, "restaurants", restaurantId, "catalog_categories"));
+  const categories = await Promise.all(categorySnaps.docs.map(async (categorySnap) => {
+    const category = { id: categorySnap.id, ...categorySnap.data() };
+    const itemSnaps = await getDocs(collection(services.db, "restaurants", restaurantId, "catalog_categories", categorySnap.id, "items"));
+    const items = itemSnaps.docs
+      .map((itemSnap) => normalizeCatalogItem({ id: itemSnap.id, categoryId: categorySnap.id, ...itemSnap.data() }))
+      .filter((item) => !options.publicOnly || isPublicCatalogEntry(item))
+      .sort(sortByDisplayOrder);
+    return {
+      ...normalizeCatalogCategory(category),
+      items
+    };
+  }));
+  return {
+    title: "Menu",
+    type: "catalog",
+    isActive: true,
+    categories: categories
+      .filter((category) => !options.publicOnly || isPublicCatalogEntry(category) && category.items.length)
+      .sort(sortByDisplayOrder)
+  };
+}
+
 async function syncPublicRestaurant(restaurantId, restaurantOverride = null) {
   if (!restaurantId) return;
   const services = await getServices();
@@ -502,7 +575,11 @@ async function syncPublicRestaurant(restaurantId, restaurantOverride = null) {
   const restaurant = restaurantOverride || await getRestaurant(restaurantId).catch(() => null);
   if (!restaurant) return;
   const menuSnap = await getDoc(doc(services.db, "restaurants", restaurant.id || restaurantId, "menus", "main")).catch(() => null);
-  const menu = menuSnap?.exists() ? { id: menuSnap.id, ...menuSnap.data() } : null;
+  const catalogMenu = await listCatalogMenu(restaurant.id || restaurantId, { publicOnly: true }).catch(() => null);
+  const savedMenu = menuSnap?.exists() ? { id: menuSnap.id, ...menuSnap.data() } : null;
+  const menu = catalogMenu?.categories?.length
+    ? { ...(savedMenu || {}), ...catalogMenu, title: savedMenu?.title || catalogMenu.title, type: savedMenu?.type || "catalog", isActive: restaurant.qrMenuEnabled === true }
+    : savedMenu;
   const publicData = buildPublicRestaurantPayload(restaurant, menu, serverTimestamp());
   const ids = uniqueValues([
     publicData.id,
@@ -550,6 +627,7 @@ function buildPublicRestaurantPayload(restaurant, menu, updatedAt) {
       externalUrl: menu.externalUrl || "",
       pdfUrl: menu.pdfUrl || "",
       items: Array.isArray(menu.items) ? menu.items : [],
+      categories: Array.isArray(menu.categories) ? menu.categories : [],
       isActive: menu.isActive === true
     } : null,
     updatedAt
@@ -833,12 +911,16 @@ async function renderDashboard(root, user, restaurantId) {
   localStorage.setItem("poksolActiveRestaurantId", restaurant.id);
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
-  const [reservations, members, menu] = await Promise.all([
+  const [reservations, members, menu, catalogMenu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listMembers(restaurant.id).catch(() => []),
-    getActiveMenu(restaurant.id).catch(() => null)
+    getActiveMenu(restaurant.id).catch(() => null),
+    listCatalogMenu(restaurant.id).catch(() => null)
   ]);
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, members, menu);
+  const dashboardMenu = catalogMenu?.categories?.length
+    ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
+    : menu;
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, members, dashboardMenu);
 }
 
 async function resolveRestaurantRole(restaurant, user) {
@@ -937,7 +1019,44 @@ function hydratePublicRestaurant(root, restaurant, menu) {
     menuLink.textContent = restaurant.qrMenuEnabled ? "Ouvrir le menu QR" : "Menu bientot disponible";
   }
   const menuContainer = document.querySelector("[data-public-menu-items]");
-  if (menuContainer && menu?.items?.length) {
+  const menuIsVisible = restaurant.qrMenuEnabled === true && menu?.isActive !== false;
+  if (menuContainer && !menuIsVisible) {
+    menuContainer.classList.remove("public-menu-category-list");
+    menuContainer.innerHTML = `
+      <article class="menu-item-card">
+        <div>
+          <span>Menu</span>
+          <h3>Menu bientot disponible</h3>
+          <p>Le restaurant n'a pas encore publie son menu en ligne.</p>
+          <strong></strong>
+        </div>
+      </article>
+    `;
+  } else if (menuContainer && menu?.categories?.length) {
+    menuContainer.classList.add("public-menu-category-list");
+    menuContainer.innerHTML = menu.categories.map((category) => `
+      <section class="public-menu-category">
+        <div class="public-menu-category-heading">
+          <span>${escapeHtml(category.displayName || category.name || "Menu")}</span>
+          ${category.description ? `<p>${escapeHtml(category.description)}</p>` : ""}
+        </div>
+        <div class="menu-grid">
+          ${category.items.map((item) => `
+            <article class="menu-item-card menu-item-card-live">
+              ${item.imageUrl ? `<img class="menu-photo" src="${escapeAttr(item.imageUrl)}" alt="${escapeAttr(item.displayName || item.name)}" loading="lazy" />` : `<div class="menu-photo menu-photo-empty"></div>`}
+              <div>
+                <span>${escapeHtml(category.displayName || category.name || "Menu")}</span>
+                <h3>${escapeHtml(item.displayName || item.name)}</h3>
+                <p>${escapeHtml(item.description || "")}</p>
+                <strong>${escapeHtml(item.priceLabel || item.price || "")}</strong>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `).join("");
+  } else if (menuContainer && menu?.items?.length) {
+    menuContainer.classList.remove("public-menu-category-list");
     menuContainer.innerHTML = menu.items.map((item) => `
       <article class="menu-item-card menu-item-card-live">
         <div>
@@ -1234,6 +1353,7 @@ function menuFormHtml(restaurant, menu, canEdit) {
   const structuredText = Array.isArray(menu?.items)
     ? menu.items.map((item) => [item.category, item.name, item.description, item.price].filter(Boolean).join(" | ")).join("\n")
     : "";
+  const hasCatalog = Array.isArray(menu?.categories) && menu.categories.length > 0;
   return `
     <form class="platform-form" data-dashboard-menu-form>
       <div class="qr-menu-preview">
@@ -1249,6 +1369,7 @@ function menuFormHtml(restaurant, menu, canEdit) {
           <select name="type" ${disabled(canEdit)}>
             <option value="external_link" ${menu?.type === "external_link" ? "selected" : ""}>Lien externe</option>
             <option value="pdf" ${menu?.type === "pdf" ? "selected" : ""}>PDF</option>
+            <option value="catalog" ${!menu?.type || menu?.type === "catalog" ? "selected" : ""}>Catalogue Poket</option>
             <option value="structured" ${menu?.type === "structured" ? "selected" : ""}>Structure Poksol</option>
           </select>
         </label>
@@ -1257,9 +1378,67 @@ function menuFormHtml(restaurant, menu, canEdit) {
         <label><input type="checkbox" name="isActive" ${restaurant.qrMenuEnabled || menu?.isActive ? "checked" : ""} ${disabled(canEdit)} /> Menu actif</label>
         <label class="wide-field">Menu structure<textarea name="structuredItems" rows="7" placeholder="Categorie | Nom du plat | Description | Prix" ${disabled(canEdit)}>${escapeHtml(structuredText)}</textarea></label>
       </div>
+      <section class="catalog-menu-editor">
+        <div class="section-title-row">
+          <div>
+            <p class="eyebrow">Catalogue Poket</p>
+            <h3>Articles affiches sur la page publique</h3>
+            <p>Activez les categories et articles a publier, puis personnalisez leur nom, description et image pour le menu QR.</p>
+          </div>
+        </div>
+        ${hasCatalog ? menu.categories.map((category) => catalogCategoryEditorHtml(category, canEdit)).join("") : emptyHtml("Aucune categorie catalogue trouvee dans Firestore pour ce restaurant.")}
+      </section>
       ${canEdit ? `<button class="primary-btn button-reset" type="submit">Enregistrer le menu</button>` : ""}
       <small data-form-status></small>
     </form>
+  `;
+}
+
+function catalogCategoryEditorHtml(category, canEdit) {
+  return `
+    <article class="catalog-category-editor">
+      <div class="catalog-category-head">
+        <label class="inline-toggle">
+          <input type="checkbox" name="category.${escapeAttr(category.id)}.publicVisible" ${category.publicVisible ? "checked" : ""} ${disabled(canEdit)} />
+          Afficher la categorie
+        </label>
+        <strong>${escapeHtml(category.name || category.id)}</strong>
+      </div>
+      <div class="form-grid compact-form-grid">
+        <label>Nom d'affichage<input name="category.${escapeAttr(category.id)}.publicDisplayName" value="${escapeAttr(category.displayName !== category.name ? category.displayName : "")}" placeholder="${escapeAttr(category.name || "Nom catalogue")}" ${disabled(canEdit)} /></label>
+        <label class="wide-field">Description categorie<textarea name="category.${escapeAttr(category.id)}.publicDescription" rows="2" ${disabled(canEdit)}>${escapeHtml(category.description || "")}</textarea></label>
+      </div>
+      <div class="catalog-items-editor">
+        ${category.items.length ? category.items.map((item) => catalogItemEditorHtml(item, canEdit)).join("") : emptyHtml("Aucun article dans cette categorie.")}
+      </div>
+    </article>
+  `;
+}
+
+function catalogItemEditorHtml(item, canEdit) {
+  const fieldPrefix = `item.${item.categoryId}.${item.id}`;
+  return `
+    <article class="catalog-item-editor">
+      <div class="catalog-item-visual">
+        ${item.imageUrl ? `<img src="${escapeAttr(item.imageUrl)}" alt="${escapeAttr(item.displayName || item.name)}" loading="lazy" />` : `<span>Image</span>`}
+      </div>
+      <div class="catalog-item-fields">
+        <div class="catalog-item-title">
+          <label class="inline-toggle">
+            <input type="checkbox" name="${escapeAttr(fieldPrefix)}.publicVisible" ${item.publicVisible ? "checked" : ""} ${disabled(canEdit)} />
+            Afficher
+          </label>
+          <strong>${escapeHtml(item.name || item.id)}</strong>
+          ${item.priceLabel ? `<span>${escapeHtml(item.priceLabel)}</span>` : ""}
+        </div>
+        <div class="form-grid compact-form-grid">
+          <label>Nom d'affichage<input name="${escapeAttr(fieldPrefix)}.publicDisplayName" value="${escapeAttr(item.displayName !== item.name ? item.displayName : "")}" placeholder="${escapeAttr(item.name || "Nom catalogue")}" ${disabled(canEdit)} /></label>
+          <label>URL image<input name="${escapeAttr(fieldPrefix)}.imageUrl" value="${escapeAttr(item.imageUrl || "")}" placeholder="https://..." ${disabled(canEdit)} /></label>
+          <label>Image<input name="${escapeAttr(fieldPrefix)}.imageFile" type="file" accept="image/png,image/jpeg,image/webp" ${disabled(canEdit)} /></label>
+          <label class="wide-field">Description article<textarea name="${escapeAttr(fieldPrefix)}.publicDescription" rows="2" ${disabled(canEdit)}>${escapeHtml(item.description || "")}</textarea></label>
+        </div>
+      </div>
+    </article>
   `;
 }
 
@@ -1340,6 +1519,69 @@ function parseMenuItems(raw) {
       return { category, name, description, price };
     })
     .filter((item) => item.name);
+}
+
+function normalizeCatalogCategory(category = {}) {
+  const name = firstText(category.name, category.label, category.title, category.categoryName, category.categoryPrefix, category.id);
+  const publicDisplayName = firstText(category.publicDisplayName, category.menuDisplayName, category.displayName);
+  return {
+    ...category,
+    id: category.id || "",
+    name,
+    displayName: publicDisplayName || name,
+    description: firstText(category.publicDescription, category.menuDescription, category.description),
+    publicVisible: category.publicVisible === true,
+    displayOrder: numberValue(category.displayOrder, category.order, category.position, category.sortOrder)
+  };
+}
+
+function normalizeCatalogItem(item = {}) {
+  const name = firstText(item.name, item.label, item.title, item.itemName, item.productName, item.designation, item.id);
+  const publicDisplayName = firstText(item.publicDisplayName, item.menuDisplayName, item.displayName);
+  const price = firstText(item.price, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount);
+  return {
+    ...item,
+    id: item.id || "",
+    categoryId: item.categoryId || "",
+    name,
+    displayName: publicDisplayName || name,
+    description: firstText(item.publicDescription, item.menuDescription, item.description, item.shortDescription),
+    imageUrl: firstText(item.imageUrl, item.publicImageUrl, item.photoUrl, item.pictureUrl, item.image),
+    price,
+    priceLabel: formatPrice(price),
+    publicVisible: item.publicVisible === true,
+    displayOrder: numberValue(item.displayOrder, item.order, item.position, item.sortOrder)
+  };
+}
+
+function isPublicCatalogEntry(entry = {}) {
+  return entry.publicVisible === true && entry.active !== false && !entry.deletedAt && entry.deleted !== true;
+}
+
+function sortByDisplayOrder(a = {}, b = {}) {
+  const orderDelta = numberValue(a.displayOrder) - numberValue(b.displayOrder);
+  if (orderDelta) return orderDelta;
+  return String(a.displayName || a.name || a.id || "").localeCompare(String(b.displayName || b.name || b.id || ""), "fr");
+}
+
+function firstText(...values) {
+  const found = values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+  return found === undefined ? "" : String(found).trim();
+}
+
+function numberValue(...values) {
+  const value = values.find((candidate) => candidate !== undefined && candidate !== null && candidate !== "");
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatPrice(value) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "string" && /[€$£]|eur|usd|cad/i.test(value)) return value;
+  const number = Number(String(value).replace(",", "."));
+  if (!Number.isFinite(number)) return String(value);
+  const amount = number > 1000 ? number / 100 : number;
+  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
 }
 
 function statusCardHtml(label, value) {

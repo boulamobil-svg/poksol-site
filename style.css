@@ -1401,6 +1401,110 @@ select:focus-visible {
   background: white;
 }
 
+.catalog-menu-editor {
+  display: grid;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.catalog-menu-editor h3 {
+  margin: 4px 0 8px;
+  font-size: 24px;
+  color: var(--poksol-navy);
+}
+
+.catalog-menu-editor p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.catalog-category-editor {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #d3e5ff;
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.catalog-category-head,
+.catalog-item-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.catalog-category-head strong,
+.catalog-item-title strong {
+  min-width: 0;
+  color: var(--poksol-navy);
+  font-size: 18px;
+}
+
+.inline-toggle {
+  width: max-content;
+  display: inline-flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 8px !important;
+  padding: 8px 10px;
+  border: 1px solid #d3e5ff;
+  border-radius: 999px;
+  background: white;
+  font-size: 13px;
+}
+
+.compact-form-grid {
+  margin-top: 0;
+}
+
+.catalog-items-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-item-editor {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 14px;
+  background: white;
+}
+
+.catalog-item-visual {
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #eef6ff;
+  color: var(--text-muted);
+  font-weight: 900;
+}
+
+.catalog-item-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.catalog-item-fields {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-item-title span {
+  color: var(--poksol-blue);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .downloads-card {
   margin-top: 18px;
 }
@@ -1753,6 +1857,39 @@ select:focus-visible {
   margin-top: 26px;
 }
 
+.public-menu-category-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+}
+
+.public-menu-category {
+  display: grid;
+  gap: 14px;
+}
+
+.public-menu-category-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.public-menu-category-heading span {
+  color: var(--poksol-navy);
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.public-menu-category-heading p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.public-menu-category .menu-grid {
+  margin-top: 0;
+}
+
 .menu-item-card {
   overflow: hidden;
   border-radius: 22px;
@@ -1786,7 +1923,19 @@ select:focus-visible {
 }
 
 .menu-photo {
+  display: block;
+  width: 100%;
   height: 170px;
+  object-fit: cover;
+  background: linear-gradient(135deg, #ecf4ff, #fffaf3);
+}
+
+.menu-photo-empty::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f1b36f, #fff2da);
 }
 
 .placeholder-one {
@@ -2509,6 +2658,21 @@ select:focus-visible {
   .restaurant-quick-actions,
   .reservation-form {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-category-head,
+  .catalog-item-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .catalog-item-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-item-visual {
+    width: 100%;
+    height: 180px;
   }
 
   .restaurant-public-main {

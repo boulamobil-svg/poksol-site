@@ -15,5 +15,10 @@ service firebase.storage {
       allow read: if true;
       allow write: if signedIn() && validImage();
     }
+
+    match /restaurants/{restaurantId}/catalog/{categoryId}/{fileName} {
+      allow read: if true;
+      allow write: if signedIn() && validImage();
+    }
   }
 }
