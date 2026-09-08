@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+37",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  37,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+37.apk",
+    "apkSha256":  "83167d5fd34384899b35ad30e0da83e36bd169df7401cddbc9741dcc5d7a1e3a",
+    "apkFileSize":  96188722,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+37 : partage des tickets depuis les comptes clients.",
+    "publishedAt":  "2026-09-08T21:50:36Z",
+    "updatedAt":  "2026-09-08T21:50:36Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+37.zip",
+    "webSha256":  "22dd06516f3d8dc27e2e93489d2e1d7a4050092a8ebe2e9c08372d14df0446f3",
+    "webFileSize":  14778176,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+37.zip",
+    "windowsSha256":  "7ca671f0e4c6c2f7bc117f0c512f09f6a3b031ad0fb39e01f62c107bdc42faf4",
+    "windowsFileSize":  22765493
+}
