@@ -1540,6 +1540,11 @@ select:focus-visible {
   object-fit: cover;
 }
 
+.catalog-item-visual.has-preview {
+  background: white;
+  border: 1px solid #d3e5ff;
+}
+
 .catalog-item-fields {
   min-width: 0;
   display: grid;

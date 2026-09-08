@@ -861,10 +861,21 @@ function initDashboardPage() {
     }
   });
   root.addEventListener("change", async (event) => {
+    if (event.target.matches("[data-catalog-image-file]")) {
+      previewCatalogImageFile(event.target);
+      return;
+    }
+    if (event.target.matches("[data-catalog-image-url]")) {
+      previewCatalogImageUrl(event.target);
+      return;
+    }
     if (!event.target.matches("[data-reservation-status]")) return;
     const restaurantId = root.dataset.restaurantId;
     await updateReservationStatus(restaurantId, event.target.dataset.reservationStatus, event.target.value);
     await renderDashboard(root, currentUser, restaurantId);
+  });
+  root.addEventListener("input", (event) => {
+    if (event.target.matches("[data-catalog-image-url]")) previewCatalogImageUrl(event.target);
   });
   initAuthObserver(async (user, error) => {
     try {
@@ -1545,7 +1556,7 @@ function catalogItemEditorHtml(item, canEdit) {
   const fieldPrefix = `item.${item.categoryId}.${item.id}`;
   return `
     <article class="catalog-item-editor">
-      <div class="catalog-item-visual">
+      <div class="catalog-item-visual" data-catalog-image-preview>
         ${item.imageUrl ? `<img src="${escapeAttr(item.imageUrl)}" alt="${escapeAttr(item.displayName || item.name)}" loading="lazy" />` : `<span>Image</span>`}
       </div>
       <div class="catalog-item-fields">
@@ -1559,13 +1570,35 @@ function catalogItemEditorHtml(item, canEdit) {
         </div>
         <div class="form-grid compact-form-grid">
           <label>Nom d'affichage<input name="${escapeAttr(fieldPrefix)}.publicDisplayName" value="${escapeAttr(item.displayName !== item.name ? item.displayName : "")}" placeholder="${escapeAttr(item.name || "Nom catalogue")}" ${disabled(canEdit)} /></label>
-          <label>URL image<input name="${escapeAttr(fieldPrefix)}.imageUrl" value="${escapeAttr(item.imageUrl || "")}" placeholder="https://..." ${disabled(canEdit)} /></label>
-          <label>Image<input name="${escapeAttr(fieldPrefix)}.imageFile" type="file" accept="image/png,image/jpeg,image/webp" ${disabled(canEdit)} /></label>
+          <label>URL image<input name="${escapeAttr(fieldPrefix)}.imageUrl" value="${escapeAttr(item.imageUrl || "")}" placeholder="https://..." data-catalog-image-url ${disabled(canEdit)} /></label>
+          <label>Image<input name="${escapeAttr(fieldPrefix)}.imageFile" type="file" accept="image/png,image/jpeg,image/webp" data-catalog-image-file ${disabled(canEdit)} /></label>
           <label class="wide-field">Description article<textarea name="${escapeAttr(fieldPrefix)}.publicDescription" rows="2" ${disabled(canEdit)}>${escapeHtml(item.description || "")}</textarea></label>
         </div>
       </div>
     </article>
   `;
+}
+
+function previewCatalogImageFile(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const preview = input.closest(".catalog-item-editor")?.querySelector("[data-catalog-image-preview]");
+  if (!preview) return;
+  const url = URL.createObjectURL(file);
+  setCatalogImagePreview(preview, url, file.name || "Image article", () => URL.revokeObjectURL(url));
+}
+
+function previewCatalogImageUrl(input) {
+  const value = input.value.trim();
+  const preview = input.closest(".catalog-item-editor")?.querySelector("[data-catalog-image-preview]");
+  if (!preview || !value) return;
+  setCatalogImagePreview(preview, value, "Image article");
+}
+
+function setCatalogImagePreview(preview, src, alt, onLoad = null) {
+  preview.classList.add("has-preview");
+  preview.innerHTML = `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" loading="lazy" />`;
+  if (onLoad) preview.querySelector("img")?.addEventListener("load", onLoad, { once: true });
 }
 
 function reservationsHtml(reservations, role) {
