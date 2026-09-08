@@ -1430,7 +1430,7 @@ select:focus-visible {
 
 .catalog-category-summary {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
   cursor: pointer;
@@ -1467,6 +1467,34 @@ select:focus-visible {
   font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.catalog-autosave-status {
+  width: max-content;
+  justify-self: end;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: #edf5ff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.catalog-autosave-status[data-state="saving"],
+.catalog-autosave-status[data-state="pending"] {
+  color: #8a5a00;
+  background: #fff4d6;
+}
+
+.catalog-autosave-status[data-state="saved"] {
+  color: #0b7a32;
+  background: #e5f8eb;
+}
+
+.catalog-autosave-status[data-state="error"] {
+  color: #a72525;
+  background: #ffe6e6;
 }
 
 .catalog-category-body {
@@ -3062,12 +3090,18 @@ select:focus-visible {
   }
 
   .catalog-category-summary {
-    grid-template-columns: 18px minmax(0, 1fr);
+    grid-template-columns: 18px minmax(0, 1fr) auto;
   }
 
   .catalog-category-count {
     grid-column: 2;
     white-space: normal;
+  }
+
+  .catalog-category-summary .catalog-autosave-status {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
   }
 
   .catalog-item-editor {

@@ -32,6 +32,7 @@ const ROLE_LABELS = {
 
 let servicesPromise = null;
 let currentUser = null;
+const catalogAutosaveTimers = new Map();
 
 function getServices() {
   if (!servicesPromise) {
@@ -863,10 +864,16 @@ function initDashboardPage() {
   root.addEventListener("change", async (event) => {
     if (event.target.matches("[data-catalog-image-file]")) {
       previewCatalogImageFile(event.target);
+      autoSaveCatalogField(root, event.target, { immediate: true });
       return;
     }
     if (event.target.matches("[data-catalog-image-url]")) {
       previewCatalogImageUrl(event.target);
+      autoSaveCatalogField(root, event.target, { immediate: true });
+      return;
+    }
+    if (event.target.matches("[data-catalog-autosave]")) {
+      autoSaveCatalogField(root, event.target, { immediate: true });
       return;
     }
     if (!event.target.matches("[data-reservation-status]")) return;
@@ -876,6 +883,7 @@ function initDashboardPage() {
   });
   root.addEventListener("input", (event) => {
     if (event.target.matches("[data-catalog-image-url]")) previewCatalogImageUrl(event.target);
+    if (event.target.matches("[data-catalog-autosave], [data-catalog-image-url]")) autoSaveCatalogField(root, event.target);
   });
   initAuthObserver(async (user, error) => {
     try {
@@ -930,6 +938,82 @@ async function renderDashboard(root, user, restaurantId) {
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
   root.innerHTML = dashboardHtml(restaurant, role, reservations, members, dashboardMenu);
+}
+
+async function autoSaveCatalogField(root, field, options = {}) {
+  const form = field.closest("[data-dashboard-menu-form]");
+  if (!form) return;
+  const restaurantId = root.dataset.restaurantId;
+  const target = resolveCatalogAutosaveTarget(field);
+  if (!restaurantId || !target) return;
+  const key = `${target.type}.${target.categoryId || ""}.${target.itemId || ""}`;
+  clearTimeout(catalogAutosaveTimers.get(key));
+  const run = async () => {
+    const status = catalogAutosaveStatus(field);
+    try {
+      setAutosaveStatus(status, "Sauvegarde...", "saving");
+      await saveCatalogAutosaveTarget(restaurantId, form, target);
+      setAutosaveStatus(status, "Publie", "saved");
+    } catch (error) {
+      setAutosaveStatus(status, "Erreur", "error");
+      console.error(error);
+    }
+  };
+  if (options.immediate) {
+    await run();
+    return;
+  }
+  setAutosaveStatus(catalogAutosaveStatus(field), "Modification...", "pending");
+  catalogAutosaveTimers.set(key, setTimeout(run, 900));
+}
+
+function resolveCatalogAutosaveTarget(field) {
+  const type = field.dataset.catalogType;
+  if (type === "category") return { type, categoryId: field.dataset.categoryId };
+  if (type === "item") return { type, categoryId: field.dataset.categoryId, itemId: field.dataset.itemId };
+  return null;
+}
+
+async function saveCatalogAutosaveTarget(restaurantId, form, target) {
+  const services = await getServices();
+  const { doc, serverTimestamp, setDoc } = services.firestoreModule;
+  if (target.type === "category") {
+    const categoryId = target.categoryId;
+    await setDoc(doc(services.db, "restaurants", restaurantId, "catalog_categories", categoryId), {
+      publicVisible: form.elements[`category.${categoryId}.publicVisible`]?.checked === true,
+      publicDisplayName: form.elements[`category.${categoryId}.publicDisplayName`]?.value.trim() || "",
+      publicDescription: form.elements[`category.${categoryId}.publicDescription`]?.value.trim() || "",
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  }
+  if (target.type === "item") {
+    const { categoryId, itemId } = target;
+    const fieldPrefix = `item.${categoryId}.${itemId}`;
+    const fileInput = form.elements[`${fieldPrefix}.imageFile`];
+    const urlInput = form.elements[`${fieldPrefix}.imageUrl`];
+    const file = fileInput?.files?.[0];
+    const imageUrl = file ? await uploadCatalogItemImage(restaurantId, categoryId, itemId, file) : urlInput?.value.trim() || "";
+    if (file && urlInput) urlInput.value = imageUrl;
+    if (fileInput) fileInput.value = "";
+    await setDoc(doc(services.db, "restaurants", restaurantId, "catalog_categories", categoryId, "items", itemId), {
+      publicVisible: form.elements[`${fieldPrefix}.publicVisible`]?.checked === true,
+      publicDisplayName: form.elements[`${fieldPrefix}.publicDisplayName`]?.value.trim() || "",
+      publicDescription: form.elements[`${fieldPrefix}.publicDescription`]?.value.trim() || "",
+      imageUrl,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  }
+  await syncPublicRestaurant(restaurantId);
+}
+
+function catalogAutosaveStatus(field) {
+  return field.closest(".catalog-category-editor, .catalog-item-editor")?.querySelector("[data-catalog-autosave-status]");
+}
+
+function setAutosaveStatus(status, label, state) {
+  if (!status) return;
+  status.textContent = label;
+  status.dataset.state = state;
 }
 
 async function resolveRestaurantRole(restaurant, user) {
@@ -1532,17 +1616,18 @@ function catalogCategoryEditorHtml(category, canEdit) {
         <span class="catalog-category-chevron" aria-hidden="true"></span>
         <span class="catalog-category-name">${escapeHtml(category.name || category.id)}</span>
         <span class="catalog-category-count">${category.items.length} article${category.items.length > 1 ? "s" : ""} - ${visibleItems} affiche${visibleItems > 1 ? "s" : ""}</span>
+        <span class="catalog-autosave-status" data-catalog-autosave-status data-state="${category.publicVisible ? "saved" : "idle"}">${category.publicVisible ? "Publie" : "Non publie"}</span>
       </summary>
       <div class="catalog-category-body">
         <div class="catalog-category-head">
           <label class="inline-toggle">
-            <input type="checkbox" name="category.${escapeAttr(category.id)}.publicVisible" ${category.publicVisible ? "checked" : ""} ${disabled(canEdit)} />
+            <input type="checkbox" name="category.${escapeAttr(category.id)}.publicVisible" data-catalog-autosave data-catalog-type="category" data-category-id="${escapeAttr(category.id)}" ${category.publicVisible ? "checked" : ""} ${disabled(canEdit)} />
             Afficher la categorie
           </label>
         </div>
         <div class="form-grid compact-form-grid">
-          <label>Nom d'affichage<input name="category.${escapeAttr(category.id)}.publicDisplayName" value="${escapeAttr(category.displayName !== category.name ? category.displayName : "")}" placeholder="${escapeAttr(category.name || "Nom catalogue")}" ${disabled(canEdit)} /></label>
-          <label class="wide-field">Description categorie<textarea name="category.${escapeAttr(category.id)}.publicDescription" rows="2" ${disabled(canEdit)}>${escapeHtml(category.description || "")}</textarea></label>
+          <label>Nom d'affichage<input name="category.${escapeAttr(category.id)}.publicDisplayName" value="${escapeAttr(category.displayName !== category.name ? category.displayName : "")}" placeholder="${escapeAttr(category.name || "Nom catalogue")}" data-catalog-autosave data-catalog-type="category" data-category-id="${escapeAttr(category.id)}" ${disabled(canEdit)} /></label>
+          <label class="wide-field">Description categorie<textarea name="category.${escapeAttr(category.id)}.publicDescription" rows="2" data-catalog-autosave data-catalog-type="category" data-category-id="${escapeAttr(category.id)}" ${disabled(canEdit)}>${escapeHtml(category.description || "")}</textarea></label>
         </div>
         <div class="catalog-items-editor">
           ${category.items.length ? category.items.map((item) => catalogItemEditorHtml(item, canEdit)).join("") : emptyHtml("Aucun article dans cette categorie.")}
@@ -1562,17 +1647,18 @@ function catalogItemEditorHtml(item, canEdit) {
       <div class="catalog-item-fields">
         <div class="catalog-item-title">
           <label class="inline-toggle">
-            <input type="checkbox" name="${escapeAttr(fieldPrefix)}.publicVisible" ${item.publicVisible ? "checked" : ""} ${disabled(canEdit)} />
+            <input type="checkbox" name="${escapeAttr(fieldPrefix)}.publicVisible" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${item.publicVisible ? "checked" : ""} ${disabled(canEdit)} />
             Afficher
           </label>
           <strong>${escapeHtml(item.name || item.id)}</strong>
           ${item.priceLabel ? `<span>${escapeHtml(item.priceLabel)}</span>` : ""}
+          <small class="catalog-autosave-status" data-catalog-autosave-status data-state="${item.publicVisible || item.imageUrl ? "saved" : "idle"}">${item.publicVisible || item.imageUrl ? "Publie" : "Non publie"}</small>
         </div>
         <div class="form-grid compact-form-grid">
-          <label>Nom d'affichage<input name="${escapeAttr(fieldPrefix)}.publicDisplayName" value="${escapeAttr(item.displayName !== item.name ? item.displayName : "")}" placeholder="${escapeAttr(item.name || "Nom catalogue")}" ${disabled(canEdit)} /></label>
-          <label>URL image<input name="${escapeAttr(fieldPrefix)}.imageUrl" value="${escapeAttr(item.imageUrl || "")}" placeholder="https://..." data-catalog-image-url ${disabled(canEdit)} /></label>
-          <label>Image<input name="${escapeAttr(fieldPrefix)}.imageFile" type="file" accept="image/png,image/jpeg,image/webp" data-catalog-image-file ${disabled(canEdit)} /></label>
-          <label class="wide-field">Description article<textarea name="${escapeAttr(fieldPrefix)}.publicDescription" rows="2" ${disabled(canEdit)}>${escapeHtml(item.description || "")}</textarea></label>
+          <label>Nom d'affichage<input name="${escapeAttr(fieldPrefix)}.publicDisplayName" value="${escapeAttr(item.displayName !== item.name ? item.displayName : "")}" placeholder="${escapeAttr(item.name || "Nom catalogue")}" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
+          <label>URL image<input name="${escapeAttr(fieldPrefix)}.imageUrl" value="${escapeAttr(item.imageUrl || "")}" placeholder="https://..." data-catalog-image-url data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
+          <label>Image<input name="${escapeAttr(fieldPrefix)}.imageFile" type="file" accept="image/png,image/jpeg,image/webp" data-catalog-image-file data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
+          <label class="wide-field">Description article<textarea name="${escapeAttr(fieldPrefix)}.publicDescription" rows="2" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)}>${escapeHtml(item.description || "")}</textarea></label>
         </div>
       </div>
     </article>
