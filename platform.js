@@ -1116,35 +1116,35 @@ function renderPublicMenuContent(menuContainer, restaurant, menu) {
           ${category.description ? `<p>${escapeHtml(category.description)}</p>` : ""}
         </div>
         <div class="menu-grid">
-          ${category.items.map((item) => `
-            <article class="menu-item-card menu-item-card-live">
-              <img class="menu-photo ${item.imageUrl ? "" : "menu-photo-logo"}" src="${escapeAttr(item.imageUrl || fallbackLogo)}" alt="${escapeAttr(item.displayName || item.name)}" loading="lazy" />
-              <div>
-                <span>${escapeHtml(category.displayName || category.name || "Menu")}</span>
-                <h3>${escapeHtml(item.displayName || item.name)}</h3>
-                <p>${escapeHtml(item.description || "")}</p>
-                <strong>${escapeHtml(displayMenuItemPrice(item))}</strong>
-              </div>
-            </article>
-          `).join("")}
+          ${category.items.map((item) => menuItemRowHtml(item, category, fallbackLogo)).join("")}
         </div>
       </section>
     `;
     }).join("");
   } else if (menuContainer && menu?.items?.length) {
     menuContainer.classList.remove("public-menu-category-list");
-    menuContainer.innerHTML = menu.items.map((item) => `
-      <article class="menu-item-card menu-item-card-live">
-        <img class="menu-photo menu-photo-logo" src="${escapeAttr(fallbackLogo)}" alt="${escapeAttr(item.name)}" loading="lazy" />
-        <div>
-          <span>${escapeHtml(item.category || "Menu")}</span>
-          <h3>${escapeHtml(item.name)}</h3>
-          <p>${escapeHtml(item.description || "")}</p>
-          <strong>${escapeHtml(displayMenuItemPrice(item))}</strong>
-        </div>
-      </article>
-    `).join("");
+    menuContainer.innerHTML = menu.items.map((item) => menuItemRowHtml(item, { displayName: item.category || "Menu" }, fallbackLogo)).join("");
   }
+}
+
+function menuItemRowHtml(item, category, fallbackLogo) {
+  const title = item.displayName || item.name;
+  const description = item.description || "";
+  const price = displayMenuItemPrice(item);
+  return `
+    <details class="menu-item-card menu-item-card-live menu-item-row">
+      <summary class="menu-item-summary">
+        <img class="menu-photo ${item.imageUrl ? "" : "menu-photo-logo"}" src="${escapeAttr(item.imageUrl || fallbackLogo)}" alt="${escapeAttr(title)}" loading="lazy" />
+        <span class="menu-item-main">
+          <span class="menu-item-category">${escapeHtml(category.displayName || category.name || "Menu")}</span>
+          <span class="menu-item-name">${escapeHtml(title)}</span>
+          ${price ? `<strong>${escapeHtml(price)}</strong>` : ""}
+        </span>
+        ${description ? `<span class="menu-item-expand">Details</span>` : ""}
+      </summary>
+      ${description ? `<p class="menu-item-description">${escapeHtml(description)}</p>` : ""}
+    </details>
+  `;
 }
 
 function hydrateMenuCategoryNavigation(menu) {
