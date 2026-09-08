@@ -492,6 +492,7 @@ async function saveQrMenu(restaurantId, form, menu = null) {
           publicVisible: data.get(`${itemField}.publicVisible`) === "on",
           publicDisplayName: text(data, `${itemField}.publicDisplayName`),
           publicDescription: text(data, `${itemField}.publicDescription`),
+          ...(data.has(`${itemField}.publicPrice`) ? { publicPrice: text(data, `${itemField}.publicPrice`) } : {}),
           imageUrl: imageUrl || text(data, `${itemField}.imageUrl`),
           ...(imageUrl ? { imageUrl } : {}),
           updatedAt: serverTimestamp()
@@ -999,6 +1000,7 @@ async function saveCatalogAutosaveTarget(restaurantId, form, target) {
       publicVisible: form.elements[`${fieldPrefix}.publicVisible`]?.checked === true,
       publicDisplayName: form.elements[`${fieldPrefix}.publicDisplayName`]?.value.trim() || "",
       publicDescription: form.elements[`${fieldPrefix}.publicDescription`]?.value.trim() || "",
+      ...(form.elements[`${fieldPrefix}.publicPrice`] ? { publicPrice: form.elements[`${fieldPrefix}.publicPrice`].value.trim() || "" } : {}),
       imageUrl,
       updatedAt: serverTimestamp()
     }, { merge: true });
@@ -1259,7 +1261,7 @@ function publicMenuUrl(restaurant) {
 }
 
 function displayMenuItemPrice(item = {}) {
-  return item.priceLabel || formatPrice(firstText(item.price, item.priceOnSite, item.priceTakeaway, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount));
+  return item.priceLabel || formatPrice(firstDefinedMenuPrice(item.price, item.priceOnSite, item.priceTakeaway, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount, item.publicPrice, item.menuPrice));
 }
 
 function menuCategoryDomId(category = {}, index = 0) {
@@ -1613,6 +1615,7 @@ function catalogCategoryEditorHtml(category, canEdit) {
 
 function catalogItemEditorHtml(item, canEdit) {
   const fieldPrefix = `item.${item.categoryId}.${item.id}`;
+  const needsMenuPrice = !item.catalogPriceLabel;
   return `
     <article class="catalog-item-editor">
       <div class="catalog-item-visual" data-catalog-image-preview>
@@ -1625,11 +1628,12 @@ function catalogItemEditorHtml(item, canEdit) {
             Afficher
           </label>
           <strong>${escapeHtml(item.name || item.id)}</strong>
-          ${item.priceLabel ? `<span>${escapeHtml(item.priceLabel)}</span>` : ""}
+          ${item.catalogPriceLabel ? `<span>${escapeHtml(item.catalogPriceLabel)}</span>` : ""}
           <small class="catalog-autosave-status" data-catalog-autosave-status data-state="${item.publicVisible || item.imageUrl ? "saved" : "idle"}">${item.publicVisible || item.imageUrl ? "Publie" : "Non publie"}</small>
         </div>
         <div class="form-grid compact-form-grid">
           <label>Nom d'affichage<input name="${escapeAttr(fieldPrefix)}.publicDisplayName" value="${escapeAttr(item.displayName !== item.name ? item.displayName : "")}" placeholder="${escapeAttr(item.name || "Nom catalogue")}" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
+          ${needsMenuPrice ? `<label>Prix menu<input name="${escapeAttr(fieldPrefix)}.publicPrice" value="${escapeAttr(item.publicPrice || "")}" placeholder="Ex: 12,50" inputmode="decimal" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>` : ""}
           <label>URL image<input name="${escapeAttr(fieldPrefix)}.imageUrl" value="${escapeAttr(item.imageUrl || "")}" placeholder="https://..." data-catalog-image-url data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
           <label>Image<input name="${escapeAttr(fieldPrefix)}.imageFile" type="file" accept="image/png,image/jpeg,image/webp" data-catalog-image-file data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
           <label class="wide-field">Description article<textarea name="${escapeAttr(fieldPrefix)}.publicDescription" rows="2" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)}>${escapeHtml(item.description || "")}</textarea></label>
@@ -1757,7 +1761,9 @@ function normalizeCatalogCategory(category = {}) {
 function normalizeCatalogItem(item = {}) {
   const name = firstText(item.name, item.label, item.title, item.itemName, item.productName, item.designation, item.id);
   const publicDisplayName = firstText(item.publicDisplayName, item.menuDisplayName, item.displayName);
-  const price = firstText(item.price, item.priceOnSite, item.priceTakeaway, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount);
+  const catalogPrice = firstDefinedMenuPrice(item.price, item.priceOnSite, item.priceTakeaway, item.priceTtc, item.salePrice, item.defaultPrice, item.unitPrice, item.amount);
+  const publicPrice = firstDefinedMenuPrice(item.publicPrice, item.menuPrice);
+  const price = catalogPrice || publicPrice;
   return {
     ...item,
     id: item.id || "",
@@ -1766,7 +1772,10 @@ function normalizeCatalogItem(item = {}) {
     displayName: publicDisplayName || name,
     description: firstText(item.publicDescription, item.menuDescription, item.description, item.shortDescription),
     imageUrl: firstText(item.imageUrl, item.publicImageUrl, item.photoUrl, item.pictureUrl, item.image),
+    publicPrice,
     price,
+    catalogPrice,
+    catalogPriceLabel: formatPrice(catalogPrice),
     priceLabel: formatPrice(price),
     publicVisible: item.publicVisible === true,
     displayOrder: numberValue(item.displayOrder, item.order, item.position, item.sortOrder)
@@ -1786,6 +1795,27 @@ function sortByDisplayOrder(a = {}, b = {}) {
 function firstText(...values) {
   const found = values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
   return found === undefined ? "" : String(found).trim();
+}
+
+function firstDefinedMenuPrice(...values) {
+  const found = values.find((value) => value !== undefined && value !== null && String(value).trim() !== "" && !isUndefinedMenuPrice(value));
+  return found === undefined ? "" : String(found).trim();
+}
+
+function isUndefinedMenuPrice(value) {
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return normalized === "undefined" ||
+    normalized === "nan" ||
+    normalized === "null" ||
+    normalized.includes("indefini") ||
+    normalized.includes("non defini") ||
+    normalized.includes("non renseigne") ||
+    normalized.includes("a saisir") ||
+    normalized.includes("sur le champ");
 }
 
 function numberValue(...values) {
