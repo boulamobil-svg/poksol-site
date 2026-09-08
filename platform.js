@@ -1136,11 +1136,9 @@ function menuItemRowHtml(item, category, fallbackLogo) {
       <summary class="menu-item-summary">
         <img class="menu-photo ${item.imageUrl ? "" : "menu-photo-logo"}" src="${escapeAttr(item.imageUrl || fallbackLogo)}" alt="${escapeAttr(title)}" loading="lazy" />
         <span class="menu-item-main">
-          <span class="menu-item-category">${escapeHtml(category.displayName || category.name || "Menu")}</span>
           <span class="menu-item-name">${escapeHtml(title)}</span>
           ${price ? `<strong>${escapeHtml(price)}</strong>` : ""}
         </span>
-        ${description ? `<span class="menu-item-expand">Details</span>` : ""}
       </summary>
       ${description ? `<p class="menu-item-description">${escapeHtml(description)}</p>` : ""}
     </details>

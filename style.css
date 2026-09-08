@@ -2169,7 +2169,7 @@ select:focus-visible {
 
 .menu-item-summary {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr) auto;
+  grid-template-columns: 104px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   padding: 12px;
@@ -2187,35 +2187,11 @@ select:focus-visible {
   gap: 5px;
 }
 
-.menu-item-category {
-  color: var(--poksol-green);
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
 .menu-item-name {
   color: var(--poksol-navy);
   font-size: 19px;
   font-weight: 900;
   line-height: 1.18;
-}
-
-.menu-item-expand {
-  align-self: center;
-  padding: 8px 10px;
-  border: 1px solid #d3e5ff;
-  border-radius: 999px;
-  color: var(--poksol-blue);
-  background: white;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.menu-item-row[open] .menu-item-expand {
-  color: white;
-  background: var(--poksol-blue);
-  border-color: var(--poksol-blue);
 }
 
 .menu-item-description {
@@ -3062,12 +3038,6 @@ select:focus-visible {
 
   .menu-item-name {
     font-size: 17px;
-  }
-
-  .menu-item-summary .menu-item-expand {
-    grid-column: 2;
-    justify-self: start;
-    padding: 6px 9px;
   }
 
   .menu-item-description {
