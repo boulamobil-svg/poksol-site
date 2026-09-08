@@ -1578,8 +1578,12 @@ function menuFormHtml(restaurant, menu, canEdit) {
         </div>
         ${hasCatalog ? menu.categories.map((category) => catalogCategoryEditorHtml(category, canEdit)).join("") : emptyHtml("Aucune categorie catalogue trouvee dans Firestore pour ce restaurant.")}
       </section>
-      ${canEdit ? `<button class="primary-btn button-reset" type="submit">Enregistrer le menu</button>` : ""}
-      <small data-form-status></small>
+      ${canEdit ? `
+        <div class="menu-save-bar">
+          <small data-form-status></small>
+          <button class="primary-btn button-reset" type="submit">Enregistrer le menu</button>
+        </div>
+      ` : `<small data-form-status></small>`}
     </form>
   `;
 }
