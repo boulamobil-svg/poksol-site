@@ -1895,36 +1895,6 @@ select:focus-visible {
   font-weight: 900;
 }
 
-.menu-standalone-cta {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  align-items: center;
-  padding: 20px;
-  border-radius: 22px;
-  background: #fffaf3;
-  border: 1px solid #ead8c0;
-}
-
-.menu-standalone-cta span {
-  color: var(--poksol-green);
-  font-size: 12px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.menu-standalone-cta h3 {
-  margin: 8px 0;
-  color: var(--poksol-navy);
-  font-size: 24px;
-}
-
-.menu-standalone-cta p {
-  margin: 0;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
 .menu-page-body {
   min-height: 100vh;
   background: #fffaf3;
@@ -3014,7 +2984,6 @@ select:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .menu-standalone-cta,
   .menu-page-identity {
     align-items: flex-start;
     flex-direction: column;
@@ -3029,7 +2998,6 @@ select:focus-visible {
     grid-column: 1 / -1;
   }
 
-  .menu-standalone-cta .primary-btn,
   .menu-page-nav .outline-btn {
     width: 100%;
     justify-content: center;

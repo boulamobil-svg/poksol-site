@@ -1126,11 +1126,10 @@ function hydratePublicRestaurant(root, restaurant, menu) {
   const hours = document.querySelector("[data-public-hours]");
   if (hours) hours.innerHTML = hoursHtml(restaurant.openingHours);
   setupReservationHoursUi(restaurant);
-  const menuLink = document.querySelector("[data-public-menu-link]");
   const menuHasContent = !!(menu?.categories?.length || menu?.items?.length || menu?.externalUrl || menu?.pdfUrl);
   const menuIsVisible = menu?.isActive === true || restaurant.qrMenuEnabled === true && menuHasContent;
   const menuPageUrl = publicMenuUrl(restaurant);
-  if (menuLink) {
+  document.querySelectorAll("[data-public-menu-link]").forEach((menuLink) => {
     const menuUrl = menu?.type === "external_link" && menu?.externalUrl
       ? menu.externalUrl
       : menu?.type === "pdf" && menu?.pdfUrl
@@ -1145,33 +1144,8 @@ function hydratePublicRestaurant(root, restaurant, menu) {
       menuLink.removeAttribute("rel");
     }
     menuLink.textContent = menuIsVisible ? "Afficher le menu" : "Menu bientot disponible";
-  }
-  const menuContainer = document.querySelector("[data-public-menu-items]");
-  if (menuContainer && !menuIsVisible) {
-    menuContainer.classList.remove("public-menu-category-list");
-    menuContainer.innerHTML = `
-      <article class="menu-item-card">
-        <div>
-          <span>Menu</span>
-          <h3>Menu bientot disponible</h3>
-          <p>Le restaurant n'a pas encore publie son menu en ligne.</p>
-          <strong></strong>
-        </div>
-      </article>
-    `;
-  } else if (menuContainer) {
-    menuContainer.classList.remove("public-menu-category-list");
-    menuContainer.innerHTML = `
-      <article class="menu-standalone-cta">
-        <div>
-          <span>Menu QR</span>
-          <h3>Consulter le menu complet</h3>
-          <p>Le menu s'ouvre sur une page dediee, plus confortable sur smartphone.</p>
-        </div>
-        <a class="primary-btn" href="${escapeAttr(menuPageUrl)}">Afficher le menu</a>
-      </article>
-    `;
-  }
+  });
+  document.querySelector("[data-public-menu-items]")?.closest(".restaurant-section")?.remove();
   if (restaurant.reservationEnabled === false) {
     const reservation = document.querySelector("[data-public-reservation-form]");
     if (reservation) reservation.innerHTML = `<p class="alert-note">Les reservations en ligne ne sont pas encore activees pour ce restaurant.</p>`;
