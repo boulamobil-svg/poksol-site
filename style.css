@@ -1148,6 +1148,15 @@ select:focus-visible {
   gap: 16px;
 }
 
+.dashboard-shell {
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+}
+
+.dashboard-topline {
+  grid-column: 1 / -1;
+}
+
 .restaurant-mini-card {
   display: flex;
   align-items: center;
@@ -1231,14 +1240,13 @@ select:focus-visible {
 }
 
 .dashboard-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  gap: 8px;
   padding: 12px;
   border-radius: 18px;
   background: #edf6ff;
   position: sticky;
-  top: 12px;
+  top: 18px;
   z-index: 4;
 }
 
@@ -1250,7 +1258,8 @@ select:focus-visible {
   cursor: pointer;
   font: inherit;
   font-weight: 900;
-  padding: 12px 14px;
+  padding: 13px 14px;
+  text-align: left;
 }
 
 .dashboard-tabs button.is-active {
@@ -1260,6 +1269,7 @@ select:focus-visible {
 
 .dashboard-panel {
   display: none;
+  min-width: 0;
   padding: 26px;
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -2952,6 +2962,7 @@ select:focus-visible {
   .portal-roadmap,
   .admin-dashboard,
   .admin-workspace,
+  .dashboard-shell,
   .roadmap-list,
   .platform-grid-two,
   .contact-platform-card,
@@ -2986,6 +2997,10 @@ select:focus-visible {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     position: static;
+  }
+
+  .dashboard-tabs button {
+    text-align: center;
   }
 
   .admin-public-page-card,
