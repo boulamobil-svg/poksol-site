@@ -1508,12 +1508,16 @@ function hoursFormHtml(restaurant, canEdit) {
           return `
             <div class="weekly-hour-row">
               <strong>${label}</strong>
-              <label class="day-toggle"><input type="checkbox" name="${key}.lunchEnabled" ${lunchEnabled ? "checked" : ""} ${disabled(canEdit)} /> Service midi</label>
-              <label>Debut midi<input type="time" name="${key}.lunchStart" value="${escapeAttr(day.lunchStart || "12:00")}" ${disabled(canEdit)} /></label>
-              <label>Fin midi<input type="time" name="${key}.lunchEnd" value="${escapeAttr(day.lunchEnd || "14:30")}" ${disabled(canEdit)} /></label>
-              <label class="day-toggle"><input type="checkbox" name="${key}.dinnerEnabled" ${dinnerEnabled ? "checked" : ""} ${disabled(canEdit)} /> Service soir</label>
-              <label>Debut soir<input type="time" name="${key}.dinnerStart" value="${escapeAttr(day.dinnerStart || "19:00")}" ${disabled(canEdit)} /></label>
-              <label>Fin soir<input type="time" name="${key}.dinnerEnd" value="${escapeAttr(day.dinnerEnd || "22:30")}" ${disabled(canEdit)} /></label>
+              <div class="hours-service-row">
+                <label class="day-toggle"><input type="checkbox" name="${key}.lunchEnabled" ${lunchEnabled ? "checked" : ""} ${disabled(canEdit)} /> Service midi</label>
+                <label>Debut midi<input type="time" name="${key}.lunchStart" value="${escapeAttr(day.lunchStart || "12:00")}" ${disabled(canEdit)} /></label>
+                <label>Fin midi<input type="time" name="${key}.lunchEnd" value="${escapeAttr(day.lunchEnd || "14:30")}" ${disabled(canEdit)} /></label>
+              </div>
+              <div class="hours-service-row">
+                <label class="day-toggle"><input type="checkbox" name="${key}.dinnerEnabled" ${dinnerEnabled ? "checked" : ""} ${disabled(canEdit)} /> Service soir</label>
+                <label>Debut soir<input type="time" name="${key}.dinnerStart" value="${escapeAttr(day.dinnerStart || "19:00")}" ${disabled(canEdit)} /></label>
+                <label>Fin soir<input type="time" name="${key}.dinnerEnd" value="${escapeAttr(day.dinnerEnd || "22:30")}" ${disabled(canEdit)} /></label>
+              </div>
             </div>
           `;
         }).join("")}

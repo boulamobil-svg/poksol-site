@@ -1338,17 +1338,24 @@ select:focus-visible {
 
 .weekly-hour-row {
   display: grid;
-  grid-template-columns: minmax(110px, 0.8fr) minmax(130px, 1fr) repeat(2, minmax(120px, 0.8fr));
-  gap: 12px;
-  align-items: end;
-  padding: 14px;
+  gap: 14px;
+  align-items: stretch;
+  padding: 18px;
   border-radius: 16px;
   background: #f8fbff;
 }
 
 .weekly-hour-row > strong {
-  align-self: center;
+  display: block;
   color: var(--poksol-navy);
+  font-size: 18px;
+}
+
+.hours-service-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) repeat(2, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
 }
 
 .toggle-grid {
@@ -3007,10 +3014,24 @@ select:focus-visible {
   }
 
   .admin-table [role="row"],
-  .weekly-hour-row,
   .table-row {
     grid-template-columns: 1fr;
     text-align: center;
+  }
+
+  .weekly-hour-row {
+    text-align: left;
+  }
+
+  .hours-service-row {
+    grid-template-columns: 1fr;
+    padding-top: 12px;
+    border-top: 1px solid #d3e5ff;
+  }
+
+  .hours-service-row:first-of-type {
+    padding-top: 0;
+    border-top: 0;
   }
 
   .dashboard-shell {
