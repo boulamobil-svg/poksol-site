@@ -1502,6 +1502,11 @@ select:focus-visible {
   line-height: 1.55;
 }
 
+.catalog-category-list {
+  display: grid;
+  gap: 16px;
+}
+
 .menu-save-bar {
   position: sticky;
   bottom: 16px;
@@ -1535,11 +1540,18 @@ select:focus-visible {
   border: 1px solid #d3e5ff;
   border-radius: 18px;
   background: #f8fbff;
+  transition: border-color 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+.catalog-category-editor.is-dragging {
+  border-color: var(--poksol-blue);
+  opacity: 0.72;
+  transform: scale(0.99);
 }
 
 .catalog-category-summary {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto auto;
   gap: 12px;
   align-items: center;
   cursor: pointer;
@@ -1569,6 +1581,36 @@ select:focus-visible {
   color: var(--poksol-navy);
   font-size: 18px;
   font-weight: 900;
+}
+
+.catalog-drag-handle {
+  display: none;
+}
+
+.catalog-category-order-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.catalog-order-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d3e5ff;
+  border-radius: 10px;
+  background: white;
+  color: var(--poksol-blue);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.catalog-order-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.34;
 }
 
 .catalog-category-count {
@@ -3249,16 +3291,40 @@ select:focus-visible {
   }
 
   .catalog-category-summary {
-    grid-template-columns: 18px minmax(0, 1fr) auto;
+    grid-template-columns: 36px 18px minmax(0, 1fr) auto;
+  }
+
+  .catalog-drag-handle {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #d3e5ff;
+    border-radius: 10px;
+    background: white;
+    color: var(--text-muted);
+    cursor: grab;
+    font-size: 16px;
+    font-weight: 900;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .catalog-category-editor.is-dragging .catalog-drag-handle {
+    cursor: grabbing;
+  }
+
+  .catalog-category-order-actions {
+    display: none;
   }
 
   .catalog-category-count {
-    grid-column: 2;
+    grid-column: 3;
     white-space: normal;
   }
 
   .catalog-category-summary .catalog-autosave-status {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1 / span 2;
     align-self: center;
   }

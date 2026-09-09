@@ -33,6 +33,7 @@ const ROLE_LABELS = {
 let servicesPromise = null;
 let currentUser = null;
 const catalogAutosaveTimers = new Map();
+let draggedCatalogCategory = null;
 
 function getServices() {
   if (!servicesPromise) {
@@ -466,6 +467,7 @@ async function saveQrMenu(restaurantId, form, menu = null) {
   const data = new FormData(form);
   const catalogMenu = menu?.categories ? menu : await listCatalogMenu(restaurantId).catch(() => null);
   const categoryIds = new Set(catalogMenu?.categories?.map((category) => category.id) || []);
+  const categoryOrder = catalogCategoryOrderMap(form);
   const itemRefs = [];
   catalogMenu?.categories?.forEach((category) => {
     category.items.forEach((item) => itemRefs.push({ categoryId: category.id, itemId: item.id }));
@@ -478,6 +480,7 @@ async function saveQrMenu(restaurantId, form, menu = null) {
         publicVisible: data.get(`category.${categoryId}.publicVisible`) === "on",
         publicDisplayName: text(data, `category.${categoryId}.publicDisplayName`),
         publicDescription: text(data, `category.${categoryId}.publicDescription`),
+        ...(categoryOrder.has(categoryId) ? { displayOrder: categoryOrder.get(categoryId) } : {}),
         updatedAt: serverTimestamp()
       },
       { merge: true }
@@ -514,6 +517,18 @@ async function saveQrMenu(restaurantId, form, menu = null) {
     isActive: data.get("isActive") === "on",
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await syncPublicRestaurant(restaurantId);
+}
+
+async function saveCatalogCategoryOrder(restaurantId, form) {
+  const services = await getServices();
+  const { doc, serverTimestamp, setDoc } = services.firestoreModule;
+  const order = catalogCategoryOrderMap(form);
+  await Promise.all([...order].map(([categoryId, displayOrder]) => setDoc(
+    doc(services.db, "restaurants", restaurantId, "catalog_categories", categoryId),
+    { displayOrder, updatedAt: serverTimestamp() },
+    { merge: true }
+  )));
   await syncPublicRestaurant(restaurantId);
 }
 
@@ -841,6 +856,13 @@ function initDashboardPage() {
     }
     const copyButton = event.target.closest("[data-copy]");
     if (copyButton) navigator.clipboard?.writeText(copyButton.dataset.copy);
+    const categoryMove = event.target.closest("[data-category-move]");
+    if (categoryMove) {
+      event.preventDefault();
+      moveCatalogCategory(root, categoryMove);
+    }
+    const dragHandleClick = event.target.closest("[data-category-drag-handle]");
+    if (dragHandleClick) event.preventDefault();
     const colorChoice = event.target.closest("[data-color-choice]");
     if (colorChoice) {
       const form = colorChoice.closest("form");
@@ -905,6 +927,28 @@ function initDashboardPage() {
     if (event.target.matches("[data-catalog-autosave], [data-catalog-image-url]")) autoSaveCatalogField(root, event.target);
     if (event.target.matches("[data-color-input]")) updateColorPreview(event.target);
   });
+  root.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest("[data-category-drag-handle]");
+    if (!handle) return;
+    const category = handle.closest("[data-catalog-category-editor]");
+    if (!category) return;
+    event.preventDefault();
+    draggedCatalogCategory = category;
+    category.classList.add("is-dragging");
+    handle.setPointerCapture?.(event.pointerId);
+  });
+  root.addEventListener("pointermove", (event) => {
+    if (!draggedCatalogCategory) return;
+    const list = draggedCatalogCategory.closest("[data-catalog-category-list]");
+    if (!list) return;
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-catalog-category-editor]");
+    if (!target || target === draggedCatalogCategory || target.closest("[data-catalog-category-list]") !== list) return;
+    event.preventDefault();
+    const afterTarget = event.clientY > target.getBoundingClientRect().top + target.offsetHeight / 2;
+    list.insertBefore(draggedCatalogCategory, afterTarget ? target.nextSibling : target);
+  });
+  root.addEventListener("pointerup", () => finishCatalogCategoryDrag(root));
+  root.addEventListener("pointercancel", () => finishCatalogCategoryDrag(root));
   initAuthObserver(async (user, error) => {
     try {
       if (error) {
@@ -1600,7 +1644,7 @@ function menuFormHtml(restaurant, menu, canEdit) {
             <p>Activez les categories et articles a publier, puis personnalisez leur nom, description et image pour le menu QR.</p>
           </div>
         </div>
-        ${hasCatalog ? menu.categories.map((category) => catalogCategoryEditorHtml(category, canEdit)).join("") : emptyHtml("Aucune categorie catalogue trouvee dans Firestore pour ce restaurant.")}
+        ${hasCatalog ? `<div class="catalog-category-list" data-catalog-category-list>${menu.categories.map((category, index) => catalogCategoryEditorHtml(category, canEdit, index, menu.categories.length)).join("")}</div>` : emptyHtml("Aucune categorie catalogue trouvee dans Firestore pour ce restaurant.")}
       </section>
       ${canEdit ? `
         <div class="menu-save-bar">
@@ -1642,13 +1686,20 @@ function normalizeHexColor(value, fallback) {
   return fallback;
 }
 
-function catalogCategoryEditorHtml(category, canEdit) {
+function catalogCategoryEditorHtml(category, canEdit, index = 0, total = 0) {
   const visibleItems = category.items.filter((item) => item.publicVisible).length;
   return `
-    <details class="catalog-category-editor">
+    <details class="catalog-category-editor" data-catalog-category-editor data-category-id="${escapeAttr(category.id)}">
       <summary class="catalog-category-summary">
+        ${canEdit ? `<button class="catalog-drag-handle button-reset" type="button" aria-label="Deplacer ${escapeAttr(category.name || category.id)}" title="Deplacer" data-category-drag-handle>⋮⋮</button>` : ""}
         <span class="catalog-category-chevron" aria-hidden="true"></span>
         <span class="catalog-category-name">${escapeHtml(category.name || category.id)}</span>
+        ${canEdit ? `
+          <span class="catalog-category-order-actions">
+            <button class="catalog-order-btn button-reset" type="button" aria-label="Monter ${escapeAttr(category.name || category.id)}" title="Monter" data-category-move="up" ${index === 0 ? "disabled" : ""}>↑</button>
+            <button class="catalog-order-btn button-reset" type="button" aria-label="Descendre ${escapeAttr(category.name || category.id)}" title="Descendre" data-category-move="down" ${index === total - 1 ? "disabled" : ""}>↓</button>
+          </span>
+        ` : ""}
         <span class="catalog-category-count">${category.items.length} article${category.items.length > 1 ? "s" : ""} - ${visibleItems} affiche${visibleItems > 1 ? "s" : ""}</span>
         <span class="catalog-autosave-status" data-catalog-autosave-status data-state="${category.publicVisible ? "saved" : "idle"}">${category.publicVisible ? "Publie" : "Non publie"}</span>
       </summary>
@@ -1669,6 +1720,58 @@ function catalogCategoryEditorHtml(category, canEdit) {
       </div>
     </details>
   `;
+}
+
+function catalogCategoryOrderMap(form) {
+  return new Map([...form.querySelectorAll("[data-catalog-category-editor][data-category-id]")]
+    .map((category, index) => [category.dataset.categoryId, index + 1]));
+}
+
+function moveCatalogCategory(root, button) {
+  const category = button.closest("[data-catalog-category-editor]");
+  const list = category?.closest("[data-catalog-category-list]");
+  if (!category || !list) return;
+  if (button.dataset.categoryMove === "up" && category.previousElementSibling) {
+    list.insertBefore(category, category.previousElementSibling);
+  }
+  if (button.dataset.categoryMove === "down" && category.nextElementSibling) {
+    list.insertBefore(category.nextElementSibling, category);
+  }
+  persistCatalogCategoryOrder(root, list);
+}
+
+function finishCatalogCategoryDrag(root) {
+  if (!draggedCatalogCategory) return;
+  const list = draggedCatalogCategory.closest("[data-catalog-category-list]");
+  draggedCatalogCategory.classList.remove("is-dragging");
+  draggedCatalogCategory = null;
+  if (list) persistCatalogCategoryOrder(root, list);
+}
+
+async function persistCatalogCategoryOrder(root, list) {
+  updateCatalogOrderButtons(list);
+  const form = list.closest("[data-dashboard-menu-form]");
+  const restaurantId = root.dataset.restaurantId;
+  const status = form?.querySelector("[data-form-status]");
+  if (!form || !restaurantId) return;
+  try {
+    if (status) status.textContent = "Ordre des categories...";
+    await saveCatalogCategoryOrder(restaurantId, form);
+    if (status) status.textContent = "Ordre publie";
+  } catch (error) {
+    if (status) status.textContent = "Erreur ordre categories";
+    console.error(error);
+  }
+}
+
+function updateCatalogOrderButtons(list) {
+  const categories = [...list.querySelectorAll("[data-catalog-category-editor]")];
+  categories.forEach((category, index) => {
+    const up = category.querySelector('[data-category-move="up"]');
+    const down = category.querySelector('[data-category-move="down"]');
+    if (up) up.disabled = index === 0;
+    if (down) down.disabled = index === categories.length - 1;
+  });
 }
 
 function catalogItemEditorHtml(item, canEdit) {
