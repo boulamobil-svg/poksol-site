@@ -822,6 +822,15 @@ function initDashboardPage() {
     if (tabButton) {
       root.querySelectorAll("[data-dashboard-tab]").forEach((button) => button.classList.toggle("is-active", button === tabButton));
       root.querySelectorAll("[data-dashboard-panel]").forEach((panel) => panel.classList.toggle("is-active", panel.dataset.dashboardPanel === tabButton.dataset.dashboardTab));
+      root.querySelector(".dashboard-shell")?.classList.remove("is-nav-open");
+    }
+    const navToggle = event.target.closest("[data-dashboard-nav-toggle]");
+    if (navToggle) {
+      root.querySelector(".dashboard-shell")?.classList.toggle("is-nav-open");
+    }
+    const navBackdrop = event.target.closest("[data-dashboard-nav-backdrop]");
+    if (navBackdrop) {
+      root.querySelector(".dashboard-shell")?.classList.remove("is-nav-open");
     }
     const tabLink = event.target.closest("[data-dashboard-tab-link]");
     if (tabLink) {
@@ -1421,13 +1430,12 @@ function dashboardHtml(restaurant, role, reservations, members, menu) {
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
   return `
     <div class="dashboard-shell">
-      <div class="dashboard-topline">
-        <div>
-          <p class="eyebrow">${escapeHtml(ROLE_LABELS[role] || role)}</p>
-          <h2>${escapeHtml(restaurant.name || restaurant.id)}</h2>
-          <p data-dashboard-status>Dashboard connecte a Firestore.</p>
-        </div>
-      </div>
+      <button class="dashboard-nav-toggle button-reset" type="button" aria-label="Ouvrir les sections" data-dashboard-nav-toggle>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+      <button class="dashboard-nav-backdrop button-reset" type="button" aria-label="Fermer les sections" data-dashboard-nav-backdrop></button>
       <nav class="dashboard-tabs" aria-label="Sections dashboard">
         ${["overview", "profile", "hours", "public", "menu", "reservations", "team", "downloads"].map((tab, index) => `
           <button class="${index === 0 ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>

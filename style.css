@@ -1044,6 +1044,19 @@ select:focus-visible {
   margin: 28px auto 0;
 }
 
+.admin-work-body {
+  background: #f5f8fc;
+}
+
+.admin-work-body .portal-page {
+  padding-top: 28px;
+}
+
+.admin-work-body .platform-section {
+  max-width: 1640px;
+  margin-top: 0;
+}
+
 .platform-card {
   padding: 28px;
   border: 1px solid var(--line);
@@ -1149,12 +1162,17 @@ select:focus-visible {
 }
 
 .dashboard-shell {
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: minmax(190px, 250px) minmax(0, 1fr);
   align-items: start;
 }
 
 .dashboard-topline {
   grid-column: 1 / -1;
+}
+
+.dashboard-nav-toggle,
+.dashboard-nav-backdrop {
+  display: none;
 }
 
 .restaurant-mini-card {
@@ -1242,12 +1260,14 @@ select:focus-visible {
 .dashboard-tabs {
   display: grid;
   gap: 8px;
-  padding: 12px;
+  min-height: calc(100vh - 56px);
+  padding: 22px 18px;
   border-radius: 18px;
   background: #edf6ff;
   position: sticky;
-  top: 18px;
+  top: 28px;
   z-index: 4;
+  align-content: start;
 }
 
 .dashboard-tabs button {
@@ -1270,7 +1290,8 @@ select:focus-visible {
 .dashboard-panel {
   display: none;
   min-width: 0;
-  padding: 26px;
+  min-height: calc(100vh - 56px);
+  padding: 40px;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: white;
@@ -2962,7 +2983,6 @@ select:focus-visible {
   .portal-roadmap,
   .admin-dashboard,
   .admin-workspace,
-  .dashboard-shell,
   .roadmap-list,
   .platform-grid-two,
   .contact-platform-card,
@@ -2993,14 +3013,78 @@ select:focus-visible {
     text-align: center;
   }
 
-  .dashboard-tabs {
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+    padding-top: 58px;
+  }
+
+  .dashboard-nav-toggle {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 20;
+    width: 44px;
+    height: 44px;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    position: static;
+    place-items: center;
+    gap: 3px;
+    border: 1px solid #d3e5ff;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 12px 32px rgba(10, 37, 64, 0.12);
+  }
+
+  .dashboard-nav-toggle span {
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--poksol-navy);
+  }
+
+  .dashboard-nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 17;
+    display: none;
+    background: rgba(10, 37, 64, 0.22);
+  }
+
+  .dashboard-tabs {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 18;
+    width: min(82vw, 300px);
+    height: 100vh;
+    min-height: 0;
+    grid-template-columns: 1fr;
+    padding: 74px 16px 18px;
+    border-radius: 0 22px 22px 0;
+    box-shadow: 18px 0 46px rgba(10, 37, 64, 0.18);
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
   }
 
   .dashboard-tabs button {
-    text-align: center;
+    text-align: left;
+  }
+
+  .dashboard-shell.is-nav-open .dashboard-tabs {
+    transform: translateX(0);
+  }
+
+  .dashboard-shell.is-nav-open .dashboard-nav-backdrop {
+    display: block;
+  }
+
+  .dashboard-topline {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .dashboard-panel {
+    min-height: 0;
+    padding: 24px 18px;
   }
 
   .admin-public-page-card,
