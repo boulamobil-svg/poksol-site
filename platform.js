@@ -841,6 +841,15 @@ function initDashboardPage() {
     }
     const copyButton = event.target.closest("[data-copy]");
     if (copyButton) navigator.clipboard?.writeText(copyButton.dataset.copy);
+    const colorChoice = event.target.closest("[data-color-choice]");
+    if (colorChoice) {
+      const form = colorChoice.closest("form");
+      const input = form?.elements[colorChoice.dataset.colorTarget];
+      if (input) {
+        input.value = colorChoice.dataset.colorChoice;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
   });
   root.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -894,6 +903,7 @@ function initDashboardPage() {
   root.addEventListener("input", (event) => {
     if (event.target.matches("[data-catalog-image-url]")) previewCatalogImageUrl(event.target);
     if (event.target.matches("[data-catalog-autosave], [data-catalog-image-url]")) autoSaveCatalogField(root, event.target);
+    if (event.target.matches("[data-color-input]")) updateColorPreview(event.target);
   });
   initAuthObserver(async (user, error) => {
     try {
@@ -1531,6 +1541,8 @@ function hoursFormHtml(restaurant, canEdit) {
 function publicSettingsHtml(restaurant, publicUrl, canEdit) {
   const settings = restaurant.publicPageSettings || {};
   const theme = settings.theme || {};
+  const primaryColor = normalizeHexColor(theme.primaryColor, "#0A2540");
+  const accentColor = normalizeHexColor(theme.accentColor, "#1976F3");
   return `
     <form class="platform-form" data-dashboard-public-form>
       <div class="toggle-grid">
@@ -1539,8 +1551,8 @@ function publicSettingsHtml(restaurant, publicUrl, canEdit) {
         <label><input type="checkbox" name="qrMenuEnabled" ${restaurant.qrMenuEnabled ? "checked" : ""} ${disabled(canEdit)} /> QR menu actif</label>
       </div>
       <div class="form-grid">
-        <label>Couleur principale<input name="primaryColor" value="${escapeAttr(theme.primaryColor || "#0A2540")}" ${disabled(canEdit)} /></label>
-        <label>Couleur accent<input name="accentColor" value="${escapeAttr(theme.accentColor || "#1976F3")}" ${disabled(canEdit)} /></label>
+        ${colorPickerFieldHtml("Couleur principale", "primaryColor", primaryColor, canEdit, ["#0A2540", "#123C63", "#17324D", "#2D3748", "#1F2937", "#0F766E"])}
+        ${colorPickerFieldHtml("Couleur accent", "accentColor", accentColor, canEdit, ["#1976F3", "#42C96F", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6"])}
         <label class="wide-field">Message public<textarea name="customMessage" rows="3" ${disabled(canEdit)}>${escapeHtml(settings.customMessage || "")}</textarea></label>
       </div>
       <div class="quick-links">
@@ -1598,6 +1610,36 @@ function menuFormHtml(restaurant, menu, canEdit) {
       ` : `<small data-form-status></small>`}
     </form>
   `;
+}
+
+function colorPickerFieldHtml(label, name, value, canEdit, palette) {
+  return `
+    <label class="color-picker-field">${escapeHtml(label)}
+      <span class="color-picker-control">
+        <span class="color-preview" style="background:${escapeAttr(value)}"></span>
+        <input type="color" name="${escapeAttr(name)}" value="${escapeAttr(value)}" data-color-input ${disabled(canEdit)} />
+      </span>
+      <span class="color-swatch-grid" aria-label="${escapeAttr(label)}">
+        ${palette.map((color) => `
+          <button class="color-swatch button-reset" type="button" style="background:${escapeAttr(color)}" title="${escapeAttr(color)}" aria-label="${escapeAttr(color)}" data-color-target="${escapeAttr(name)}" data-color-choice="${escapeAttr(color)}" ${disabled(canEdit)}></button>
+        `).join("")}
+      </span>
+    </label>
+  `;
+}
+
+function updateColorPreview(input) {
+  const preview = input.closest(".color-picker-control")?.querySelector(".color-preview");
+  if (preview) preview.style.background = input.value;
+}
+
+function normalizeHexColor(value, fallback) {
+  const color = String(value || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+  if (/^#[0-9a-f]{3}$/i.test(color)) {
+    return `#${color.slice(1).split("").map((char) => char + char).join("")}`;
+  }
+  return fallback;
 }
 
 function catalogCategoryEditorHtml(category, canEdit) {
