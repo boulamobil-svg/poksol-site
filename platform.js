@@ -1613,7 +1613,6 @@ function menuFormHtml(restaurant, menu, canEdit) {
   const qrUrl = publicMenuUrl(restaurant);
   const qrImage = `https://quickchart.io/qr?size=180&text=${encodeURIComponent(qrUrl)}`;
   const hasCatalog = Array.isArray(menu?.categories) && menu.categories.length > 0;
-  const menuType = ["external_link", "pdf", "catalog"].includes(menu?.type) ? menu.type : "catalog";
   return `
     <form class="platform-form" data-dashboard-menu-form>
       <div class="qr-menu-preview">
@@ -1623,19 +1622,11 @@ function menuFormHtml(restaurant, menu, canEdit) {
         </div>
         <img src="${qrImage}" alt="QR menu" loading="lazy" />
       </div>
-      <div class="form-grid">
-        <label>Titre<input name="title" value="${escapeAttr(menu?.title || "Menu principal")}" ${disabled(canEdit)} /></label>
-        <label>Type
-          <select name="type" ${disabled(canEdit)}>
-            <option value="external_link" ${menu?.type === "external_link" ? "selected" : ""}>Lien externe</option>
-            <option value="pdf" ${menu?.type === "pdf" ? "selected" : ""}>PDF</option>
-            <option value="catalog" ${menuType === "catalog" ? "selected" : ""}>Catalogue Poket</option>
-          </select>
-        </label>
-        <label>URL externe<input name="externalUrl" value="${escapeAttr(menu?.externalUrl || "")}" placeholder="https://..." ${disabled(canEdit)} /></label>
-        <label>PDF URL<input name="pdfUrl" value="${escapeAttr(menu?.pdfUrl || "")}" placeholder="https://..." ${disabled(canEdit)} /></label>
-        <label><input type="checkbox" name="isActive" ${restaurant.qrMenuEnabled || menu?.isActive ? "checked" : ""} ${disabled(canEdit)} /> Menu actif</label>
-      </div>
+      <input type="hidden" name="title" value="${escapeAttr(menu?.title || "Menu")}" />
+      <input type="hidden" name="type" value="catalog" />
+      <input type="hidden" name="externalUrl" value="" />
+      <input type="hidden" name="pdfUrl" value="" />
+      ${(restaurant.qrMenuEnabled || menu?.isActive) ? `<input type="hidden" name="isActive" value="on" />` : ""}
       <section class="catalog-menu-editor">
         <div class="section-title-row">
           <div>
