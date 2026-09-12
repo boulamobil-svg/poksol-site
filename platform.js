@@ -1154,6 +1154,12 @@ function initPublicMenuPage() {
     item.classList.toggle("is-image-expanded");
     imageToggle.setAttribute("aria-expanded", item.classList.contains("is-image-expanded") ? "true" : "false");
   });
+  root.addEventListener("toggle", (event) => {
+    const item = event.target.closest?.("[data-menu-item-row]");
+    if (!item || item.open) return;
+    item.classList.remove("is-image-expanded");
+    item.querySelector("[data-menu-image-toggle]")?.setAttribute("aria-expanded", "false");
+  }, true);
   document.querySelectorAll("[data-menu-drawer-toggle]").forEach((button) => {
     button.addEventListener("click", () => toggleMenuDrawer(true));
   });
