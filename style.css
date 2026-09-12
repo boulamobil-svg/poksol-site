@@ -2284,6 +2284,64 @@ body.menu-page-body.translated-rtl {
   overflow: hidden;
 }
 
+.menu-lightbox-open {
+  overflow: hidden;
+}
+
+.menu-image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  place-items: center;
+  padding: 24px;
+}
+
+.menu-image-lightbox.is-open {
+  display: grid;
+}
+
+.menu-image-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 25, 46, 0.88);
+}
+
+.menu-image-lightbox figure {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  width: min(1100px, 94vw);
+  max-height: 92vh;
+  display: grid;
+  place-items: center;
+}
+
+.menu-image-lightbox img {
+  display: block;
+  max-width: 100%;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
+}
+
+.menu-image-lightbox-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  color: var(--poksol-navy);
+  background: white;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+  font-size: 28px;
+  line-height: 1;
+}
+
 .restaurant-layout {
   max-width: 1180px;
   margin: 0 auto;
@@ -2491,6 +2549,7 @@ body.menu-page-body.translated-rtl {
   grid-row: 1;
   opacity: 1;
   pointer-events: auto;
+  cursor: zoom-in;
 }
 
 .menu-item-row.is-image-expanded .menu-item-detail-media {
@@ -3486,6 +3545,15 @@ body.menu-page-body.translated-rtl {
   .menu-photo-large {
     aspect-ratio: 16 / 10;
     border-radius: 16px;
+  }
+
+  .menu-image-lightbox {
+    padding: 14px;
+  }
+
+  .menu-image-lightbox-close {
+    top: 10px;
+    right: 10px;
   }
 
   .catalog-category-head,

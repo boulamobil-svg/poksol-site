@@ -1144,6 +1144,13 @@ function initPublicMenuPage() {
   if (!root) return;
   initMenuLanguageSelector();
   root.addEventListener("click", (event) => {
+    const lightboxImage = event.target.closest("[data-menu-lightbox-image]");
+    if (lightboxImage) {
+      event.preventDefault();
+      event.stopPropagation();
+      openMenuImageLightbox(lightboxImage.src, lightboxImage.alt);
+      return;
+    }
     const imageToggle = event.target.closest("[data-menu-image-toggle]");
     if (!imageToggle) return;
     event.preventDefault();
@@ -1165,6 +1172,9 @@ function initPublicMenuPage() {
   });
   document.querySelectorAll("[data-menu-drawer-close]").forEach((button) => {
     button.addEventListener("click", () => toggleMenuDrawer(false));
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeMenuImageLightbox();
   });
   const slug = root.dataset.restaurantSlug || new URLSearchParams(window.location.search).get("slug") || "chez-marwan";
   getRestaurantBySlug(slug).then((restaurant) => {
@@ -1401,7 +1411,7 @@ function menuItemRowHtml(item, category, fallbackLogo) {
       <div class="menu-item-detail">
         <span class="menu-item-detail-media">
           <button class="menu-photo-toggle button-reset" type="button" data-menu-image-toggle aria-label="Agrandir l'image" aria-expanded="false">+</button>
-          <img class="menu-photo-large ${imageClass}" src="${escapeAttr(imageUrl)}" alt="${escapeAttr(title)}" loading="lazy" />
+          <img class="menu-photo-large ${imageClass}" src="${escapeAttr(imageUrl)}" alt="${escapeAttr(title)}" loading="lazy" data-menu-lightbox-image />
         </span>
         ${description ? `<p class="menu-item-description">${escapeHtml(description)}</p>` : `<p class="menu-item-description">Aucune description disponible.</p>`}
       </div>
@@ -1434,6 +1444,39 @@ function toggleMenuDrawer(open) {
   drawer.classList.toggle("is-open", open);
   drawer.setAttribute("aria-hidden", open ? "false" : "true");
   document.body.classList.toggle("menu-drawer-open", open);
+}
+
+function openMenuImageLightbox(src, alt = "") {
+  if (!src) return;
+  let lightbox = document.querySelector("[data-menu-image-lightbox]");
+  if (!lightbox) {
+    lightbox = document.createElement("div");
+    lightbox.className = "menu-image-lightbox";
+    lightbox.dataset.menuImageLightbox = "";
+    lightbox.innerHTML = `
+      <button class="menu-image-lightbox-backdrop button-reset" type="button" data-menu-lightbox-close aria-label="Fermer l'image"></button>
+      <figure>
+        <button class="menu-image-lightbox-close button-reset" type="button" data-menu-lightbox-close aria-label="Fermer">×</button>
+        <img src="" alt="" />
+      </figure>
+    `;
+    lightbox.addEventListener("click", (event) => {
+      if (event.target.closest("[data-menu-lightbox-close]")) closeMenuImageLightbox();
+    });
+    document.body.appendChild(lightbox);
+  }
+  const image = lightbox.querySelector("img");
+  image.src = src;
+  image.alt = alt || "";
+  lightbox.classList.add("is-open");
+  document.body.classList.add("menu-lightbox-open");
+}
+
+function closeMenuImageLightbox() {
+  const lightbox = document.querySelector("[data-menu-image-lightbox]");
+  if (!lightbox) return;
+  lightbox.classList.remove("is-open");
+  document.body.classList.remove("menu-lightbox-open");
 }
 
 function publicMenuEmptyHtml(title) {
