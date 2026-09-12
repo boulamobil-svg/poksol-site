@@ -30,6 +30,8 @@ const ROLE_LABELS = {
   staff: "Staff"
 };
 
+const MENU_TRANSLATION_LANGUAGES = new Set(["fr", "de", "en", "es", "it", "tr", "ar"]);
+
 let servicesPromise = null;
 let currentUser = null;
 const catalogAutosaveTimers = new Map();
@@ -480,7 +482,7 @@ async function saveQrMenu(restaurantId, form, menu = null) {
         publicVisible: data.get(`category.${categoryId}.publicVisible`) === "on",
         publicDisplayName: text(data, `category.${categoryId}.publicDisplayName`),
         publicDescription: text(data, `category.${categoryId}.publicDescription`),
-        ...(categoryOrder.has(categoryId) ? { displayOrder: categoryOrder.get(categoryId) } : {}),
+        ...(categoryOrder.has(categoryId) ? { publicDisplayOrder: categoryOrder.get(categoryId) } : {}),
         updatedAt: serverTimestamp()
       },
       { merge: true }
@@ -524,9 +526,9 @@ async function saveCatalogCategoryOrder(restaurantId, form) {
   const services = await getServices();
   const { doc, serverTimestamp, setDoc } = services.firestoreModule;
   const order = catalogCategoryOrderMap(form);
-  await Promise.all([...order].map(([categoryId, displayOrder]) => setDoc(
+  await Promise.all([...order].map(([categoryId, publicDisplayOrder]) => setDoc(
     doc(services.db, "restaurants", restaurantId, "catalog_categories", categoryId),
-    { displayOrder, updatedAt: serverTimestamp() },
+    { publicDisplayOrder, updatedAt: serverTimestamp() },
     { merge: true }
   )));
   await syncPublicRestaurant(restaurantId);
@@ -1140,6 +1142,18 @@ function initPublicRestaurantPage() {
 function initPublicMenuPage() {
   const root = document.querySelector("[data-public-menu-page]");
   if (!root) return;
+  initMenuLanguageSelector();
+  root.addEventListener("click", (event) => {
+    const imageToggle = event.target.closest("[data-menu-image-toggle]");
+    if (!imageToggle) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const item = imageToggle.closest("[data-menu-item-row]");
+    if (!item) return;
+    item.open = true;
+    item.classList.toggle("is-image-expanded");
+    imageToggle.setAttribute("aria-expanded", item.classList.contains("is-image-expanded") ? "true" : "false");
+  });
   document.querySelectorAll("[data-menu-drawer-toggle]").forEach((button) => {
     button.addEventListener("click", () => toggleMenuDrawer(true));
   });
@@ -1156,6 +1170,106 @@ function initPublicMenuPage() {
   }).catch(() => {
     root.innerHTML = publicMenuEmptyHtml("Menu indisponible");
   });
+}
+
+function initMenuLanguageSelector() {
+  const select = document.querySelector("[data-menu-language-select]");
+  if (!select) return;
+  const currentLanguage = currentMenuTranslationLanguage();
+  select.value = currentLanguage;
+  applyMenuLanguageDocumentState(currentLanguage);
+  suppressGoogleTranslateBanner();
+  select.addEventListener("change", () => {
+    const language = MENU_TRANSLATION_LANGUAGES.has(select.value) ? select.value : "fr";
+    setMenuTranslationLanguage(language);
+  });
+  if (currentLanguage !== "fr") loadGoogleMenuTranslate();
+}
+
+function loadGoogleMenuTranslate() {
+  if (window.google?.translate?.TranslateElement) {
+    setupGoogleMenuTranslate();
+    return;
+  }
+  window.googleTranslateElementInit = setupGoogleMenuTranslate;
+  if (document.querySelector("[data-google-translate-script]")) return;
+  const script = document.createElement("script");
+  script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+  script.async = true;
+  script.dataset.googleTranslateScript = "true";
+  document.head.appendChild(script);
+}
+
+function setupGoogleMenuTranslate() {
+  const host = document.getElementById("google_translate_element");
+  if (!host || !window.google?.translate?.TranslateElement) return;
+  if (host.dataset.ready === "true") return;
+  host.dataset.ready = "true";
+  new window.google.translate.TranslateElement({
+    pageLanguage: "fr",
+    includedLanguages: "fr,de,en,es,it,tr,ar",
+    autoDisplay: false
+  }, "google_translate_element");
+  suppressGoogleTranslateBanner();
+}
+
+function currentMenuTranslationLanguage() {
+  const stored = localStorage.getItem("poksolQrMenuLanguage") || readGoogleTranslateLanguage();
+  return MENU_TRANSLATION_LANGUAGES.has(stored) ? stored : "fr";
+}
+
+function setMenuTranslationLanguage(language) {
+  localStorage.setItem("poksolQrMenuLanguage", language);
+  applyMenuLanguageDocumentState(language);
+  writeGoogleTranslateLanguage(language);
+  window.location.reload();
+}
+
+function readGoogleTranslateLanguage() {
+  const match = document.cookie.match(/(?:^|;\s*)googtrans=([^;]+)/);
+  const value = match ? decodeURIComponent(match[1]) : "";
+  const language = value.split("/").filter(Boolean).pop();
+  return MENU_TRANSLATION_LANGUAGES.has(language) ? language : "";
+}
+
+function writeGoogleTranslateLanguage(language) {
+  const value = language === "fr" ? "" : `/fr/${language}`;
+  writeCookie("googtrans", value);
+  if (window.location.hostname.includes(".")) {
+    const parts = window.location.hostname.split(".");
+    const parentDomain = `.${parts.slice(-2).join(".")}`;
+    writeCookie("googtrans", value, parentDomain);
+  }
+}
+
+function writeCookie(name, value, domain = "") {
+  const expires = value ? "Fri, 31 Dec 9999 23:59:59 GMT" : "Thu, 01 Jan 1970 00:00:00 GMT";
+  const domainPart = domain ? `; domain=${domain}` : "";
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/${domainPart}`;
+}
+
+function applyMenuLanguageDocumentState(language) {
+  document.documentElement.lang = language;
+  document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+}
+
+function suppressGoogleTranslateBanner() {
+  const hide = () => {
+    document.documentElement.style.top = "0px";
+    document.body.style.top = "0px";
+    document.body.style.marginTop = "0px";
+    document.querySelectorAll("iframe.goog-te-banner-frame, .goog-te-banner-frame, .skiptranslate iframe").forEach((element) => {
+      element.style.display = "none";
+      element.style.visibility = "hidden";
+      element.style.height = "0";
+    });
+  };
+  hide();
+  window.setTimeout(hide, 200);
+  window.setTimeout(hide, 800);
+  if (document.body.dataset.googleBannerObserver === "true") return;
+  document.body.dataset.googleBannerObserver = "true";
+  new MutationObserver(hide).observe(document.documentElement, { childList: true, subtree: true, attributes: true });
 }
 
 function initContactForms() {
@@ -1265,16 +1379,26 @@ function menuItemRowHtml(item, category, fallbackLogo) {
   const title = item.displayName || item.name;
   const description = item.description || "";
   const price = displayMenuItemPrice(item);
+  const imageUrl = item.imageUrl || fallbackLogo;
+  const imageClass = item.imageUrl ? "" : "menu-photo-logo";
   return `
-    <details class="menu-item-card menu-item-card-live menu-item-row">
+    <details class="menu-item-card menu-item-card-live menu-item-row" data-menu-item-row>
       <summary class="menu-item-summary">
-        <img class="menu-photo ${item.imageUrl ? "" : "menu-photo-logo"}" src="${escapeAttr(item.imageUrl || fallbackLogo)}" alt="${escapeAttr(title)}" loading="lazy" />
+        <span class="menu-photo-wrap">
+          <img class="menu-photo ${imageClass}" src="${escapeAttr(imageUrl)}" alt="${escapeAttr(title)}" loading="lazy" />
+        </span>
         <span class="menu-item-main">
           <span class="menu-item-name">${escapeHtml(title)}</span>
           ${price ? `<strong>${escapeHtml(price)}</strong>` : ""}
         </span>
       </summary>
-      ${description ? `<p class="menu-item-description">${escapeHtml(description)}</p>` : ""}
+      <div class="menu-item-detail">
+        <span class="menu-item-detail-media">
+          <button class="menu-photo-toggle button-reset" type="button" data-menu-image-toggle aria-label="Agrandir l'image" aria-expanded="false">+</button>
+          <img class="menu-photo-large ${imageClass}" src="${escapeAttr(imageUrl)}" alt="${escapeAttr(title)}" loading="lazy" />
+        </span>
+        ${description ? `<p class="menu-item-description">${escapeHtml(description)}</p>` : `<p class="menu-item-description">Aucune description disponible.</p>`}
+      </div>
     </details>
   `;
 }
@@ -1292,7 +1416,7 @@ function hydrateMenuCategoryNavigation(menu) {
     strip.innerHTML = html;
     strip.hidden = !categories.length;
   }
-  if (drawerList) drawerList.innerHTML = html || `<span>Aucune categorie publiee.</span>`;
+  if (drawerList) drawerList.innerHTML = html || `<span>Aucune catégorie publiée.</span>`;
   document.querySelectorAll("[data-menu-category-jump]").forEach((link) => {
     link.addEventListener("click", () => toggleMenuDrawer(false));
   });
@@ -1899,6 +2023,7 @@ function parseMenuItems(raw) {
 function normalizeCatalogCategory(category = {}) {
   const name = firstText(category.name, category.label, category.title, category.categoryName, category.categoryPrefix, category.id);
   const publicDisplayName = firstText(category.publicDisplayName, category.menuDisplayName, category.displayName);
+  const publicDisplayOrder = numberValue(category.publicDisplayOrder, category.menuDisplayOrder, category.qrDisplayOrder);
   return {
     ...category,
     id: category.id || "",
@@ -1906,7 +2031,9 @@ function normalizeCatalogCategory(category = {}) {
     displayName: publicDisplayName || name,
     description: firstText(category.publicDescription, category.menuDescription, category.description),
     publicVisible: category.publicVisible === true,
-    displayOrder: numberValue(category.displayOrder, category.order, category.position, category.sortOrder)
+    publicDisplayOrder,
+    catalogDisplayOrder: numberValue(category.displayOrder, category.order, category.position, category.sortOrder),
+    displayOrder: publicDisplayOrder || numberValue(category.displayOrder, category.order, category.position, category.sortOrder)
   };
 }
 

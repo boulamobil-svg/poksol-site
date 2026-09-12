@@ -4,32 +4,38 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Menu restaurant | Poksol</title>
-  <link rel="stylesheet" href="../style.css?v=20260909-1" />
+  <link rel="stylesheet" href="../style.css?v=20260912-2" />
 </head>
 <body class="restaurant-public-body menu-page-body" data-public-menu-page>
   <header class="menu-page-header">
     <nav class="menu-page-nav">
-      <button class="menu-page-menu-button button-reset" type="button" data-menu-drawer-toggle aria-label="Afficher les categories">
+      <button class="menu-page-menu-button button-reset" type="button" data-menu-drawer-toggle aria-label="Afficher les catégories">
         <span></span>
         <span></span>
         <span></span>
       </button>
-      <a href="../index.html" class="restaurant-powered-brand">
+      <a href="../index.html" class="restaurant-powered-brand notranslate">
         <img src="../poksol_icon.svg" alt="Poksol" />
-        <span>Propulse par <strong>POKSOL</strong></span>
+        <span>Propulsé par <strong>POKSOL</strong></span>
       </a>
-      <a class="outline-btn" href="../restaurants/" data-menu-page-back>Retour</a>
+      <label class="menu-language-select notranslate" aria-label="Choisir la langue">
+        <span>Langue</span>
+        <select data-menu-language-select>
+          <option value="fr">FR</option>
+          <option value="de">DE</option>
+          <option value="en">EN</option>
+          <option value="es">ES</option>
+          <option value="it">IT</option>
+          <option value="tr">TR</option>
+          <option value="ar">AR</option>
+        </select>
+      </label>
     </nav>
-    <section class="menu-page-identity">
-      <img src="../poksol_icon.svg" alt="" data-menu-page-logo />
-      <div>
-        <p class="eyebrow" data-menu-page-subtitle>Menu</p>
-        <h1 data-menu-page-title>Menu</h1>
-      </div>
-    </section>
   </header>
 
-  <nav class="menu-category-strip" aria-label="Categories du menu" data-menu-category-strip></nav>
+  <div id="google_translate_element" class="menu-translate-host" aria-hidden="true"></div>
+
+  <nav class="menu-category-strip" aria-label="Catégories du menu" data-menu-category-strip></nav>
 
   <main class="menu-page-main">
     <section class="public-menu-category-list" data-menu-page-content>
@@ -48,14 +54,15 @@
     <button class="menu-drawer-backdrop button-reset" type="button" data-menu-drawer-close aria-label="Fermer"></button>
     <div class="menu-drawer-panel">
       <div class="menu-drawer-head">
-        <strong>Categories</strong>
+        <strong>Catégories</strong>
         <button class="ghost-action" type="button" data-menu-drawer-close>Fermer</button>
       </div>
       <div class="menu-drawer-list" data-menu-drawer-list></div>
+      <a class="menu-drawer-contact-link" href="../restaurants/" data-menu-page-back>Contact / réservation</a>
     </div>
   </aside>
 
   <script src="../app.js?v=20260628-4"></script>
-  <script type="module" src="../platform.js?v=20260908-7"></script>
+  <script type="module" src="../platform.js?v=20260912-2"></script>
 </body>
 </html>
