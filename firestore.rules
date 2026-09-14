@@ -170,7 +170,9 @@ service cloud.firestore {
         allow create: if (
           get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.publicPageEnabled == true
           && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.reservationEnabled == true
-        ) || publicRestaurantAllowsReservations(restaurantId);
+        ) || publicRestaurantAllowsReservations(restaurantId)
+          || isRestaurantMember(restaurantId)
+          || userReferencesRestaurant(restaurantId);
         allow read: if isRestaurantMember(restaurantId);
         allow update: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]);
         allow delete: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
