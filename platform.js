@@ -9,8 +9,8 @@
 
 const DOWNLOADS = {
   web: "/apps/poket-restaurants/",
-  android: "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+37.apk",
-  windows: "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+37.zip"
+  android: "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+38.apk",
+  windows: "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+38.zip"
 };
 
 const DAYS = [
@@ -605,13 +605,9 @@ async function syncPublicRestaurant(restaurantId, restaurantOverride = null) {
     ? { ...(savedMenu || {}), ...catalogMenu, title: savedMenu?.title || catalogMenu.title, type: savedMenu?.type || "catalog", isActive: restaurant.qrMenuEnabled === true }
     : savedMenu;
   const publicData = buildPublicRestaurantPayload(restaurant, menu, serverTimestamp());
-  const ids = uniqueValues([
-    publicData.id,
-    publicData.slug,
-    legacyRestaurantIdFromSlug(publicData.slug),
-    String(publicData.id || "").replace(/-/g, "_")
-  ]).filter(Boolean);
-  await Promise.all(ids.map((id) => setDoc(doc(services.db, "publicRestaurants", id), publicData, { merge: true })));
+  const publicId = publicData.slug || normalizeSlug(publicData.id || restaurantId);
+  if (!publicId) return;
+  await setDoc(doc(services.db, "publicRestaurants", publicId), publicData, { merge: true });
 }
 
 function buildPublicRestaurantPayload(restaurant, menu, updatedAt) {
@@ -2188,7 +2184,7 @@ function reservationSourceLabel(reservation = {}) {
   const rawSource = firstText(reservation.sourceLabel, reservation.reservationSource, reservation.source, reservation.channel);
   const originHost = safeHostname(firstText(reservation.origin, reservation.referrer, reservation.sourceHost));
   const normalized = rawSource.toLowerCase();
-  if (!rawSource && reservation.updatedAt && !reservation.createdAt) return "Application Poket Restaurants";
+  if (!rawSource && isLegacyAppReservation(reservation)) return "Application Poket Restaurants";
   if (normalized.includes("external_site_hook") || normalized.includes("hook")) {
     return originHost ? `Site ${originHost} via hook` : "Site externe via hook";
   }
@@ -2211,10 +2207,25 @@ function reservationCreatedByLabel(reservation = {}) {
     reservation.uid
   );
   const normalized = creatorName.toLowerCase();
-  if (!creatorName && reservation.updatedAt && !reservation.createdAt) return "Application Poket Restaurants";
+  if (!creatorName && isLegacyAppReservation(reservation)) return "Application Poket Restaurants";
   if (normalized === "poksol_public_page") return "Page publique Poksol";
   if (normalized === "external_site_hook") return reservationSourceLabel(reservation) || "Hook site externe";
   return creatorName;
+}
+
+function isLegacyAppReservation(reservation = {}) {
+  const hasKnownSource = firstText(reservation.sourceLabel, reservation.reservationSource, reservation.source, reservation.channel, reservation.origin, reservation.referrer, reservation.sourceHost);
+  if (hasKnownSource) return false;
+  const id = String(reservation.id || "");
+  const looksImported = id.startsWith("wp_");
+  return !looksImported && Boolean(
+    reservation.customerName ||
+    reservation.phone ||
+    reservation.customerPhone ||
+    reservation.reservedAt ||
+    reservation.createdAt ||
+    reservation.updatedAt
+  );
 }
 
 function dateFromFirestoreValue(value) {
@@ -2863,6 +2874,7 @@ initDashboardPage();
 initPublicRestaurantPage();
 initPublicMenuPage();
 initContactForms();
+
 
 
 
