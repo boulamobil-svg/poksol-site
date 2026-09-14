@@ -551,9 +551,11 @@ async function uploadCatalogItemImage(restaurantId, categoryId, itemId, file) {
 
 async function listReservations(restaurantId) {
   const services = await getServices();
-  const { collection, getDocs, orderBy, query } = services.firestoreModule;
-  const snaps = await getDocs(query(collection(services.db, "restaurants", restaurantId, "reservations"), orderBy("createdAt", "desc")));
-  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  const { collection, getDocs } = services.firestoreModule;
+  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "reservations"));
+  return snaps.docs
+    .map((snap) => ({ id: snap.id, ...snap.data() }))
+    .sort((a, b) => reservationSortTime(b) - reservationSortTime(a));
 }
 
 async function getActiveMenu(restaurantId) {
@@ -2186,6 +2188,7 @@ function reservationSourceLabel(reservation = {}) {
   const rawSource = firstText(reservation.sourceLabel, reservation.reservationSource, reservation.source, reservation.channel);
   const originHost = safeHostname(firstText(reservation.origin, reservation.referrer, reservation.sourceHost));
   const normalized = rawSource.toLowerCase();
+  if (!rawSource && reservation.updatedAt && !reservation.createdAt) return "Application Poket Restaurants";
   if (normalized.includes("external_site_hook") || normalized.includes("hook")) {
     return originHost ? `Site ${originHost} via hook` : "Site externe via hook";
   }
@@ -2208,6 +2211,7 @@ function reservationCreatedByLabel(reservation = {}) {
     reservation.uid
   );
   const normalized = creatorName.toLowerCase();
+  if (!creatorName && reservation.updatedAt && !reservation.createdAt) return "Application Poket Restaurants";
   if (normalized === "poksol_public_page") return "Page publique Poksol";
   if (normalized === "external_site_hook") return reservationSourceLabel(reservation) || "Hook site externe";
   return creatorName;
@@ -2219,6 +2223,17 @@ function dateFromFirestoreValue(value) {
   if (typeof value.seconds === "number") return new Date(value.seconds * 1000);
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function reservationSortTime(reservation = {}) {
+  return dateFromFirestoreValue(
+    reservation.createdAt ||
+    reservation.reservedAt ||
+    reservation.reservationAt ||
+    reservation.dateTime ||
+    reservation.startAt ||
+    reservation.updatedAt
+  )?.getTime() || 0;
 }
 
 function teamHtml(members, canManageTeam) {

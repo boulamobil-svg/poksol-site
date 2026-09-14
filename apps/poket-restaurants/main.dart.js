@@ -94117,7 +94117,7 @@ m=B.e.n(e)
 l=A.bs("\\s+",!0,!1,!1)
 m=A.c6(m,l," ")
 l=A.Bg(1000*g.a+g.b)
-n=A.cgA(A.a4(["customerName",n,"phone",m,"guests",c,"reservedAt",l,"notes",p,"customFields",a,"updatedAt",A.Bg(1000*Date.now()),"restaurantId",q.b],t.K,t.X))
+n=A.cgA(A.a4(["customerName",n,"phone",m,"guests",c,"reservedAt",l,"notes",p,"customFields",a,"createdAt",A.Bg(1000*Date.now()),"updatedAt",A.Bg(1000*Date.now()),"restaurantId",q.b,"source","app_user","sourceLabel","Application Poket Restaurants","reservationSource","poket_restaurants_app","channel","app","createdBy","poket_restaurants_app","createdByName","Application Poket Restaurants","createdByType","app"],t.K,t.X))
 n.toString
 s=2
 return A.c(o.a.dV(0,n),$async$Xx)
