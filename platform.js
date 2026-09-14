@@ -31,6 +31,7 @@ const ROLE_LABELS = {
 };
 
 const MENU_TRANSLATION_LANGUAGES = new Set(["fr", "de", "en", "es", "it", "tr", "ar"]);
+const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 let servicesPromise = null;
 let currentUser = null;
@@ -364,6 +365,7 @@ async function joinRestaurantWithCode(code, user) {
 
 async function uploadRestaurantImage(restaurantId, file, kind) {
   if (!file) return "";
+  validateImageUpload(file);
   const services = await getServices();
   const { getDownloadURL, ref, uploadBytes } = services.storageModule;
   const extension = file.name.split(".").pop()?.toLowerCase() || "png";
@@ -535,6 +537,7 @@ async function saveCatalogCategoryOrder(restaurantId, form) {
 }
 
 async function uploadCatalogItemImage(restaurantId, categoryId, itemId, file) {
+  validateImageUpload(file);
   const services = await getServices();
   const { getDownloadURL, ref, uploadBytes } = services.storageModule;
   const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -2211,6 +2214,9 @@ function normalizeRestaurant(id, data) {
 
 function readableFirebaseError(error) {
   const raw = error?.code || error?.message || String(error || "");
+  if (raw.includes("storage/unauthorized")) {
+    return "Upload refuse par Firebase Storage. Verifiez que vous etes connecte, que les regles Storage sont deployees et que l'image fait moins de 5 Mo.";
+  }
   if (raw.includes("permission-denied")) {
     return "Acces refuse par Firestore. Les regles Firebase doivent autoriser le membre du restaurant a lire ce dashboard.";
   }
@@ -2221,6 +2227,23 @@ function readableFirebaseError(error) {
     return "Connexion reseau ou Firebase indisponible.";
   }
   return raw || "Erreur inconnue pendant le chargement du dashboard.";
+}
+
+function validateImageUpload(file) {
+  if (!file) return;
+  if (!String(file.type || "").startsWith("image/")) {
+    throw new Error(`Fichier invalide : "${file.name}" n'est pas une image.`);
+  }
+  if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
+    throw new Error(`Image trop volumineuse : "${file.name}" fait ${formatFileSize(file.size)}. La limite est ${formatFileSize(MAX_IMAGE_UPLOAD_BYTES)}.`);
+  }
+}
+
+function formatFileSize(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1).replace(".", ",")} Mo`;
+  if (value >= 1024) return `${Math.round(value / 1024)} Ko`;
+  return `${value} octets`;
 }
 
 function normalizeHours(hours) {
