@@ -1447,6 +1447,92 @@ select:focus-visible {
   background: #f8fbff;
 }
 
+.reservations-table .reservation-summary {
+  grid-template-columns: 1fr 1fr 1.1fr 0.6fr 0.8fr 82px;
+}
+
+.reservation-card {
+  overflow: hidden;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.reservation-card[open] {
+  background: white;
+  box-shadow: 0 14px 34px rgba(10, 37, 64, 0.08);
+}
+
+.reservation-card > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.reservation-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.reservation-card > .table-row {
+  border-radius: 14px;
+}
+
+.reservation-more-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--poksol-blue);
+  font-weight: 900;
+}
+
+.reservation-more-label::after {
+  content: "+";
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--poksol-blue);
+  line-height: 1;
+}
+
+.reservation-card[open] .reservation-more-label::after {
+  content: "-";
+}
+
+.reservation-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.reservation-detail-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d3e5ff;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.reservation-detail-item span,
+.reservation-detail-item strong {
+  display: block;
+}
+
+.reservation-detail-item span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.reservation-detail-item strong {
+  margin-top: 4px;
+  color: var(--poksol-navy);
+  overflow-wrap: anywhere;
+}
+
 .table-head {
   color: var(--text-muted);
   font-size: 13px;
@@ -1901,6 +1987,8 @@ select:focus-visible {
 }
 
 .restaurant-public-body {
+  --restaurant-primary: var(--poksol-navy);
+  --restaurant-accent: var(--poksol-blue);
   background: #f7f1e8;
 }
 
@@ -1908,9 +1996,9 @@ select:focus-visible {
   padding: 26px 8% 74px;
   color: white;
   background:
-    linear-gradient(120deg, rgba(10, 37, 64, 0.94), rgba(10, 37, 64, 0.64)),
-    radial-gradient(circle at 78% 22%, rgba(66, 201, 111, 0.34), transparent 28%),
-    linear-gradient(135deg, #7a3f1d, #0a2540);
+    linear-gradient(120deg, color-mix(in srgb, var(--restaurant-primary) 94%, black 6%), color-mix(in srgb, var(--restaurant-primary) 64%, transparent)),
+    radial-gradient(circle at 78% 22%, color-mix(in srgb, var(--restaurant-accent) 34%, transparent), transparent 28%),
+    linear-gradient(135deg, color-mix(in srgb, var(--restaurant-accent) 52%, #7a3f1d), var(--restaurant-primary));
 }
 
 .restaurant-public-nav {
@@ -1937,7 +2025,7 @@ select:focus-visible {
 }
 
 .restaurant-powered-brand strong {
-  color: var(--poksol-blue);
+  color: var(--restaurant-accent);
 }
 
 .restaurant-public-links {
@@ -1968,8 +2056,8 @@ select:focus-visible {
   margin-bottom: 16px;
   padding: 8px 13px;
   border-radius: 999px;
-  color: var(--poksol-navy);
-  background: var(--poksol-green);
+  color: var(--restaurant-primary);
+  background: var(--restaurant-accent);
   font-size: 13px;
   font-weight: 900;
   text-transform: uppercase;
@@ -2010,8 +2098,8 @@ select:focus-visible {
   padding: 24px;
   background:
     radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.9), transparent 16%),
-    radial-gradient(circle at 72% 34%, rgba(66, 201, 111, 0.72), transparent 18%),
-    linear-gradient(135deg, #d46f36, #f4c37e 46%, #173e62);
+    radial-gradient(circle at 72% 34%, color-mix(in srgb, var(--restaurant-accent) 72%, transparent), transparent 18%),
+    linear-gradient(135deg, color-mix(in srgb, var(--restaurant-accent) 56%, #d46f36), #f4c37e 46%, var(--restaurant-primary));
 }
 
 .restaurant-cover-photo span {
@@ -2052,9 +2140,9 @@ select:focus-visible {
 .restaurant-quick-actions a {
   padding: 18px;
   border-radius: 18px;
-  color: var(--poksol-navy);
+  color: var(--restaurant-primary);
   background: white;
-  border: 1px solid rgba(10, 37, 64, 0.1);
+  border: 1px solid color-mix(in srgb, var(--restaurant-primary) 12%, white);
   box-shadow: 0 16px 40px rgba(10, 37, 64, 0.1);
   text-align: center;
   text-decoration: none;
@@ -2062,15 +2150,24 @@ select:focus-visible {
 }
 
 .menu-page-body {
+  --menu-sticky-offset: 142px;
   min-height: 100vh;
   background: #fffaf3;
   scroll-behavior: smooth;
 }
 
+.menu-page-sticky-shell {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: rgba(255, 250, 243, 0.98);
+  box-shadow: 0 10px 26px rgba(10, 37, 64, 0.06);
+}
+
 .menu-page-header {
   padding: 14px max(16px, 5vw);
   color: var(--poksol-navy);
-  background: #fffaf3;
+  background: transparent;
   border-bottom: 1px solid #ead8c0;
 }
 
@@ -2182,9 +2279,6 @@ body.menu-page-body.translated-rtl {
 }
 
 .menu-category-strip {
-  position: sticky;
-  top: 0;
-  z-index: 8;
   display: flex;
   gap: 10px;
   max-width: 100%;
@@ -2192,7 +2286,7 @@ body.menu-page-body.translated-rtl {
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
   padding: 12px max(16px, calc((100vw - 980px) / 2 + 16px));
-  background: rgba(255, 250, 243, 0.96);
+  background: transparent;
   border-bottom: 1px solid #ead8c0;
   scrollbar-width: none;
 }
@@ -2408,7 +2502,7 @@ body.menu-page-body.translated-rtl {
 .public-menu-category {
   display: grid;
   gap: 14px;
-  scroll-margin-top: 82px;
+  scroll-margin-top: calc(var(--menu-sticky-offset, 142px) + 18px);
 }
 
 .public-menu-category-heading {
@@ -2751,7 +2845,7 @@ body.menu-page-body.translated-rtl {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--poksol-green);
+  background: var(--restaurant-accent);
 }
 
 .restaurant-public-footer {
@@ -2760,11 +2854,11 @@ body.menu-page-body.translated-rtl {
   gap: 20px;
   padding: 24px 8%;
   color: white;
-  background: var(--poksol-navy);
+  background: var(--restaurant-primary);
 }
 
 .restaurant-public-footer a {
-  color: var(--poksol-green);
+  color: var(--restaurant-accent);
   text-decoration: none;
   font-weight: 900;
 }
@@ -3344,6 +3438,15 @@ body.menu-page-body.translated-rtl {
   .table-row {
     grid-template-columns: 1fr;
     text-align: center;
+  }
+
+  .reservations-table .reservation-summary,
+  .reservation-details {
+    grid-template-columns: 1fr;
+  }
+
+  .reservation-more-label {
+    justify-content: center;
   }
 
   .weekly-hour-row {

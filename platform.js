@@ -440,6 +440,8 @@ async function savePublicSettings(restaurantId, form) {
   const services = await getServices();
   const { doc, serverTimestamp, setDoc } = services.firestoreModule;
   const data = new FormData(form);
+  const primaryColor = normalizeHexColor(text(data, "primaryColor"), "#0A2540");
+  const accentColor = normalizeHexColor(text(data, "accentColor"), "#1976F3");
   await setDoc(doc(services.db, "restaurants", restaurantId), {
     publicPageEnabled: data.get("publicPageEnabled") === "on",
     qrMenuEnabled: data.get("qrMenuEnabled") === "on",
@@ -455,8 +457,8 @@ async function savePublicSettings(restaurantId, form) {
       },
       customMessage: text(data, "customMessage"),
       theme: {
-        primaryColor: text(data, "primaryColor") || "#0A2540",
-        accentColor: text(data, "accentColor") || "#1976F3"
+        primaryColor,
+        accentColor
       },
       updatedAt: serverTimestamp()
     },
@@ -639,6 +641,13 @@ function buildPublicRestaurantPayload(restaurant, menu, updatedAt) {
     publicPageEnabled: normalized.publicPageEnabled !== false,
     qrMenuEnabled: normalized.qrMenuEnabled === true || menu?.isActive === true,
     reservationEnabled: normalized.reservationEnabled !== false,
+    publicPageSettings: {
+      ...(restaurant.publicPageSettings || normalized.publicPageSettings || {}),
+      theme: {
+        primaryColor: normalizeHexColor(restaurant.publicPageSettings?.theme?.primaryColor || normalized.publicPageSettings?.theme?.primaryColor, "#0A2540"),
+        accentColor: normalizeHexColor(restaurant.publicPageSettings?.theme?.accentColor || normalized.publicPageSettings?.theme?.accentColor, "#1976F3")
+      }
+    },
     openingHours,
     openingHoursByDay,
     menu: menu ? {
@@ -720,6 +729,7 @@ async function submitReservation(restaurant, form) {
   const time = text(data, "time");
   const customerName = text(data, "name");
   const customerPhone = text(data, "phone");
+  const customerEmail = text(data, "email");
   if (!customerName || !customerPhone || !date || !time) {
     throw new Error("Nom, telephone, date et heure sont obligatoires.");
   }
@@ -728,17 +738,34 @@ async function submitReservation(restaurant, form) {
     throw new Error("Date ou heure invalide.");
   }
   const restaurantId = restaurant.restaurantId || restaurant.id;
+  const creation = publicReservationCreationMeta(restaurant);
   const payload = {
     restaurantId,
     customerName,
+    customerPhone,
+    customerEmail,
+    customer: {
+      name: customerName,
+      phone: customerPhone,
+      email: customerEmail
+    },
+    date,
+    time,
     phone: customerPhone,
+    email: customerEmail,
     guests: Number(text(data, "guests") || 1),
     notes: text(data, "message"),
     status: "planned",
     reservedAt: services.firestoreModule.Timestamp.fromDate(reservedAt),
-    source: "public_site",
-    reservationSource: "poksol_public_page",
+    source: creation.source,
+    sourceLabel: creation.sourceLabel,
+    reservationSource: creation.reservationSource,
     channel: "web",
+    createdBy: creation.createdBy,
+    createdByName: creation.createdByName,
+    createdByType: creation.createdByType,
+    sourceHost: creation.sourceHost,
+    referrer: creation.referrer,
     origin: window.location.href,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
@@ -747,6 +774,53 @@ async function submitReservation(restaurant, form) {
     throw new Error("Ce crÃ©neau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
   }
   await addDoc(collection(services.db, "restaurants", restaurantId, "reservations"), payload);
+}
+
+function publicReservationCreationMeta(restaurant = {}) {
+  const params = new URLSearchParams(window.location.search);
+  const explicitSource = firstText(params.get("source"), params.get("utm_source"));
+  const explicitHost = firstText(params.get("sourceHost"), params.get("host"), params.get("site"));
+  const referrerHost = safeHostname(document.referrer);
+  const currentHost = window.location.hostname || "";
+  const sourceHost = explicitHost || referrerHost || currentHost;
+  const restaurantHost = safeHostname(restaurant.website);
+  const isPoksolHost = /(^|\.)poksol\.com$/i.test(currentHost);
+  const isExternalHook = explicitSource === "hook" ||
+    explicitSource === "external_site_hook" ||
+    explicitHost ||
+    (referrerHost && !/(^|\.)poksol\.com$/i.test(referrerHost));
+  if (isExternalHook) {
+    const labelHost = explicitHost || referrerHost || restaurantHost || sourceHost;
+    return {
+      source: "external_site_hook",
+      sourceLabel: labelHost ? `Site ${labelHost} via hook` : "Site externe via hook",
+      reservationSource: "external_site_hook",
+      createdBy: "external_site_hook",
+      createdByName: labelHost ? `Hook ${labelHost}` : "Hook site externe",
+      createdByType: "hook",
+      sourceHost: labelHost || sourceHost,
+      referrer: document.referrer || ""
+    };
+  }
+  return {
+    source: "poksol_public_page",
+    sourceLabel: isPoksolHost ? "Page publique Poksol" : `Page publique ${currentHost || "Poksol"}`,
+    reservationSource: "poksol_public_page",
+    createdBy: "poksol_public_page",
+    createdByName: "Page publique Poksol",
+    createdByType: "public_page",
+    sourceHost,
+    referrer: document.referrer || ""
+  };
+}
+
+function safeHostname(value) {
+  if (!value) return "";
+  try {
+    return new URL(value.startsWith("http") ? value : `https://${value}`).hostname;
+  } catch (_) {
+    return "";
+  }
 }
 
 async function submitContact(form) {
@@ -1146,6 +1220,8 @@ function initPublicMenuPage() {
   const root = document.querySelector("[data-public-menu-page]");
   if (!root) return;
   initMenuLanguageSelector();
+  updateMenuStickyOffset();
+  window.addEventListener("resize", updateMenuStickyOffset);
   root.addEventListener("click", (event) => {
     const lightboxImage = event.target.closest("[data-menu-lightbox-image]");
     if (lightboxImage) {
@@ -1186,9 +1262,17 @@ function initPublicMenuPage() {
       return;
     }
     hydratePublicMenuPage(root, restaurant, restaurant.menu || null);
+    updateMenuStickyOffset();
   }).catch(() => {
     root.innerHTML = publicMenuEmptyHtml("Menu indisponible");
+    updateMenuStickyOffset();
   });
+}
+
+function updateMenuStickyOffset() {
+  const stickyShell = document.querySelector("[data-menu-sticky-shell]");
+  if (!stickyShell) return;
+  document.body.style.setProperty("--menu-sticky-offset", `${Math.ceil(stickyShell.getBoundingClientRect().height)}px`);
 }
 
 function initMenuLanguageSelector() {
@@ -1308,6 +1392,7 @@ function initContactForms() {
 }
 
 function hydratePublicRestaurant(root, restaurant, menu) {
+  applyPublicRestaurantTheme(restaurant);
   setText("[data-public-name]", restaurant.name);
   setText("[data-public-description]", restaurant.description);
   setText("[data-public-cuisine]", restaurant.cuisineType || "Restaurant");
@@ -1348,6 +1433,14 @@ function hydratePublicRestaurant(root, restaurant, menu) {
     const reservation = document.querySelector("[data-public-reservation-form]");
     if (reservation) reservation.innerHTML = `<p class="alert-note">Les reservations en ligne ne sont pas encore activees pour ce restaurant.</p>`;
   }
+}
+
+function applyPublicRestaurantTheme(restaurant = {}) {
+  const theme = restaurant.publicPageSettings?.theme || {};
+  const primaryColor = normalizeHexColor(theme.primaryColor, "#0A2540");
+  const accentColor = normalizeHexColor(theme.accentColor, "#1976F3");
+  document.body.style.setProperty("--restaurant-primary", primaryColor);
+  document.body.style.setProperty("--restaurant-accent", accentColor);
 }
 
 function hydratePublicMenuPage(root, restaurant, menu) {
@@ -1439,6 +1532,7 @@ function hydrateMenuCategoryNavigation(menu) {
   document.querySelectorAll("[data-menu-category-jump]").forEach((link) => {
     link.addEventListener("click", () => toggleMenuDrawer(false));
   });
+  updateMenuStickyOffset();
 }
 
 function toggleMenuDrawer(open) {
@@ -1764,6 +1858,7 @@ function publicSettingsHtml(restaurant, publicUrl, canEdit) {
   const theme = settings.theme || {};
   const primaryColor = normalizeHexColor(theme.primaryColor, "#0A2540");
   const accentColor = normalizeHexColor(theme.accentColor, "#1976F3");
+  const previewUrl = `${publicUrl}${publicUrl.includes("?") ? "&" : "?"}preview=${Date.now()}`;
   return `
     <form class="platform-form" data-dashboard-public-form>
       <div class="toggle-grid">
@@ -1777,7 +1872,7 @@ function publicSettingsHtml(restaurant, publicUrl, canEdit) {
         <label class="wide-field">Message public<textarea name="customMessage" rows="3" ${disabled(canEdit)}>${escapeHtml(settings.customMessage || "")}</textarea></label>
       </div>
       <div class="quick-links">
-        <a href="${publicUrl}" target="_blank" rel="noopener noreferrer">Previsualiser</a>
+        <a href="${escapeAttr(previewUrl)}" target="_blank" rel="noopener noreferrer">Previsualiser</a>
         <button class="ghost-action" type="button" data-copy="${escapeAttr(publicUrl)}">Copier l'URL</button>
       </div>
       ${canEdit ? `<button class="primary-btn button-reset" type="submit">Enregistrer la page publique</button>` : ""}
@@ -1997,19 +2092,133 @@ function setCatalogImagePreview(preview, src, alt, onLoad = null) {
 function reservationsHtml(reservations, role) {
   const canUpdate = ["owner", "admin", "manager"].includes(role);
   return `
-    <div class="responsive-table">
-      <div class="table-row table-head"><span>Date</span><span>Client</span><span>Contact</span><span>Couverts</span><span>Statut</span></div>
-      ${reservations.length ? reservations.map((reservation) => `
-        <div class="table-row">
-          <span>${escapeHtml(reservation.date || "")} ${escapeHtml(reservation.time || "")}</span>
-          <span>${escapeHtml(reservation.customerName || "")}</span>
-          <span>${escapeHtml(reservation.customerPhone || reservation.customerEmail || "")}</span>
+    <div class="responsive-table reservations-table">
+      <div class="table-row table-head reservation-summary"><span>Date</span><span>Client</span><span>Contact</span><span>Couverts</span><span>Statut</span><span>Infos</span></div>
+      ${reservations.length ? reservations.map((reservation) => {
+        const reservationDate = reservationDateLabel(reservation);
+        const reservationTime = reservationTimeLabel(reservation);
+        const contact = reservationContactLabel(reservation);
+        const source = reservationSourceLabel(reservation);
+        const createdBy = reservationCreatedByLabel(reservation);
+        return `
+        <details class="reservation-card">
+          <summary class="table-row reservation-summary">
+          <span>${escapeHtml(reservationDate || "Date non renseignee")}</span>
+          <span>${escapeHtml(reservation.customerName || reservation.name || reservation.clientName || "")}</span>
+          <span>${escapeHtml(contact || "Contact non renseigne")}</span>
           <span>${escapeHtml(reservation.guests || "")}</span>
           <span>${canUpdate ? statusSelectHtml(reservation) : escapeHtml(reservation.status || "pending")}</span>
-        </div>
-      `).join("") : `<div class="empty-state">Aucune reservation pour le moment.</div>`}
+          <span class="reservation-more-label">Details</span>
+          </summary>
+          <div class="reservation-details">
+            ${reservationDetailItemHtml("Date", reservationDate || "Date non renseignee")}
+            ${reservationDetailItemHtml("Heure", reservationTime || "Heure non renseignee")}
+            ${reservationDetailItemHtml("Source", source || "Source non renseignee")}
+            ${reservationDetailItemHtml("Created by", createdBy || "Created by non renseigne")}
+            ${reservationDetailItemHtml("Telephone", firstText(reservation.customerPhone, reservation.phone, reservation.telephone, reservation.customer?.phone))}
+            ${reservationDetailItemHtml("Email", firstText(reservation.customerEmail, reservation.email, reservation.contactEmail, reservation.customer?.email))}
+            ${reservationDetailItemHtml("Notes", firstText(reservation.notes, reservation.message, reservation.comment))}
+            ${reservationDetailItemHtml("ID reservation", reservation.id)}
+          </div>
+        </details>
+      `;
+      }).join("") : `<div class="empty-state">Aucune reservation pour le moment.</div>`}
     </div>
   `;
+}
+
+function reservationDetailItemHtml(label, value) {
+  return `
+    <div class="reservation-detail-item">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value || "-")}</strong>
+    </div>
+  `;
+}
+
+function reservationDateLabel(reservation = {}) {
+  const explicitDate = firstText(reservation.date, reservation.reservationDate, reservation.day, reservation.bookingDate);
+  const explicitTime = firstText(reservation.time, reservation.reservationTime, reservation.hour, reservation.bookingTime);
+  if (explicitDate || explicitTime) return `${explicitDate} ${explicitTime}`.trim();
+  const date = dateFromFirestoreValue(reservation.reservedAt || reservation.reservationAt || reservation.dateTime || reservation.startAt || reservation.createdFor);
+  if (!date) return "";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function reservationTimeLabel(reservation = {}) {
+  const explicitTime = firstText(reservation.time, reservation.reservationTime, reservation.hour, reservation.bookingTime);
+  if (explicitTime) return explicitTime;
+  const date = dateFromFirestoreValue(reservation.reservedAt || reservation.reservationAt || reservation.dateTime || reservation.startAt || reservation.createdFor);
+  if (!date) return "";
+  return new Intl.DateTimeFormat("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function reservationContactLabel(reservation = {}) {
+  const customer = reservation.customer || {};
+  const contact = reservation.contact || {};
+  return firstText(
+    reservation.customerPhone,
+    reservation.phone,
+    reservation.telephone,
+    reservation.mobile,
+    reservation.contactPhone,
+    customer.phone,
+    typeof contact === "object" ? contact.phone : "",
+    reservation.customerEmail,
+    reservation.email,
+    reservation.contactEmail,
+    customer.email,
+    typeof contact === "object" ? contact.email : "",
+    typeof contact === "string" ? contact : ""
+  );
+}
+
+function reservationSourceLabel(reservation = {}) {
+  const rawSource = firstText(reservation.sourceLabel, reservation.reservationSource, reservation.source, reservation.channel);
+  const originHost = safeHostname(firstText(reservation.origin, reservation.referrer, reservation.sourceHost));
+  const normalized = rawSource.toLowerCase();
+  if (normalized.includes("external_site_hook") || normalized.includes("hook")) {
+    return originHost ? `Site ${originHost} via hook` : "Site externe via hook";
+  }
+  if (normalized.includes("poksol_public_page") || normalized.includes("public_site")) return "Page publique Poksol";
+  if (normalized.includes("app_user") || normalized.includes("application") || normalized.includes("poket_app")) return "Application Poket Restaurants";
+  if (originHost && !/(^|\.)poksol\.com$/i.test(originHost)) return `Site ${originHost}`;
+  return rawSource;
+}
+
+function reservationCreatedByLabel(reservation = {}) {
+  const createdBy = reservation.createdBy || {};
+  const creatorName = firstText(
+    reservation.createdByName,
+    reservation.createdByDisplayName,
+    typeof createdBy === "object" ? createdBy.name : "",
+    typeof createdBy === "object" ? createdBy.email : "",
+    typeof createdBy === "string" ? createdBy : "",
+    reservation.createdByUid,
+    reservation.userId,
+    reservation.uid
+  );
+  const normalized = creatorName.toLowerCase();
+  if (normalized === "poksol_public_page") return "Page publique Poksol";
+  if (normalized === "external_site_hook") return reservationSourceLabel(reservation) || "Hook site externe";
+  return creatorName;
+}
+
+function dateFromFirestoreValue(value) {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  if (typeof value.seconds === "number") return new Date(value.seconds * 1000);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function teamHtml(members, canManageTeam) {
