@@ -1670,6 +1670,7 @@ function dashboardHtml(restaurant, role, reservations, members, menu) {
         ${["overview", "profile", "hours", "public", "menu", "reservations", "team", "downloads"].map((tab, index) => `
           <button class="${index === 0 ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>
         `).join("")}
+        <button class="dashboard-logout-button" type="button" data-platform-logout>Deconnexion</button>
       </nav>
       <section class="dashboard-panel is-active" data-dashboard-panel="overview">${overviewHtml(restaurant, publicUrl)}</section>
       <section class="dashboard-panel" data-dashboard-panel="profile">${profileFormHtml(restaurant, canEditProfile)}</section>

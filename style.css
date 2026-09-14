@@ -1287,6 +1287,21 @@ select:focus-visible {
   color: white;
 }
 
+.dashboard-tabs .dashboard-logout-button {
+  margin-top: auto;
+  justify-self: end;
+  width: auto;
+  border: 1px solid #c8ddf5;
+  background: white;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.dashboard-tabs .dashboard-logout-button:hover {
+  color: var(--poksol-navy);
+  background: #f8fbff;
+}
+
 .dashboard-panel {
   display: none;
   min-width: 0;
