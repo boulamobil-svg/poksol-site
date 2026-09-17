@@ -1214,6 +1214,7 @@ select:focus-visible {
 
 .mini-actions a,
 .quick-links a,
+.quick-links button,
 .download-inline a,
 .download-grid a,
 .disabled-download {
@@ -1226,6 +1227,20 @@ select:focus-visible {
   text-decoration: none;
   font-weight: 900;
   padding: 12px 14px;
+}
+
+.quick-links button {
+  border: 1px solid #c8ddf5;
+  background: white;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.quick-links button:hover {
+  color: var(--poksol-navy);
+  background: #f8fbff;
 }
 
 .mini-actions a:nth-child(2),
@@ -1285,21 +1300,6 @@ select:focus-visible {
 .dashboard-tabs button.is-active {
   background: var(--poksol-blue);
   color: white;
-}
-
-.dashboard-tabs .dashboard-logout-button {
-  margin-top: auto;
-  align-self: flex-end;
-  width: auto;
-  border: 1px solid #c8ddf5;
-  background: white;
-  color: var(--text-muted);
-  text-align: right;
-}
-
-.dashboard-tabs .dashboard-logout-button:hover {
-  color: var(--poksol-navy);
-  background: #f8fbff;
 }
 
 .dashboard-panel {
