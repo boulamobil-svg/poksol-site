@@ -1258,7 +1258,8 @@ select:focus-visible {
 }
 
 .dashboard-tabs {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   min-height: calc(100vh - 56px);
   padding: 22px 18px;
@@ -1267,7 +1268,6 @@ select:focus-visible {
   position: sticky;
   top: 28px;
   z-index: 4;
-  align-content: start;
 }
 
 .dashboard-tabs button {
@@ -1289,7 +1289,7 @@ select:focus-visible {
 
 .dashboard-tabs .dashboard-logout-button {
   margin-top: auto;
-  justify-self: end;
+  align-self: flex-end;
   width: auto;
   border: 1px solid #c8ddf5;
   background: white;
@@ -1344,6 +1344,49 @@ select:focus-visible {
   margin-top: 6px;
   color: var(--poksol-navy);
   font-size: 24px;
+}
+
+.overview-general-info {
+  display: grid;
+  gap: 18px;
+  margin: 0 0 22px;
+  padding: 22px;
+  border: 1px solid #d3e5ff;
+  border-radius: 18px;
+  background: #fbfdff;
+}
+
+.overview-general-info .eyebrow {
+  margin: 0 0 6px;
+}
+
+.overview-general-info h2 {
+  margin: 0;
+  color: var(--poksol-navy);
+  font-size: 1.25rem;
+}
+
+.overview-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 22px;
+  margin: 0;
+}
+
+.overview-info-grid div {
+  min-width: 0;
+}
+
+.overview-info-grid dt {
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.overview-info-grid dd {
+  margin: 5px 0 0;
+  color: var(--poksol-navy);
+  font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .weekly-hours {
@@ -3415,6 +3458,7 @@ body.menu-page-body.translated-rtl {
   .platform-grid-two,
   .contact-platform-card,
   .dashboard-stats,
+  .overview-info-grid,
   .toggle-grid,
   .download-grid {
     grid-template-columns: 1fr;

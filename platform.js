@@ -1777,12 +1777,41 @@ function dashboardHtml(restaurant, role, reservations, members, menu) {
 }
 
 function overviewHtml(restaurant, publicUrl) {
+  const generalInfo = [
+    ["Nom", restaurant.name],
+    ["Type cuisine", restaurant.cuisineType],
+    ["Telephone", restaurant.phone],
+    ["Email", restaurant.email],
+    ["Adresse", restaurant.addressLine1 || restaurant.address],
+    ["Ville", [restaurant.postalCode, restaurant.city].filter(Boolean).join(" ")],
+    ["Pays", restaurant.country || "France"],
+    ["Site web", restaurant.website]
+  ].filter(([, value]) => String(value || "").trim().length);
   return `
     <div class="dashboard-stats">
       ${statusCardHtml("Page publique", restaurant.publicPageEnabled !== false ? "Active" : "Desactivee")}
       ${statusCardHtml("QR menu", restaurant.qrMenuEnabled ? "Actif" : "A completer")}
       ${statusCardHtml("Reservations", restaurant.reservationEnabled !== false ? "Actives" : "Desactivees")}
     </div>
+    <section class="overview-general-info" aria-labelledby="overview-general-title">
+      <div>
+        <p class="eyebrow">Restaurant</p>
+        <h2 id="overview-general-title">Informations generales</h2>
+      </div>
+      <dl class="overview-info-grid">
+        ${generalInfo.length ? generalInfo.map(([label, value]) => `
+          <div>
+            <dt>${escapeHtml(label)}</dt>
+            <dd>${escapeHtml(value)}</dd>
+          </div>
+        `).join("") : `
+          <div>
+            <dt>Profil</dt>
+            <dd>Aucune information generale renseignee.</dd>
+          </div>
+        `}
+      </dl>
+    </section>
     <div class="quick-links">
       <a href="${publicUrl}" target="_blank" rel="noopener noreferrer">Voir page publique</a>
       <a href="${DOWNLOADS.web}" target="_blank" rel="noopener noreferrer">Ouvrir web app</a>
