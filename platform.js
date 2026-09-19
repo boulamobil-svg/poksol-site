@@ -561,8 +561,34 @@ async function listReservations(restaurantId) {
 async function listCustomers(restaurantId) {
   const services = await getServices();
   const { collection, getDocs } = services.firestoreModule;
-  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "Customers"));
-  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  const collectionNames = ["customers", "Customers"];
+  const results = await Promise.all(collectionNames.map(async (collectionName) => {
+    try {
+      const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, collectionName));
+      return {
+        collectionName,
+        customers: snaps.docs.map((snap) => ({ id: snap.id, customerCollection: collectionName, ...snap.data() }))
+      };
+    } catch (error) {
+      return { collectionName, error };
+    }
+  }));
+  const byPath = new Map();
+  const errors = [];
+  results.forEach((result) => {
+    if (result.error) {
+      errors.push(`${result.collectionName}: ${readableFirebaseError(result.error)}`);
+      return;
+    }
+    result.customers.forEach((customer) => {
+      byPath.set(`${customer.customerCollection}/${customer.id}`, customer);
+    });
+  });
+  return {
+    customers: [...byPath.values()],
+    errors,
+    checkedCollections: collectionNames
+  };
 }
 
 async function createCustomerAccount(restaurantId, form, user) {
@@ -575,7 +601,7 @@ async function createCustomerAccount(restaurantId, form, user) {
   if (!displayName && !phone && !email) {
     throw new Error("Renseignez au moins un nom, un telephone ou un email.");
   }
-  await addDoc(collection(services.db, "restaurants", restaurantId, "Customers"), {
+  await addDoc(collection(services.db, "restaurants", restaurantId, "customers"), {
     type: text(data, "type") || "individual",
     displayName,
     firstName: text(data, "firstName"),
@@ -1019,6 +1045,11 @@ function initDashboardPage() {
     }
   });
   root.addEventListener("change", async (event) => {
+    if (event.target.matches("[data-customer-type-select]")) {
+      const form = event.target.closest("[data-dashboard-customer-form]");
+      if (form) form.dataset.customerType = event.target.value || "individual";
+      return;
+    }
     if (event.target.matches("[data-catalog-image-file]")) {
       previewCatalogImageFile(event.target);
       autoSaveCatalogField(root, event.target, { immediate: true });
@@ -1108,9 +1139,9 @@ async function renderDashboard(root, user, restaurantId) {
   localStorage.setItem("poksolActiveRestaurantId", restaurant.id);
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
-  const [reservations, customers, members, menu, catalogMenu] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
-    listCustomers(restaurant.id).catch(() => []),
+    listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
     getActiveMenu(restaurant.id).catch(() => null),
     listCatalogMenu(restaurant.id).catch(() => null)
@@ -1118,7 +1149,7 @@ async function renderDashboard(root, user, restaurantId) {
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customers, members, dashboardMenu);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu);
 }
 
 async function autoSaveCatalogField(root, field, options = {}) {
@@ -1786,7 +1817,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, customers, members, menu) {
+function dashboardHtml(restaurant, role, reservations, customerAccounts, members, menu) {
   const canEditProfile = ["owner", "admin", "manager"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -1809,7 +1840,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu)
       <section class="dashboard-panel" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="clients">${clientsHtml(customers)}</section>
+      <section class="dashboard-panel" data-dashboard-panel="clients">${clientsHtml(customerAccounts)}</section>
       <section class="dashboard-panel" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
       <section class="dashboard-panel" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -2157,7 +2188,9 @@ function setCatalogImagePreview(preview, src, alt, onLoad = null) {
   if (onLoad) preview.querySelector("img")?.addEventListener("load", onLoad, { once: true });
 }
 
-function clientsHtml(customers = []) {
+function clientsHtml(customerAccounts = {}) {
+  const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
+  const readErrors = Array.isArray(customerAccounts.errors) ? customerAccounts.errors : [];
   const clients = customers.map(normalizeCustomerAccount).sort((a, b) => {
     const dateDiff = clientTimeValue(b.updatedAt || b.createdAt) - clientTimeValue(a.updatedAt || a.createdAt);
     if (dateDiff) return dateDiff;
@@ -2176,29 +2209,30 @@ function clientsHtml(customers = []) {
       </div>
       <div class="clients-section-head">
         <div>
-          <p class="eyebrow">Firestore Customers</p>
+          <p class="eyebrow">Restaurant</p>
           <h2>Comptes clients</h2>
         </div>
-        <p>Ces comptes viennent uniquement de la collection Firestore <strong>Customers</strong> du restaurant actif.</p>
+        <p>Ajoutez, consultez et ouvrez les comptes clients rattaches au restaurant actif.</p>
       </div>
-      <form class="platform-form customer-account-form" data-dashboard-customer-form>
+      ${readErrors.length ? `<p class="alert-note">Lecture des comptes clients incomplete ou impossible : ${escapeHtml(readErrors.join(" | "))}</p>` : ""}
+      <form class="platform-form customer-account-form" data-dashboard-customer-form data-customer-type="individual">
         <div class="form-grid">
           <label>Type
-            <select name="type">
+            <select name="type" data-customer-type-select>
               <option value="individual">Particulier</option>
               <option value="company">Societe</option>
             </select>
           </label>
           <label>Nom affichage<input name="displayName" placeholder="Nom du client" /></label>
-          <label>Prenom<input name="firstName" /></label>
-          <label>Nom<input name="lastName" /></label>
-          <label>Societe<input name="companyName" /></label>
-          <label>Contact<input name="contactName" /></label>
+          <label class="customer-field-individual">Prenom<input name="firstName" /></label>
+          <label class="customer-field-individual">Nom<input name="lastName" /></label>
+          <label class="customer-field-company">Societe<input name="companyName" /></label>
+          <label class="customer-field-company">Contact<input name="contactName" /></label>
           <label>Telephone<input name="phone" /></label>
           <label>Email<input name="email" type="email" /></label>
           <label class="wide-field">Adresse<input name="address" /></label>
-          <label>Tax ID<input name="taxId" /></label>
-          <label>TVA<input name="vatNumber" /></label>
+          <label class="customer-field-company">Tax ID<input name="taxId" /></label>
+          <label class="customer-field-company">TVA<input name="vatNumber" /></label>
           <label class="wide-field">Notes<textarea name="notes" rows="3"></textarea></label>
         </div>
         <button class="primary-btn button-reset" type="submit">Ajouter un compte client</button>
@@ -2216,7 +2250,7 @@ function clientsHtml(customers = []) {
           </div>
           ${clients.map(clientCardHtml).join("")}
         </div>
-      ` : `<div class="empty-state">Aucun compte client dans Customers pour le moment.</div>`}
+      ` : `<div class="empty-state">${readErrors.length ? "Impossible d'afficher les comptes clients pour le moment." : "Aucun compte client pour le moment."}</div>`}
     </div>
   `;
 }
