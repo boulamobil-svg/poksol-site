@@ -103,7 +103,20 @@ async function getRestaurant(id) {
   const { doc, getDoc } = services.firestoreModule;
   const snap = await getDoc(doc(services.db, "restaurants", id));
   if (!snap.exists()) return null;
-  return normalizeRestaurant(snap.id, snap.data());
+  const baseData = snap.data();
+  const settingsSnap = await getDoc(doc(services.db, "restaurants", id, "settings", "restaurant_profile")).catch(() => null);
+  const settingsData = settingsSnap?.exists() ? settingsSnap.data() : {};
+  const settingsProfile = settingsData.restaurantProfile || {};
+  return normalizeRestaurant(snap.id, {
+    ...baseData,
+    ...settingsProfile,
+    ...settingsData,
+    restaurantProfile: {
+      ...(baseData.restaurantProfile || {}),
+      ...settingsProfile,
+      ...settingsData
+    }
+  });
 }
 
 async function getPublicRestaurantBySlug(slug) {
@@ -537,8 +550,34 @@ async function listReservations(restaurantId) {
 async function listCustomers(restaurantId) {
   const services = await getServices();
   const { collection, getDocs } = services.firestoreModule;
-  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "Customers"));
-  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  const collectionNames = ["customers", "Customers"];
+  const results = await Promise.all(collectionNames.map(async (collectionName) => {
+    try {
+      const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, collectionName));
+      return {
+        collectionName,
+        customers: snaps.docs.map((snap) => ({ id: snap.id, customerCollection: collectionName, ...snap.data() }))
+      };
+    } catch (error) {
+      return { collectionName, error };
+    }
+  }));
+  const byPath = new Map();
+  const errors = [];
+  results.forEach((result) => {
+    if (result.error) {
+      errors.push(`${result.collectionName}: ${readableFirebaseError(result.error)}`);
+      return;
+    }
+    result.customers.forEach((customer) => {
+      byPath.set(`${customer.customerCollection}/${customer.id}`, customer);
+    });
+  });
+  return {
+    customers: [...byPath.values()],
+    errors,
+    checkedCollections: collectionNames
+  };
 }
 
 async function createCustomerAccount(restaurantId, form, user) {
@@ -548,7 +587,7 @@ async function createCustomerAccount(restaurantId, form, user) {
   if (!data.displayName && !data.phone && !data.email) {
     throw new Error("Renseignez au moins un nom, un telephone ou un email.");
   }
-  await addDoc(collection(services.db, "restaurants", restaurantId, "Customers"), {
+  await addDoc(collection(services.db, "restaurants", restaurantId, "customers"), {
     ...data,
     active: true,
     createdBy: user?.uid || "",
@@ -562,32 +601,37 @@ async function updateCustomerAccount(restaurantId, form) {
   const services = await getServices();
   const { doc, serverTimestamp, setDoc } = services.firestoreModule;
   const customerId = form.dataset.customerId;
+  const customerCollection = customerCollectionName(form.dataset.customerCollection);
   if (!customerId) throw new Error("Client introuvable.");
   const data = customerAccountPayload(form);
   if (!data.displayName && !data.phone && !data.email) {
     throw new Error("Renseignez au moins un nom, un telephone ou un email.");
   }
-  await setDoc(doc(services.db, "restaurants", restaurantId, "Customers", customerId), {
+  await setDoc(doc(services.db, "restaurants", restaurantId, customerCollection, customerId), {
     ...data,
     updatedAt: serverTimestamp()
   }, { merge: true });
 }
 
-async function setCustomerAccountActive(restaurantId, customerId, active) {
+async function setCustomerAccountActive(restaurantId, customerId, active, collectionName = "customers") {
   const services = await getServices();
   const { doc, serverTimestamp, setDoc } = services.firestoreModule;
   if (!customerId) throw new Error("Client introuvable.");
-  await setDoc(doc(services.db, "restaurants", restaurantId, "Customers", customerId), {
+  await setDoc(doc(services.db, "restaurants", restaurantId, customerCollectionName(collectionName), customerId), {
     active,
     updatedAt: serverTimestamp()
   }, { merge: true });
 }
 
-async function deleteCustomerAccount(restaurantId, customerId) {
+async function deleteCustomerAccount(restaurantId, customerId, collectionName = "customers") {
   const services = await getServices();
   const { deleteDoc, doc } = services.firestoreModule;
   if (!customerId) throw new Error("Client introuvable.");
-  await deleteDoc(doc(services.db, "restaurants", restaurantId, "Customers", customerId));
+  await deleteDoc(doc(services.db, "restaurants", restaurantId, customerCollectionName(collectionName), customerId));
+}
+
+function customerCollectionName(value) {
+  return value === "Customers" ? "Customers" : "customers";
 }
 
 function customerAccountPayload(form) {
@@ -1025,7 +1069,7 @@ function initDashboardPage() {
       if (form.matches("[data-dashboard-customer-update-form]")) await updateCustomerAccount(restaurantId, form);
       if (form.matches("[data-dashboard-customer-state-form]")) {
         const nextActive = form.dataset.customerActive !== "true";
-        await setCustomerAccountActive(restaurantId, form.dataset.customerId, nextActive);
+        await setCustomerAccountActive(restaurantId, form.dataset.customerId, nextActive, form.dataset.customerCollection);
       }
       if (form.matches("[data-dashboard-customer-delete-form]")) {
         const name = form.dataset.customerName || "ce client";
@@ -1033,7 +1077,7 @@ function initDashboardPage() {
           status.textContent = "";
           return;
         }
-        await deleteCustomerAccount(restaurantId, form.dataset.customerId);
+        await deleteCustomerAccount(restaurantId, form.dataset.customerId, form.dataset.customerCollection);
       }
       if (form.matches("[data-dashboard-invite-form]")) {
         const code = await createInvitation(restaurantId, form, currentUser);
@@ -1150,9 +1194,9 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   localStorage.setItem("poksolActiveRestaurantId", restaurant.id);
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
-  const [reservations, customers, members, menu, catalogMenu] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
-    listCustomers(restaurant.id).catch(() => []),
+    listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
     getActiveMenu(restaurant.id).catch(() => null),
     listCatalogMenu(restaurant.id).catch(() => null)
@@ -1160,7 +1204,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customers, members, dashboardMenu, activeTab);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab);
 }
 
 async function autoSaveCatalogField(root, field, options = {}) {
@@ -2213,7 +2257,9 @@ function setCatalogImagePreview(preview, src, alt, onLoad = null) {
   if (onLoad) preview.querySelector("img")?.addEventListener("load", onLoad, { once: true });
 }
 
-function clientsHtml(customers = []) {
+function clientsHtml(customerAccounts = {}) {
+  const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
+  const readErrors = Array.isArray(customerAccounts.errors) ? customerAccounts.errors : [];
   const clients = customers.map(normalizeCustomerAccount).sort((a, b) => {
     const dateDiff = clientTimeValue(b.updatedAt || b.createdAt) - clientTimeValue(a.updatedAt || a.createdAt);
     if (dateDiff) return dateDiff;
@@ -2251,6 +2297,7 @@ function clientsHtml(customers = []) {
           <small data-form-status></small>
         </form>
       </details>
+      ${readErrors.length ? `<p class="alert-note">Lecture des comptes clients incomplete ou impossible : ${escapeHtml(readErrors.join(" | "))}</p>` : ""}
       ${duplicateWarnings.length ? `
         <div class="client-duplicates" role="status">
           <strong>Doublons possibles</strong>
@@ -2297,7 +2344,7 @@ function clientsHtml(customers = []) {
           </div>
           ${clients.map(clientCardHtml).join("")}
         </div>
-      ` : `<div class="empty-state">Aucun compte client dans Customers pour le moment.</div>`}
+      ` : `<div class="empty-state">Aucun compte client pour le moment.</div>`}
     </div>
   `;
 }
@@ -2329,6 +2376,7 @@ function clientCardHtml(client) {
   ].join(" ");
   const updatedTime = clientTimeValue(client.updatedAt || client.createdAt);
   const statusLabel = client.active === false ? "Inactif" : "Actif";
+  const collectionName = customerCollectionName(client.customerCollection);
   return `
     <details class="customer-account-card"
       data-client-card
@@ -2365,7 +2413,7 @@ function clientCardHtml(client) {
         ${reservationDetailItemHtml("Notes", client.notes)}
       </div>
       <div class="client-management-grid">
-        <form class="platform-form client-edit-form" data-dashboard-customer-update-form data-customer-id="${escapeAttr(client.id)}">
+        <form class="platform-form client-edit-form" data-dashboard-customer-update-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}">
           <h3>Modifier le client</h3>
           ${customerFieldsHtml(client)}
           <button class="primary-btn button-reset" type="submit">Enregistrer le client</button>
@@ -2382,11 +2430,11 @@ function clientCardHtml(client) {
             </dl>
           </div>
           <div class="client-actions">
-            <form data-dashboard-customer-state-form data-customer-id="${escapeAttr(client.id)}" data-customer-active="${client.active === false ? "false" : "true"}">
+            <form data-dashboard-customer-state-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-active="${client.active === false ? "false" : "true"}">
               <button class="outline-dark-btn button-reset" type="submit">${client.active === false ? "Reactiver" : "Desactiver"}</button>
               <small data-form-status></small>
             </form>
-            <form data-dashboard-customer-delete-form data-customer-id="${escapeAttr(client.id)}" data-customer-name="${escapeAttr(identity[0])}">
+            <form data-dashboard-customer-delete-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-name="${escapeAttr(identity[0])}">
               <button class="ghost-action button-reset danger-action" type="submit">Supprimer</button>
               <small data-form-status></small>
             </form>
@@ -2452,6 +2500,7 @@ function normalizeCustomerAccount(customer = {}) {
   );
   return {
     id: customer.id,
+    customerCollection: customerCollectionName(customer.customerCollection),
     type: firstText(customer.type) || "individual",
     displayName,
     firstName: firstText(customer.firstName),
