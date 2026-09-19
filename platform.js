@@ -558,6 +558,13 @@ async function listReservations(restaurantId) {
     .sort((a, b) => reservationSortTime(b) - reservationSortTime(a));
 }
 
+async function listCustomers(restaurantId) {
+  const services = await getServices();
+  const { collection, getDocs } = services.firestoreModule;
+  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "customers"));
+  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+}
+
 async function getActiveMenu(restaurantId) {
   const services = await getServices();
   const { doc, getDoc } = services.firestoreModule;
@@ -1069,8 +1076,9 @@ async function renderDashboard(root, user, restaurantId) {
   localStorage.setItem("poksolActiveRestaurantId", restaurant.id);
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
-  const [reservations, members, menu, catalogMenu] = await Promise.all([
+  const [reservations, customers, members, menu, catalogMenu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
+    listCustomers(restaurant.id).catch(() => []),
     listMembers(restaurant.id).catch(() => []),
     getActiveMenu(restaurant.id).catch(() => null),
     listCatalogMenu(restaurant.id).catch(() => null)
@@ -1078,7 +1086,7 @@ async function renderDashboard(root, user, restaurantId) {
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, members, dashboardMenu);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customers, members, dashboardMenu);
 }
 
 async function autoSaveCatalogField(root, field, options = {}) {
@@ -1746,7 +1754,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, members, menu) {
+function dashboardHtml(restaurant, role, reservations, customers, members, menu) {
   const canEditProfile = ["owner", "admin", "manager"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -1759,7 +1767,7 @@ function dashboardHtml(restaurant, role, reservations, members, menu) {
       </button>
       <button class="dashboard-nav-backdrop button-reset" type="button" aria-label="Fermer les sections" data-dashboard-nav-backdrop></button>
       <nav class="dashboard-tabs" aria-label="Sections dashboard">
-        ${["overview", "profile", "hours", "public", "menu", "reservations", "team", "downloads"].map((tab, index) => `
+        ${["overview", "profile", "hours", "public", "menu", "reservations", "clients", "team", "downloads"].map((tab, index) => `
           <button class="${index === 0 ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>
         `).join("")}
       </nav>
@@ -1769,6 +1777,7 @@ function dashboardHtml(restaurant, role, reservations, members, menu) {
       <section class="dashboard-panel" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
+      <section class="dashboard-panel" data-dashboard-panel="clients">${clientsHtml(customers, reservations)}</section>
       <section class="dashboard-panel" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
       <section class="dashboard-panel" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -2116,6 +2125,190 @@ function setCatalogImagePreview(preview, src, alt, onLoad = null) {
   if (onLoad) preview.querySelector("img")?.addEventListener("load", onLoad, { once: true });
 }
 
+function clientsHtml(customers = [], reservations = []) {
+  const clients = buildRestaurantClients(customers, reservations);
+  const withPhone = clients.filter((client) => client.phone).length;
+  const withEmail = clients.filter((client) => client.email).length;
+  const fromReservations = clients.filter((client) => client.reservationCount > 0).length;
+  return `
+    <div class="clients-dashboard">
+      <div class="client-stats">
+        ${statusCardHtml("Clients", String(clients.length))}
+        ${statusCardHtml("Avec telephone", String(withPhone))}
+        ${statusCardHtml("Avec email", String(withEmail))}
+        ${statusCardHtml("Lies aux reservations", String(fromReservations))}
+      </div>
+      <div class="clients-section-head">
+        <div>
+          <p class="eyebrow">Clients restaurant</p>
+          <h2>Contacts et historique</h2>
+        </div>
+        <p>Les fiches clients de l'application sont regroupees avec les contacts trouves dans les reservations.</p>
+      </div>
+      ${clients.length ? `
+        <div class="responsive-table clients-table">
+          <div class="table-row table-head client-row">
+            <span>Client</span>
+            <span>Contact</span>
+            <span>Adresse</span>
+            <span>Reservations</span>
+            <span>Derniere activite</span>
+            <span>Notes</span>
+          </div>
+          ${clients.map(clientCardHtml).join("")}
+        </div>
+      ` : `<div class="empty-state">Aucune information client pour le moment.</div>`}
+    </div>
+  `;
+}
+
+function clientCardHtml(client) {
+  const contactLines = [
+    client.phone ? `Tel. ${client.phone}` : "",
+    client.email || ""
+  ].filter(Boolean);
+  const identity = [
+    client.name || "Client sans nom",
+    client.companyName ? `Societe : ${client.companyName}` : "",
+    client.taxId ? `Tax ID : ${client.taxId}` : "",
+    client.vatNumber ? `TVA : ${client.vatNumber}` : ""
+  ].filter(Boolean);
+  return `
+    <article class="table-row client-row">
+      <span>
+        <strong>${escapeHtml(identity[0])}</strong>
+        ${identity.slice(1).map((line) => `<small>${escapeHtml(line)}</small>`).join("")}
+      </span>
+      <span>${contactLines.length ? contactLines.map((line) => `<small>${escapeHtml(line)}</small>`).join("") : "Contact non renseigne"}</span>
+      <span>${escapeHtml(client.address || "-")}</span>
+      <span>
+        <strong>${escapeHtml(String(client.reservationCount || 0))}</strong>
+        <small>${escapeHtml(client.sources.join(" + "))}</small>
+      </span>
+      <span>${escapeHtml(clientDateLabel(client.lastActivityAt) || "-")}</span>
+      <span>${escapeHtml(client.notes || "-")}</span>
+    </article>
+  `;
+}
+
+function buildRestaurantClients(customers = [], reservations = []) {
+  const byKey = new Map();
+  customers.forEach((customer) => {
+    const client = normalizeStoredClient(customer);
+    mergeClient(byKey, client);
+  });
+  reservations.forEach((reservation) => {
+    const client = normalizeReservationClient(reservation);
+    if (client) mergeClient(byKey, client);
+  });
+  return [...byKey.values()].sort((a, b) => {
+    const dateDiff = clientTimeValue(b.lastActivityAt) - clientTimeValue(a.lastActivityAt);
+    if (dateDiff) return dateDiff;
+    return (a.name || "").localeCompare(b.name || "", "fr");
+  });
+}
+
+function normalizeStoredClient(customer = {}) {
+  const name = firstText(
+    customer.displayName,
+    customer.name,
+    [customer.firstName, customer.lastName].filter(Boolean).join(" "),
+    customer.contactName,
+    customer.companyName
+  );
+  return {
+    key: clientIdentityKey(name, customer.phone, customer.email, customer.id),
+    id: customer.id,
+    name,
+    companyName: firstText(customer.companyName),
+    phone: firstText(customer.phone, customer.telephone, customer.mobile),
+    email: firstText(customer.email),
+    address: firstText(customer.address),
+    taxId: firstText(customer.taxId),
+    vatNumber: firstText(customer.vatNumber),
+    notes: firstText(customer.notes),
+    active: customer.active !== false,
+    reservationCount: 0,
+    lastActivityAt: customer.updatedAt || customer.createdAt || null,
+    sources: ["Fiche client"]
+  };
+}
+
+function normalizeReservationClient(reservation = {}) {
+  const customer = reservation.customer || {};
+  const contact = reservation.contact || {};
+  const name = firstText(
+    reservation.customerName,
+    reservation.name,
+    reservation.clientName,
+    typeof customer === "object" ? customer.name : "",
+    typeof contact === "object" ? contact.name : ""
+  );
+  const phone = firstText(reservation.customerPhone, reservation.phone, reservation.telephone, customer.phone, contact.phone);
+  const email = firstText(reservation.customerEmail, reservation.email, reservation.contactEmail, customer.email, contact.email);
+  if (!name && !phone && !email) return null;
+  return {
+    key: clientIdentityKey(name, phone, email, reservation.id),
+    id: reservation.id,
+    name,
+    companyName: "",
+    phone,
+    email,
+    address: firstText(reservation.address, customer.address, contact.address),
+    taxId: "",
+    vatNumber: "",
+    notes: firstText(reservation.notes, reservation.message, reservation.comment),
+    active: true,
+    reservationCount: 1,
+    lastActivityAt: reservation.reservedAt || reservation.reservationAt || reservation.dateTime || reservation.startAt || reservation.createdAt || null,
+    sources: ["Reservations"]
+  };
+}
+
+function mergeClient(byKey, incoming) {
+  const key = incoming.key || clientIdentityKey(incoming.name, incoming.phone, incoming.email, incoming.id);
+  const current = byKey.get(key);
+  if (!current) {
+    byKey.set(key, { ...incoming, key, sources: uniqueValues(incoming.sources || []) });
+    return;
+  }
+  current.name = firstText(current.name, incoming.name);
+  current.companyName = firstText(current.companyName, incoming.companyName);
+  current.phone = firstText(current.phone, incoming.phone);
+  current.email = firstText(current.email, incoming.email);
+  current.address = firstText(current.address, incoming.address);
+  current.taxId = firstText(current.taxId, incoming.taxId);
+  current.vatNumber = firstText(current.vatNumber, incoming.vatNumber);
+  current.notes = firstText(current.notes, incoming.notes);
+  current.active = current.active !== false || incoming.active !== false;
+  current.reservationCount = (current.reservationCount || 0) + (incoming.reservationCount || 0);
+  current.lastActivityAt = clientTimeValue(incoming.lastActivityAt) > clientTimeValue(current.lastActivityAt)
+    ? incoming.lastActivityAt
+    : current.lastActivityAt;
+  current.sources = uniqueValues([...(current.sources || []), ...(incoming.sources || [])]);
+}
+
+function clientIdentityKey(name, phone, email, fallback) {
+  const cleanPhone = String(phone || "").replace(/\D/g, "");
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  const cleanName = String(name || "").trim().toLowerCase();
+  return cleanPhone || cleanEmail || cleanName || String(fallback || Math.random());
+}
+
+function clientTimeValue(value) {
+  return dateFromFirestoreValue(value)?.getTime() || 0;
+}
+
+function clientDateLabel(value) {
+  const date = dateFromFirestoreValue(value);
+  if (!date) return "";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
+}
+
 function reservationsHtml(reservations, role) {
   const canUpdate = ["owner", "admin", "manager"].includes(role);
   return `
@@ -2452,6 +2645,7 @@ function tabLabel(tab) {
     public: "Page publique",
     menu: "QR menu",
     reservations: "Reservations",
+    clients: "Clients",
     team: "Equipe",
     downloads: "Downloads"
   }[tab] || tab;
