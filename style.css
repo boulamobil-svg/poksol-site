@@ -1400,6 +1400,14 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+.customer-account-form {
+  margin: 0;
+  padding: 22px;
+  border: 1px solid #d3e5ff;
+  border-radius: 18px;
+  background: #fbfdff;
+}
+
 .overview-general-info {
   display: grid;
   gap: 18px;
@@ -1568,6 +1576,58 @@ select:focus-visible {
   font-size: 13px;
   font-weight: 800;
   line-height: 1.35;
+}
+
+.customer-account-card {
+  overflow: hidden;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.customer-account-card[open] {
+  background: white;
+  box-shadow: 0 14px 34px rgba(10, 37, 64, 0.08);
+}
+
+.customer-account-card > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.customer-account-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-open-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--poksol-blue);
+  font-weight: 900;
+}
+
+.client-open-label::after {
+  content: "+";
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--poksol-blue);
+  line-height: 1;
+}
+
+.customer-account-card[open] .client-open-label::after {
+  content: "-";
+}
+
+.client-account-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 14px 14px;
 }
 
 .reservation-card {
@@ -3564,11 +3624,13 @@ body.menu-page-body.translated-rtl {
 
   .reservations-table .reservation-summary,
   .clients-table .client-row,
+  .client-account-details,
   .reservation-details {
     grid-template-columns: 1fr;
   }
 
-  .reservation-more-label {
+  .reservation-more-label,
+  .client-open-label {
     justify-content: center;
   }
 

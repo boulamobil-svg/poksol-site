@@ -561,8 +561,39 @@ async function listReservations(restaurantId) {
 async function listCustomers(restaurantId) {
   const services = await getServices();
   const { collection, getDocs } = services.firestoreModule;
-  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "customers"));
+  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "Customers"));
   return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+}
+
+async function createCustomerAccount(restaurantId, form, user) {
+  const services = await getServices();
+  const { addDoc, collection, serverTimestamp } = services.firestoreModule;
+  const data = new FormData(form);
+  const displayName = text(data, "displayName");
+  const phone = text(data, "phone");
+  const email = text(data, "email");
+  if (!displayName && !phone && !email) {
+    throw new Error("Renseignez au moins un nom, un telephone ou un email.");
+  }
+  await addDoc(collection(services.db, "restaurants", restaurantId, "Customers"), {
+    type: text(data, "type") || "individual",
+    displayName,
+    firstName: text(data, "firstName"),
+    lastName: text(data, "lastName"),
+    companyName: text(data, "companyName"),
+    contactName: text(data, "contactName"),
+    phone,
+    email,
+    address: text(data, "address"),
+    taxId: text(data, "taxId"),
+    vatNumber: text(data, "vatNumber"),
+    notes: text(data, "notes"),
+    active: true,
+    createdBy: user?.uid || "",
+    createdByEmail: user?.email || "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
 }
 
 async function getActiveMenu(restaurantId) {
@@ -968,6 +999,7 @@ function initDashboardPage() {
       if (form.matches("[data-dashboard-hours-form]")) await saveOpeningHours(restaurantId, form);
       if (form.matches("[data-dashboard-public-form]")) await savePublicSettings(restaurantId, form);
       if (form.matches("[data-dashboard-menu-form]")) await saveQrMenu(restaurantId, form);
+      if (form.matches("[data-dashboard-customer-form]")) await createCustomerAccount(restaurantId, form, currentUser);
       if (form.matches("[data-dashboard-invite-form]")) {
         const code = await createInvitation(restaurantId, form, currentUser);
         form.code.value = code;
@@ -1777,7 +1809,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu)
       <section class="dashboard-panel" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="clients">${clientsHtml(customers, reservations)}</section>
+      <section class="dashboard-panel" data-dashboard-panel="clients">${clientsHtml(customers)}</section>
       <section class="dashboard-panel" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
       <section class="dashboard-panel" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -2125,39 +2157,66 @@ function setCatalogImagePreview(preview, src, alt, onLoad = null) {
   if (onLoad) preview.querySelector("img")?.addEventListener("load", onLoad, { once: true });
 }
 
-function clientsHtml(customers = [], reservations = []) {
-  const clients = buildRestaurantClients(customers, reservations);
+function clientsHtml(customers = []) {
+  const clients = customers.map(normalizeCustomerAccount).sort((a, b) => {
+    const dateDiff = clientTimeValue(b.updatedAt || b.createdAt) - clientTimeValue(a.updatedAt || a.createdAt);
+    if (dateDiff) return dateDiff;
+    return (a.displayName || "").localeCompare(b.displayName || "", "fr");
+  });
+  const activeClients = clients.filter((client) => client.active !== false).length;
   const withPhone = clients.filter((client) => client.phone).length;
   const withEmail = clients.filter((client) => client.email).length;
-  const fromReservations = clients.filter((client) => client.reservationCount > 0).length;
   return `
     <div class="clients-dashboard">
       <div class="client-stats">
-        ${statusCardHtml("Clients", String(clients.length))}
+        ${statusCardHtml("Comptes clients", String(clients.length))}
+        ${statusCardHtml("Actifs", String(activeClients))}
         ${statusCardHtml("Avec telephone", String(withPhone))}
         ${statusCardHtml("Avec email", String(withEmail))}
-        ${statusCardHtml("Lies aux reservations", String(fromReservations))}
       </div>
       <div class="clients-section-head">
         <div>
-          <p class="eyebrow">Clients restaurant</p>
-          <h2>Contacts et historique</h2>
+          <p class="eyebrow">Firestore Customers</p>
+          <h2>Comptes clients</h2>
         </div>
-        <p>Les fiches clients de l'application sont regroupees avec les contacts trouves dans les reservations.</p>
+        <p>Ces comptes viennent uniquement de la collection Firestore <strong>Customers</strong> du restaurant actif.</p>
       </div>
+      <form class="platform-form customer-account-form" data-dashboard-customer-form>
+        <div class="form-grid">
+          <label>Type
+            <select name="type">
+              <option value="individual">Particulier</option>
+              <option value="company">Societe</option>
+            </select>
+          </label>
+          <label>Nom affichage<input name="displayName" placeholder="Nom du client" /></label>
+          <label>Prenom<input name="firstName" /></label>
+          <label>Nom<input name="lastName" /></label>
+          <label>Societe<input name="companyName" /></label>
+          <label>Contact<input name="contactName" /></label>
+          <label>Telephone<input name="phone" /></label>
+          <label>Email<input name="email" type="email" /></label>
+          <label class="wide-field">Adresse<input name="address" /></label>
+          <label>Tax ID<input name="taxId" /></label>
+          <label>TVA<input name="vatNumber" /></label>
+          <label class="wide-field">Notes<textarea name="notes" rows="3"></textarea></label>
+        </div>
+        <button class="primary-btn button-reset" type="submit">Ajouter un compte client</button>
+        <small data-form-status></small>
+      </form>
       ${clients.length ? `
         <div class="responsive-table clients-table">
           <div class="table-row table-head client-row">
             <span>Client</span>
             <span>Contact</span>
             <span>Adresse</span>
-            <span>Reservations</span>
-            <span>Derniere activite</span>
-            <span>Notes</span>
+            <span>Statut</span>
+            <span>Mis a jour</span>
+            <span>Compte</span>
           </div>
           ${clients.map(clientCardHtml).join("")}
         </div>
-      ` : `<div class="empty-state">Aucune information client pour le moment.</div>`}
+      ` : `<div class="empty-state">Aucun compte client dans Customers pour le moment.</div>`}
     </div>
   `;
 }
@@ -2168,48 +2227,45 @@ function clientCardHtml(client) {
     client.email || ""
   ].filter(Boolean);
   const identity = [
-    client.name || "Client sans nom",
+    client.displayName || "Client sans nom",
     client.companyName ? `Societe : ${client.companyName}` : "",
+    client.contactName ? `Contact : ${client.contactName}` : "",
     client.taxId ? `Tax ID : ${client.taxId}` : "",
     client.vatNumber ? `TVA : ${client.vatNumber}` : ""
   ].filter(Boolean);
   return `
-    <article class="table-row client-row">
-      <span>
-        <strong>${escapeHtml(identity[0])}</strong>
-        ${identity.slice(1).map((line) => `<small>${escapeHtml(line)}</small>`).join("")}
-      </span>
-      <span>${contactLines.length ? contactLines.map((line) => `<small>${escapeHtml(line)}</small>`).join("") : "Contact non renseigne"}</span>
-      <span>${escapeHtml(client.address || "-")}</span>
-      <span>
-        <strong>${escapeHtml(String(client.reservationCount || 0))}</strong>
-        <small>${escapeHtml(client.sources.join(" + "))}</small>
-      </span>
-      <span>${escapeHtml(clientDateLabel(client.lastActivityAt) || "-")}</span>
-      <span>${escapeHtml(client.notes || "-")}</span>
-    </article>
+    <details class="customer-account-card">
+      <summary class="table-row client-row">
+        <span>
+          <strong>${escapeHtml(identity[0])}</strong>
+          ${identity.slice(1).map((line) => `<small>${escapeHtml(line)}</small>`).join("")}
+        </span>
+        <span>${contactLines.length ? contactLines.map((line) => `<small>${escapeHtml(line)}</small>`).join("") : "Contact non renseigne"}</span>
+        <span>${escapeHtml(client.address || "-")}</span>
+        <span>${client.active === false ? "Inactif" : "Actif"}</span>
+        <span>${escapeHtml(clientDateLabel(client.updatedAt || client.createdAt) || "-")}</span>
+        <span class="client-open-label">Ouvrir compte</span>
+      </summary>
+      <div class="client-account-details">
+        ${reservationDetailItemHtml("ID compte", client.id)}
+        ${reservationDetailItemHtml("Type", client.type === "company" ? "Societe" : "Particulier")}
+        ${reservationDetailItemHtml("Prenom", client.firstName)}
+        ${reservationDetailItemHtml("Nom", client.lastName)}
+        ${reservationDetailItemHtml("Societe", client.companyName)}
+        ${reservationDetailItemHtml("Contact", client.contactName)}
+        ${reservationDetailItemHtml("Telephone", client.phone)}
+        ${reservationDetailItemHtml("Email", client.email)}
+        ${reservationDetailItemHtml("Adresse", client.address)}
+        ${reservationDetailItemHtml("Tax ID", client.taxId)}
+        ${reservationDetailItemHtml("TVA", client.vatNumber)}
+        ${reservationDetailItemHtml("Notes", client.notes)}
+      </div>
+    </details>
   `;
 }
 
-function buildRestaurantClients(customers = [], reservations = []) {
-  const byKey = new Map();
-  customers.forEach((customer) => {
-    const client = normalizeStoredClient(customer);
-    mergeClient(byKey, client);
-  });
-  reservations.forEach((reservation) => {
-    const client = normalizeReservationClient(reservation);
-    if (client) mergeClient(byKey, client);
-  });
-  return [...byKey.values()].sort((a, b) => {
-    const dateDiff = clientTimeValue(b.lastActivityAt) - clientTimeValue(a.lastActivityAt);
-    if (dateDiff) return dateDiff;
-    return (a.name || "").localeCompare(b.name || "", "fr");
-  });
-}
-
-function normalizeStoredClient(customer = {}) {
-  const name = firstText(
+function normalizeCustomerAccount(customer = {}) {
+  const displayName = firstText(
     customer.displayName,
     customer.name,
     [customer.firstName, customer.lastName].filter(Boolean).join(" "),
@@ -2217,9 +2273,12 @@ function normalizeStoredClient(customer = {}) {
     customer.companyName
   );
   return {
-    key: clientIdentityKey(name, customer.phone, customer.email, customer.id),
     id: customer.id,
-    name,
+    type: firstText(customer.type) || "individual",
+    displayName,
+    firstName: firstText(customer.firstName),
+    lastName: firstText(customer.lastName),
+    contactName: firstText(customer.contactName),
     companyName: firstText(customer.companyName),
     phone: firstText(customer.phone, customer.telephone, customer.mobile),
     email: firstText(customer.email),
@@ -2228,71 +2287,9 @@ function normalizeStoredClient(customer = {}) {
     vatNumber: firstText(customer.vatNumber),
     notes: firstText(customer.notes),
     active: customer.active !== false,
-    reservationCount: 0,
-    lastActivityAt: customer.updatedAt || customer.createdAt || null,
-    sources: ["Fiche client"]
+    createdAt: customer.createdAt || null,
+    updatedAt: customer.updatedAt || customer.createdAt || null
   };
-}
-
-function normalizeReservationClient(reservation = {}) {
-  const customer = reservation.customer || {};
-  const contact = reservation.contact || {};
-  const name = firstText(
-    reservation.customerName,
-    reservation.name,
-    reservation.clientName,
-    typeof customer === "object" ? customer.name : "",
-    typeof contact === "object" ? contact.name : ""
-  );
-  const phone = firstText(reservation.customerPhone, reservation.phone, reservation.telephone, customer.phone, contact.phone);
-  const email = firstText(reservation.customerEmail, reservation.email, reservation.contactEmail, customer.email, contact.email);
-  if (!name && !phone && !email) return null;
-  return {
-    key: clientIdentityKey(name, phone, email, reservation.id),
-    id: reservation.id,
-    name,
-    companyName: "",
-    phone,
-    email,
-    address: firstText(reservation.address, customer.address, contact.address),
-    taxId: "",
-    vatNumber: "",
-    notes: firstText(reservation.notes, reservation.message, reservation.comment),
-    active: true,
-    reservationCount: 1,
-    lastActivityAt: reservation.reservedAt || reservation.reservationAt || reservation.dateTime || reservation.startAt || reservation.createdAt || null,
-    sources: ["Reservations"]
-  };
-}
-
-function mergeClient(byKey, incoming) {
-  const key = incoming.key || clientIdentityKey(incoming.name, incoming.phone, incoming.email, incoming.id);
-  const current = byKey.get(key);
-  if (!current) {
-    byKey.set(key, { ...incoming, key, sources: uniqueValues(incoming.sources || []) });
-    return;
-  }
-  current.name = firstText(current.name, incoming.name);
-  current.companyName = firstText(current.companyName, incoming.companyName);
-  current.phone = firstText(current.phone, incoming.phone);
-  current.email = firstText(current.email, incoming.email);
-  current.address = firstText(current.address, incoming.address);
-  current.taxId = firstText(current.taxId, incoming.taxId);
-  current.vatNumber = firstText(current.vatNumber, incoming.vatNumber);
-  current.notes = firstText(current.notes, incoming.notes);
-  current.active = current.active !== false || incoming.active !== false;
-  current.reservationCount = (current.reservationCount || 0) + (incoming.reservationCount || 0);
-  current.lastActivityAt = clientTimeValue(incoming.lastActivityAt) > clientTimeValue(current.lastActivityAt)
-    ? incoming.lastActivityAt
-    : current.lastActivityAt;
-  current.sources = uniqueValues([...(current.sources || []), ...(incoming.sources || [])]);
-}
-
-function clientIdentityKey(name, phone, email, fallback) {
-  const cleanPhone = String(phone || "").replace(/\D/g, "");
-  const cleanEmail = String(email || "").trim().toLowerCase();
-  const cleanName = String(name || "").trim().toLowerCase();
-  return cleanPhone || cleanEmail || cleanName || String(fallback || Math.random());
 }
 
 function clientTimeValue(value) {
@@ -2645,7 +2642,7 @@ function tabLabel(tab) {
     public: "Page publique",
     menu: "QR menu",
     reservations: "Reservations",
-    clients: "Clients",
+    clients: "Comptes clients",
     team: "Equipe",
     downloads: "Downloads"
   }[tab] || tab;
