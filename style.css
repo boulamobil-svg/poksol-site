@@ -1214,7 +1214,6 @@ select:focus-visible {
 
 .mini-actions a,
 .quick-links a,
-.quick-links button,
 .download-inline a,
 .download-grid a,
 .disabled-download {
@@ -1227,20 +1226,6 @@ select:focus-visible {
   text-decoration: none;
   font-weight: 900;
   padding: 12px 14px;
-}
-
-.quick-links button {
-  border: 1px solid #c8ddf5;
-  background: white;
-  color: var(--text-muted);
-  box-shadow: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.quick-links button:hover {
-  color: var(--poksol-navy);
-  background: #f8fbff;
 }
 
 .mini-actions a:nth-child(2),
@@ -1302,6 +1287,21 @@ select:focus-visible {
   color: white;
 }
 
+.dashboard-tabs .dashboard-logout-button {
+  margin-top: auto;
+  align-self: flex-end;
+  width: auto;
+  border: 1px solid #c8ddf5;
+  background: white;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.dashboard-tabs .dashboard-logout-button:hover {
+  color: var(--poksol-navy);
+  background: #f8fbff;
+}
+
 .dashboard-panel {
   display: none;
   min-width: 0;
@@ -1346,18 +1346,23 @@ select:focus-visible {
   font-size: 24px;
 }
 
+.clients-dashboard {
+  display: grid;
+  gap: 18px;
+}
+
 .client-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
 
 .client-stats article {
   padding: 18px;
+  border: 1px solid #d3e5ff;
   border-radius: 18px;
   background: #f5f9ff;
-  border: 1px solid #d3e5ff;
 }
 
 .client-stats span,
@@ -1376,16 +1381,11 @@ select:focus-visible {
   font-size: 24px;
 }
 
-.clients-dashboard {
-  display: grid;
-  gap: 18px;
-}
-
 .clients-section-head {
   display: flex;
+  align-items: end;
   justify-content: space-between;
   gap: 18px;
-  align-items: end;
 }
 
 .clients-section-head h2,
@@ -1400,17 +1400,54 @@ select:focus-visible {
   line-height: 1.45;
 }
 
-.customer-account-form {
-  margin: 0;
-  padding: 22px;
+.client-duplicates {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #ffd98b;
+  border-radius: 14px;
+  background: #fff8e8;
+  color: #735000;
+  font-weight: 800;
+}
+
+.client-duplicates strong {
+  color: var(--poksol-navy);
+}
+
+.client-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(160px, 0.8fr) auto auto auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
   border: 1px solid #d3e5ff;
   border-radius: 18px;
   background: #fbfdff;
 }
 
-.customer-account-form[data-customer-type="individual"] .customer-field-company,
-.customer-account-form[data-customer-type="company"] .customer-field-individual {
-  display: none;
+.client-tools label {
+  display: grid;
+  gap: 8px;
+  color: var(--poksol-navy);
+  font-weight: 900;
+}
+
+.client-tools input,
+.client-tools select {
+  min-height: 46px;
+  border: 1px solid #d3e5ff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--poksol-navy);
+  background: white;
+  font: inherit;
+}
+
+.client-tools > span {
+  color: var(--text-muted);
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .overview-general-info {
@@ -1628,11 +1665,94 @@ select:focus-visible {
   content: "-";
 }
 
+.client-status {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #0c6b3a;
+  background: #dff8e9;
+  font-weight: 900;
+}
+
+.client-status.is-inactive {
+  color: #735000;
+  background: #fff0c2;
+}
+
 .client-account-details {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   padding: 0 14px 14px;
+}
+
+.client-management-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.8fr);
+  gap: 14px;
+  padding: 0 14px 14px;
+}
+
+.client-edit-form,
+.client-account-side {
+  padding: 16px;
+  border: 1px solid #d3e5ff;
+  border-radius: 14px;
+  background: #fbfdff;
+}
+
+.client-edit-form h3,
+.client-account-side h3 {
+  margin: 0 0 14px;
+  color: var(--poksol-navy);
+}
+
+.client-account-side {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.client-account-side dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.client-account-side dl div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #d3e5ff;
+}
+
+.client-account-side dt {
+  color: var(--text-muted);
+  font-weight: 900;
+}
+
+.client-account-side dd {
+  margin: 0;
+  color: var(--poksol-navy);
+  font-weight: 900;
+}
+
+.client-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.client-actions form {
+  display: grid;
+  gap: 6px;
+}
+
+.danger-action {
+  color: #a5281b;
+  border-color: #ffd0ca;
+  background: #fff5f3;
 }
 
 .reservation-card {
@@ -1689,6 +1809,72 @@ select:focus-visible {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   padding: 0 14px 14px;
+}
+
+.client-add-panel {
+  margin: 22px 0;
+  overflow: hidden;
+  border: 1px solid #d3e5ff;
+  border-radius: 18px;
+  background: #fbfdff;
+}
+
+.client-add-panel > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+  color: var(--poksol-navy);
+  cursor: pointer;
+  font-weight: 900;
+  list-style: none;
+}
+
+.client-add-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-add-panel > summary strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--poksol-blue);
+  font-size: 14px;
+}
+
+.client-add-panel > summary strong::after {
+  content: "+";
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--poksol-blue);
+  line-height: 1;
+}
+
+.client-add-panel[open] > summary {
+  border-bottom: 1px solid #d3e5ff;
+}
+
+.client-add-panel[open] > summary strong {
+  font-size: 0;
+}
+
+.client-add-panel[open] > summary strong::before {
+  content: "Refermer";
+  font-size: 14px;
+}
+
+.client-add-panel[open] > summary strong::after {
+  content: "-";
+  font-size: 16px;
+}
+
+.client-add-panel .customer-account-form {
+  padding: 20px;
 }
 
 .reservation-detail-item {
@@ -1971,6 +2157,45 @@ select:focus-visible {
   margin-top: 0;
 }
 
+.profile-image-field {
+  align-content: start;
+  gap: 10px;
+}
+
+.profile-image-preview,
+.profile-image-empty {
+  min-height: 92px;
+  display: grid;
+  align-items: center;
+  justify-items: start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dce9f8;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.profile-image-preview img {
+  width: 120px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: white;
+}
+
+.profile-image-preview a {
+  color: var(--poksol-blue);
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.profile-image-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .catalog-items-editor {
   display: grid;
   gap: 12px;
@@ -2190,7 +2415,7 @@ select:focus-visible {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 24px;
 }
 
@@ -2214,10 +2439,9 @@ select:focus-visible {
 
 .restaurant-public-links {
   display: flex;
-  gap: 14px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  gap: 24px;
+  padding: 0;
+  background: transparent;
 }
 
 .restaurant-public-links a {
@@ -2261,12 +2485,6 @@ select:focus-visible {
   line-height: 1.55;
 }
 
-.restaurant-hero-actions {
-  display: flex;
-  gap: 16px;
-  margin-top: 30px;
-}
-
 .restaurant-cover-card {
   overflow: hidden;
   border-radius: 28px;
@@ -2308,29 +2526,7 @@ select:focus-visible {
 }
 
 .restaurant-public-main {
-  padding: 44px 8% 70px;
-}
-
-.restaurant-quick-actions {
-  max-width: 1180px;
-  margin: -74px auto 34px;
-  position: relative;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-
-.restaurant-quick-actions a {
-  padding: 18px;
-  border-radius: 18px;
-  color: var(--restaurant-primary);
-  background: white;
-  border: 1px solid color-mix(in srgb, var(--restaurant-primary) 12%, white);
-  box-shadow: 0 16px 40px rgba(10, 37, 64, 0.1);
-  text-align: center;
-  text-decoration: none;
-  font-weight: 900;
+  padding: 54px 8% 70px;
 }
 
 .menu-page-body {
@@ -3034,17 +3230,23 @@ body.menu-page-body.translated-rtl {
 
 .restaurant-public-footer {
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 24px 8%;
+  justify-content: center;
+  padding: 20px 8%;
   color: white;
   background: var(--restaurant-primary);
 }
 
 .restaurant-public-footer a {
-  color: var(--restaurant-accent);
-  text-decoration: none;
-  font-weight: 900;
+  color: white;
+}
+
+.restaurant-public-footer .restaurant-powered-brand {
+  color: white;
+}
+
+.restaurant-public-footer .restaurant-powered-brand img {
+  width: 38px;
+  height: 38px;
 }
 
 .access-hero {
@@ -3600,6 +3802,8 @@ body.menu-page-body.translated-rtl {
   .contact-platform-card,
   .dashboard-stats,
   .client-stats,
+  .client-tools,
+  .client-management-grid,
   .overview-info-grid,
   .toggle-grid,
   .download-grid {
@@ -3730,7 +3934,6 @@ body.menu-page-body.translated-rtl {
 
   .admin-public-page-card,
   .restaurant-public-nav,
-  .restaurant-hero-actions,
   .restaurant-public-footer {
     flex-direction: column;
     text-align: center;
@@ -3745,7 +3948,6 @@ body.menu-page-body.translated-rtl {
   .restaurant-hero-content,
   .restaurant-layout,
   .menu-grid,
-  .restaurant-quick-actions,
   .reservation-form {
     grid-template-columns: 1fr;
   }
@@ -3930,10 +4132,6 @@ body.menu-page-body.translated-rtl {
 
   .restaurant-public-main {
     padding-top: 28px;
-  }
-
-  .restaurant-quick-actions {
-    margin-top: -40px;
   }
 
   .restaurant-section,
