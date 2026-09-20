@@ -555,9 +555,18 @@ async function listCustomers(restaurantId) {
   const results = await Promise.all(collectionNames.map(async (collectionName) => {
     try {
       const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, collectionName));
+      const customers = await Promise.all(snaps.docs.map(async (snap) => {
+        const movements = await listCustomerMovements(restaurantId, collectionName, snap.id).catch(() => []);
+        return {
+          id: snap.id,
+          customerCollection: collectionName,
+          ...snap.data(),
+          movements
+        };
+      }));
       return {
         collectionName,
-        customers: snaps.docs.map((snap) => ({ id: snap.id, customerCollection: collectionName, ...snap.data() }))
+        customers
       };
     } catch (error) {
       return { collectionName, error };
@@ -579,6 +588,20 @@ async function listCustomers(restaurantId) {
     errors,
     checkedCollections: collectionNames
   };
+}
+
+async function listCustomerMovements(restaurantId, collectionName, customerId) {
+  const services = await getServices();
+  const { collection, getDocs } = services.firestoreModule;
+  const snaps = await getDocs(collection(
+    services.db,
+    "restaurants",
+    restaurantId,
+    customerCollectionName(collectionName),
+    customerId,
+    "movements"
+  ));
+  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
 }
 
 async function createCustomerAccount(restaurantId, form, user) {
@@ -2711,7 +2734,7 @@ function normalizeClientMovements(client = {}) {
     client.history
   ].find(Array.isArray) || [];
   return sources.map((movement) => {
-    const amount = firstNumber(movement.amount, movement.total, movement.value, movement.balanceDelta, movement.debit, movement.credit) || 0;
+    const amount = movementAmountValue(movement);
     const date = dateFromFirestoreValue(movement.createdAt || movement.date || movement.paidAt || movement.ticketAt || movement.updatedAt);
     return {
       amount,
@@ -2721,6 +2744,22 @@ function normalizeClientMovements(client = {}) {
       label: firstText(movement.label, movement.title, movement.reason, movement.type, movement.ticketNumber, movement.id) || "Mouvement"
     };
   }).sort((a, b) => b.timeValue - a.timeValue);
+}
+
+function movementAmountValue(movement = {}) {
+  const signed = firstNumber(
+    movement.amount,
+    movement.total,
+    movement.value,
+    movement.balanceDelta,
+    movement.delta,
+    movement.remainingDue,
+    movement.due
+  );
+  if (signed !== null) return signed;
+  const debit = firstNumber(movement.debit, movement.debitAmount, movement.charge, movement.ticketTotal) || 0;
+  const credit = firstNumber(movement.credit, movement.creditAmount, movement.payment, movement.paidAmount) || 0;
+  return debit - credit;
 }
 
 function firstNumber(...values) {
