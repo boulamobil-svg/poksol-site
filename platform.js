@@ -2605,7 +2605,7 @@ function clientDetailHtml(client, reservations = []) {
               <button class="outline-dark-btn button-reset" type="submit">${client.active === false ? "Reactiver" : "Desactiver"}</button>
               <small data-form-status></small>
             </form>
-            <form data-dashboard-customer-delete-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-name="${escapeAttr(identity[0])}">
+            <form data-dashboard-customer-delete-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-name="${escapeAttr(displayName)}">
               <button class="ghost-action button-reset danger-action" type="button" data-client-delete-arm>Supprimer</button>
               <div class="client-delete-confirm">
                 <span>Suppression definitive</span>
