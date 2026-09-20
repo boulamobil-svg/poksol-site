@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+40",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  40,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+40.apk",
+    "apkSha256":  "e899637062455ef5c02184414aab7e72ebe72acd84615599f0f65162f62e9268",
+    "apkFileSize":  95726770,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+40 : synchronisation simplifiee (Firestore uniquement) et fusion des ameliorations recentes.",
+    "publishedAt":  "2026-09-20T18:25:15Z",
+    "updatedAt":  "2026-09-20T18:25:15Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+40.zip",
+    "webSha256":  "42b92d2e803dfa2d3d7013d2560da0a1819d7186323735bdd8119a86bcf405a2",
+    "webFileSize":  14756589,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+40.zip",
+    "windowsSha256":  "c47966768dfdbf9bba4040b1d641e75803f67ecf85cd5207be17c6b02d1ac238",
+    "windowsFileSize":  22714142
+}
