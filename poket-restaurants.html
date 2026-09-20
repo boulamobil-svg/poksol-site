@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Poket Restaurants | Poksol</title>
-  <link rel="stylesheet" href="style.css?v=20260629-5" />
+  <link rel="stylesheet" href="style.css?v=20260920-2" />
 </head>
 <body>
   <header class="product-hero">
@@ -85,30 +85,29 @@
         <a class="product-action" href="poket-access.html?mode=edit&section=hours">Modifier horaires</a>
         <a class="product-action" href="poket-access.html?mode=public-page">Editer la page restaurant</a>
         <a class="product-action" href="poket-access.html">Ouvrir l'application navigateur</a>
-            <a class="product-action" href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+40.apk" download>Telecharger APK Android</a>
-            <a class="product-action windows" href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+39.zip" download>Telecharger Windows</a>
+        <a class="product-action" href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+40.apk" data-release-link="android" download>Telecharger APK Android</a>
+        <a class="product-action windows" href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+40.zip" data-release-link="windows" download>Telecharger Windows</a>
       </div>
     </section>
 
     <section class="coming-soon release-ready" aria-live="polite">
       <h3>Disponible maintenant</h3>
       <p>
-        Version : 1.0.6+39<br />
+        Version : <span data-release-text="version">1.0.6+40</span><br />
         Android APK disponible<br />
         Application navigateur disponible<br />
         Version Windows disponible<br />
-        Release 1.0.6+39 : cloture manuelle des tickets payes avec filigrane PAYE.<br />
+        <span data-release-text="notes">Release 1.0.6+40 : synchronisation simplifiee (Firestore uniquement) et fusion des ameliorations recentes.</span><br />
       </p>
     </section>
 
     <section class="future-version" aria-labelledby="future-version-title">
       <div class="future-version-header">
-        <p class="eyebrow">Phase 2 Poksol</p>
-        <h2 id="future-version-title">Preparation version future</h2>
+        <p class="eyebrow">Portail Poksol</p>
+        <h2 id="future-version-title">Compte, restaurant et acces</h2>
         <p>
-          Cette page inclut maintenant une connexion utilisateur Firebase et une base front pour le
-          controle par appareil, les invitations et l'espace admin via le module JavaScript global
-          <code>window.PoksolApp</code>.
+          Connectez-vous avec Google pour retrouver votre restaurant, gerer son equipe,
+          ses clients et ses reservations, et telecharger les applications.
         </p>
       </div>
 
@@ -116,19 +115,19 @@
         <a class="future-card future-card-link" href="account.html">
           <span>01</span>
           <h3>Connexion utilisateur</h3>
-          <p>Prevoir une entree securisee par compte pour identifier chaque membre autorise.</p>
+          <p>Un compte Google identifie chaque membre autorise de votre restaurant.</p>
         </a>
 
         <a class="future-card future-card-link" href="account.html">
           <span>02</span>
           <h3>Appareil autorise</h3>
-          <p>Limiter un utilisateur standard a un seul appareil actif, avec validation admin.</p>
+          <p>A venir : limiter un utilisateur standard a un seul appareil actif, avec validation admin.</p>
         </a>
 
         <a class="future-card future-card-link" href="admin.html">
           <span>03</span>
-          <h3>Espace admin</h3>
-          <p>Donner aux owners/admins la main sur les utilisateurs, appareils et acces.</p>
+          <h3>Dashboard restaurant</h3>
+          <p>Les owners et admins gerent l'equipe, les clients, les reservations et la page publique.</p>
         </a>
       </div>
 
@@ -142,7 +141,7 @@
     </section>
   </main>
 
-  <script src="app.js?v=20260628-4"></script>
+  <script src="app.js?v=20260920-2"></script>
 </body>
 </html>
 

@@ -10,8 +10,17 @@
 const DOWNLOADS = {
   web: "/apps/poket-restaurants/",
   android: "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+40.apk",
-  windows: "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+39.zip"
+  windows: "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+40.zip"
 };
+
+// Les liens ci-dessus servent de repli : latest.json fait foi pour la version publiee.
+const releaseReady = fetch("/downloads/poket-restaurants/latest.json", { cache: "no-cache" })
+  .then((response) => (response.ok ? response.json() : null))
+  .then((release) => {
+    if (release?.downloadUrl) DOWNLOADS.android = release.downloadUrl;
+    if (release?.windowsDownloadUrl) DOWNLOADS.windows = release.windowsDownloadUrl;
+  })
+  .catch(() => {});
 
 const DAYS = [
   ["monday", "Lundi"],
@@ -276,8 +285,8 @@ async function joinRestaurantWithCode(code, user) {
   let inviteRef = doc(services.db, "invitations", normalizedCode);
   let inviteSnap = await getDoc(inviteRef);
   if (!inviteSnap.exists()) {
-    const topLevel = await getDocs(query(collection(services.db, "invitations"), where("code", "==", normalizedCode), limit(1)));
-    if (!topLevel.empty) {
+    const topLevel = await getDocs(query(collection(services.db, "invitations"), where("code", "==", normalizedCode), limit(1))).catch(() => null);
+    if (topLevel && !topLevel.empty) {
       inviteSnap = topLevel.docs[0];
       inviteRef = inviteSnap.ref;
     }
@@ -909,7 +918,7 @@ async function submitReservation(restaurant, form) {
     updatedAt: serverTimestamp()
   };
   if (!isReservationWithinOpeningHours(restaurant.openingHours, date, time)) {
-    throw new Error("Ce crÃ©neau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
+    throw new Error("Ce créneau est en dehors des horaires d'ouverture. Choisissez une heure ouverte ou contactez le restaurant.");
   }
   await addDoc(collection(services.db, "restaurants", restaurantId, "reservations"), payload);
 }
@@ -1040,6 +1049,7 @@ async function renderAccount(root, user) {
     return;
   }
   const restaurants = await listUserRestaurants(user.uid).catch(() => []);
+  await releaseReady;
   root.innerHTML = accountSignedInHtml(user, restaurants);
 }
 
@@ -1263,6 +1273,7 @@ function initDashboardPage() {
 }
 
 async function renderDashboard(root, user, restaurantId, activeTab = "overview") {
+  await releaseReady;
   if (!user) {
     root.innerHTML = dashboardSignedOutHtml();
     return;
@@ -3660,7 +3671,7 @@ function setupReservationHoursUi(restaurant) {
     if (submitButton) submitButton.disabled = !slots.length;
     note.textContent = slots.length
       ? `Horaires disponibles : ${slots.map((slot) => `${slot.open} - ${slot.close}`).join(" / ")}.`
-      : "Le restaurant est fermÃ© ce jour-lÃ . Choisissez une autre date.";
+      : "Le restaurant est fermé ce jour-là. Choisissez une autre date.";
   };
   dateInput?.addEventListener("change", updateNote);
   dateInput?.addEventListener("input", updateNote);

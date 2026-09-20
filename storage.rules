@@ -11,14 +11,44 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // Storage ne peut consulter que 2 documents Firestore par requete :
+    // members/{uid} et restaurants/{id}. Les anciennes collections staff et
+    // staff_users ne sont donc pas prises en compte ici.
+    function isRestaurantManager(restaurantId) {
+      return signedIn()
+        && (
+          (
+            firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId)/members/$(request.auth.uid))
+            && firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)/members/$(request.auth.uid)).data.status == "active"
+            && firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)/members/$(request.auth.uid)).data.role in ["owner", "admin", "manager"]
+          )
+          || (
+            firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId))
+            && firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)).data.ownerUid == request.auth.uid
+          )
+        );
+    }
+
+    // A la creation d'un restaurant, le logo est envoye avant que le document
+    // Firestore n'existe : on autorise donc l'ecriture tant que l'identifiant
+    // n'est pas encore attribue. Des que le restaurant existe, seule son
+    // equipe de gestion peut modifier ses images.
+    function canWriteRestaurantImage(restaurantId) {
+      return signedIn()
+        && (
+          !firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId))
+          || isRestaurantManager(restaurantId)
+        );
+    }
+
     match /restaurants/{restaurantId}/branding/{fileName} {
       allow read: if true;
-      allow write: if signedIn() && validImage();
+      allow write: if canWriteRestaurantImage(restaurantId) && validImage();
     }
 
     match /restaurants/{restaurantId}/catalog/{categoryId}/{fileName} {
       allow read: if true;
-      allow write: if signedIn() && validImage();
+      allow write: if canWriteRestaurantImage(restaurantId) && validImage();
     }
   }
 }

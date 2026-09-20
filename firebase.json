@@ -6,7 +6,10 @@
       ".firebaserc",
       "**/.*",
       "firestore.rules",
-      "storage.rules"
+      "storage.rules",
+      "README.md",
+      "tests/**",
+      "**/node_modules/**"
     ]
   },
   "firestore": {
@@ -14,5 +17,10 @@
   },
   "storage": {
     "rules": "storage.rules"
+  },
+  "emulators": {
+    "firestore": { "host": "127.0.0.1", "port": 8080 },
+    "storage": { "host": "127.0.0.1", "port": 9199 },
+    "ui": { "enabled": false }
   }
 }

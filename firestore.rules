@@ -65,15 +65,30 @@ service cloud.firestore {
       return signedIn() && resource.data.ownerUid == request.auth.uid;
     }
 
+    // Le document restaurants/{id} contient des donnees internes : il n'est
+    // lisible que par l'equipe. Les pages publiques lisent publicRestaurants.
     function canReadRestaurant(restaurantId) {
-      return resource.data.publicPageEnabled == true
-        || isRestaurantMember(restaurantId)
+      return isRestaurantMember(restaurantId)
         || isLegacyRestaurantOwner();
     }
 
     function canEditRestaurant(restaurantId) {
       return hasRestaurantRole(restaurantId, ["owner", "admin", "manager"])
         || isLegacyRestaurantOwner();
+    }
+
+    // Vrai pour le document restaurant lui-meme (`**` accepte zero segment :
+    // chemin "/") et pour les documents ou listings des collections qui ont
+    // leurs propres regles ("/customers/id", "/customers/"). Les sous-collections
+    // plus profondes (mouvements clients, commandes...) restent regies par le
+    // bloc generique.
+    function hasOwnRules(internalPath) {
+      return string(internalPath).matches("^/((members|staff|staff_users|reservations|invitations|customers|Customers)/[^/]*)?$");
+    }
+
+    // Un manager peut modifier une fiche mais pas le role qu'elle porte.
+    function roleUnchanged() {
+      return request.resource.data.get("role", null) == resource.data.get("role", null);
     }
 
     function canDeleteRestaurant(restaurantId) {
@@ -91,6 +106,38 @@ service cloud.firestore {
         && get(publicRestaurantPath(restaurantId)).data.reservationEnabled == true;
     }
 
+    // Une invitation n'est utilisable que si elle n'est ni expiree, ni reservee
+    // a une autre adresse email. Les champs email/invitedEmail/expiresAt sont
+    // optionnels : sans eux, le comportement precedent est conserve.
+    function inviteUsable(invite) {
+      return (invite.get("expiresAt", null) == null
+          || !(invite.expiresAt is timestamp)
+          || invite.expiresAt > request.time)
+        && (invite.get("email", "") == ""
+          || (request.auth.token.email != null
+            && invite.email.lower() == request.auth.token.email.lower()))
+        && (invite.get("invitedEmail", "") == ""
+          || (request.auth.token.email != null
+            && invite.invitedEmail.lower() == request.auth.token.email.lower()));
+    }
+
+    // Controle minimal d'une reservation creee depuis une page publique
+    // (anonyme) : statut initial impose et tailles bornees.
+    function validPublicReservation(restaurantId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(["customerName", "customerPhone", "date", "time", "status"])
+        && d.size() <= 30
+        && d.status == "planned"
+        && d.get("restaurantId", restaurantId) == restaurantId
+        && d.customerName is string && d.customerName.size() > 0 && d.customerName.size() <= 120
+        && d.customerPhone is string && d.customerPhone.size() >= 3 && d.customerPhone.size() <= 40
+        && d.date is string && d.date.size() <= 10
+        && d.time is string && d.time.size() <= 8
+        && d.get("customerEmail", "") is string && d.get("customerEmail", "").size() <= 254
+        && d.get("notes", "") is string && d.get("notes", "").size() <= 1000
+        && (!("guests" in d) || (d.guests is number && d.guests >= 1 && d.guests <= 50));
+    }
+
     function createsOwnStaffRecord(restaurantId) {
       return signedIn()
         && request.resource.data.uid == request.auth.uid
@@ -102,7 +149,8 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.restaurantId == restaurantId
         && get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.role == request.resource.data.role
         && get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.active != false
-        && !(get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.status in ["revoked", "expired"]);
+        && !(get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.status in ["revoked", "expired"])
+        && inviteUsable(get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data);
     }
 
     function createsOwnMemberRecordFromInvite(restaurantId, uid) {
@@ -115,7 +163,8 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.restaurantId == restaurantId
         && get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.role == request.resource.data.role
         && get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.active != false
-        && !(get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.status in ["revoked", "expired"]);
+        && !(get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data.status in ["revoked", "expired"])
+        && inviteUsable(get(/databases/$(database)/documents/restaurant_invites/$(request.resource.data.inviteCode)).data);
     }
 
     function createsOwnOwnerMemberRecord(restaurantId, uid) {
@@ -147,8 +196,7 @@ service cloud.firestore {
       allow get: if canReadRestaurant(restaurantId);
       allow list: if signedIn()
         && (
-          resource.data.publicPageEnabled == true
-          || resource.data.ownerUid == request.auth.uid
+          resource.data.ownerUid == request.auth.uid
           || resource.data.createdBy == request.auth.uid
         );
       allow read: if canReadRestaurant(restaurantId);
@@ -157,7 +205,12 @@ service cloud.firestore {
           request.resource.data.ownerUid == request.auth.uid
           || request.resource.data.createdBy == request.auth.uid
         );
-      allow update: if canEditRestaurant(restaurantId);
+      allow update: if canEditRestaurant(restaurantId)
+        && (
+          request.resource.data.get("ownerUid", null) == resource.data.get("ownerUid", null)
+          || hasRestaurantRole(restaurantId, ["owner"])
+          || isLegacyRestaurantOwner()
+        );
       allow delete: if canDeleteRestaurant(restaurantId);
 
       match /members/{uid} {
@@ -172,23 +225,30 @@ service cloud.firestore {
       match /staff/{staffId} {
         allow read: if isRestaurantMember(restaurantId);
         allow create: if createsOwnStaffRecord(restaurantId) || hasRestaurantRole(restaurantId, ["owner", "admin"]);
-        allow update: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]);
+        allow update: if hasRestaurantRole(restaurantId, ["owner", "admin"])
+          || (hasRestaurantRole(restaurantId, ["manager"]) && roleUnchanged());
         allow delete: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
       }
 
       match /staff_users/{uid} {
         allow read: if isRestaurantMember(restaurantId);
         allow create: if isSelf(uid) && createsOwnStaffRecord(restaurantId) || hasRestaurantRole(restaurantId, ["owner", "admin"]);
-        allow update: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]);
+        allow update: if hasRestaurantRole(restaurantId, ["owner", "admin"])
+          || (hasRestaurantRole(restaurantId, ["manager"]) && roleUnchanged());
         allow delete: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
       }
 
       match /reservations/{reservationId} {
-        allow create: if (
-          get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.publicPageEnabled == true
-          && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.reservationEnabled == true
-        ) || publicRestaurantAllowsReservations(restaurantId)
-          || isRestaurantMember(restaurantId);
+        allow create: if isRestaurantMember(restaurantId)
+          || (
+            (
+              (
+                get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.publicPageEnabled == true
+                && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.reservationEnabled == true
+              ) || publicRestaurantAllowsReservations(restaurantId)
+            )
+            && validPublicReservation(restaurantId)
+          );
         allow read: if isRestaurantMember(restaurantId);
         allow update: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]);
         allow delete: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
@@ -205,10 +265,7 @@ service cloud.firestore {
       }
 
       match /settings/{settingId} {
-        allow read: if (
-          settingId == "restaurant_profile"
-          && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.publicPageEnabled == true
-        ) || isRestaurantMember(restaurantId);
+        allow read: if isRestaurantMember(restaurantId);
         allow write: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]);
       }
 
@@ -224,14 +281,21 @@ service cloud.firestore {
         allow delete: if hasRestaurantRole(restaurantId, ["owner", "admin"]);
       }
 
+      // Les regles s'additionnent : ce bloc generique ne doit pas rouvrir les
+      // documents des collections qui ont leurs propres regles ci-dessus
+      // (sinon un manager pourrait supprimer un client ou s'attribuer un role).
       match /{internalPath=**} {
-        allow read: if isRestaurantMember(restaurantId);
-        allow write: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]);
+        allow read: if isRestaurantMember(restaurantId) && !hasOwnRules(internalPath);
+        allow write: if hasRestaurantRole(restaurantId, ["owner", "admin", "manager"]) && !hasOwnRules(internalPath);
       }
     }
 
     match /invitations/{invitationId} {
-      allow read: if signedIn();
+      // Lecture par identifiant (code) uniquement : le listing est reserve aux
+      // owners/admins du restaurant, pour empecher l'enumeration des codes.
+      allow get: if signedIn();
+      allow list: if signedIn()
+        && hasRestaurantRole(resource.data.restaurantId, ["owner", "admin"]);
       allow create: if signedIn()
         && hasRestaurantRole(request.resource.data.restaurantId, ["owner", "admin"]);
       allow update: if signedIn()
@@ -243,7 +307,11 @@ service cloud.firestore {
     }
 
     match /restaurant_invites/{invitationId} {
-      allow read: if signedIn();
+      // Lecture par identifiant (code) uniquement : le listing est reserve aux
+      // owners/admins du restaurant, pour empecher l'enumeration des codes.
+      allow get: if signedIn();
+      allow list: if signedIn()
+        && hasRestaurantRole(resource.data.restaurantId, ["owner", "admin"]);
       allow create: if signedIn()
         && hasRestaurantRole(request.resource.data.restaurantId, ["owner", "admin"]);
       allow update: if signedIn()
@@ -255,13 +323,29 @@ service cloud.firestore {
     }
 
     match /contactMessages/{messageId} {
-      allow create: if true;
+      allow create: if request.resource.data.keys().hasOnly(["name", "email", "company", "message", "status", "createdAt"])
+        && request.resource.data.keys().hasAll(["name", "email", "message"])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 120
+        && request.resource.data.email is string
+        && request.resource.data.email.size() >= 3 && request.resource.data.email.size() <= 254
+        && request.resource.data.email.matches('.+@.+')
+        && request.resource.data.get("company", "") is string
+        && request.resource.data.get("company", "").size() <= 160
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 4000
+        && request.resource.data.get("status", "new") == "new"
+        && request.resource.data.get("createdAt", request.time) == request.time;
       allow read, update, delete: if false;
     }
 
     match /publicRestaurants/{restaurantId} {
       allow read: if resource.data.publicPageEnabled == true;
-      allow create, update: if signedIn()
+      allow create: if signedIn()
+        && hasRestaurantRole(request.resource.data.restaurantId, ["owner", "admin", "manager"]);
+      // Le document existant doit deja appartenir au restaurant que l'on gere.
+      allow update: if signedIn()
+        && resource.data.restaurantId == request.resource.data.restaurantId
         && hasRestaurantRole(request.resource.data.restaurantId, ["owner", "admin", "manager"]);
       allow delete: if false;
     }

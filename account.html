@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Compte Poksol | Portail client</title>
-  <link rel="stylesheet" href="style.css?v=20260629-5" />
+  <link rel="stylesheet" href="style.css?v=20260920-2" />
 </head>
 <body>
   <header class="portal-hero">
@@ -24,7 +24,7 @@
         <a href="index.html#contact">Contact</a>
       </div>
 
-      <a class="demo-btn" href="admin.html">Espace admin</a>
+      <a class="demo-btn" href="admin.html">Dashboard restaurant</a>
     </nav>
 
     <section class="portal-hero-content">
@@ -41,13 +41,13 @@
         <button class="outline-btn button-reset is-hidden" type="button" data-account-logout>
           Se deconnecter
         </button>
-        <a class="outline-btn" href="admin.html">Voir l'espace admin</a>
+        <a class="outline-btn" href="admin.html">Ouvrir le dashboard restaurant</a>
       </div>
     </section>
   </header>
 
   <main class="portal-page">
-    <section class="portal-grid" aria-label="Apercu du futur compte Poksol">
+    <section class="portal-grid" aria-label="Apercu du compte Poksol">
       <article class="portal-panel portal-profile">
         <span class="portal-tag">Compte</span>
         <h2>Utilisateur</h2>
@@ -87,33 +87,33 @@
           <a href="poket-access.html">Ouvrir l'application</a>
           <a href="poket-access.html?mode=edit">Modifier mon restaurant</a>
           <a href="poket-access.html?mode=new">Creer un nouveau restaurant</a>
-          <a href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+40.apk" download>Telecharger Android</a>
-          <a href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+39.zip" download>Telecharger Windows</a>
+          <a href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+40.apk" data-release-link="android" download>Telecharger Android</a>
+          <a href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+40.zip" data-release-link="windows" download>Telecharger Windows</a>
         </div>
       </article>
     </section>
 
     <section class="portal-roadmap">
       <div>
-        <p class="eyebrow">Ce qui sera branche ensuite</p>
+        <p class="eyebrow">Etat du portail</p>
         <h2>Connexion, roles et securite</h2>
       </div>
       <div class="roadmap-list">
         <article>
           <strong>01</strong>
-          <span>Firebase Auth / Google</span>
+          <span>Firebase Auth / Google (actif)</span>
         </article>
         <article>
           <strong>02</strong>
-          <span>Profil utilisateur Poksol</span>
+          <span>Profil utilisateur Poksol (actif)</span>
         </article>
         <article>
           <strong>03</strong>
-          <span>Validation owner/admin</span>
+          <span>Invitations et roles owner/admin (actif)</span>
         </article>
         <article>
           <strong>04</strong>
-          <span>Controle d'appareil actif</span>
+          <span>Controle d'appareil actif (a venir)</span>
         </article>
       </div>
     </section>
@@ -126,8 +126,8 @@
     </section>
   </main>
 
-  <script src="app.js?v=20260628-4"></script>
-  <script type="module" src="platform.js?v=20260907-5"></script>
+  <script src="app.js?v=20260920-2"></script>
+  <script type="module" src="platform.js?v=20260920-2"></script>
 </body>
 </html>
 

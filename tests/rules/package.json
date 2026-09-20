@@ -1,0 +1,13 @@
+{
+  "name": "poksol-rules-tests",
+  "private": true,
+  "type": "module",
+  "description": "Tests des regles de securite Firestore et Storage (emulateurs Firebase, Java 21 requis)",
+  "scripts": {
+    "test": "cd ../.. && firebase emulators:exec --only firestore,storage --project demo-poksol \"node --test tests/rules/rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.0.0"
+  }
+}

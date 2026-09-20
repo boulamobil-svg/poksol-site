@@ -16,24 +16,15 @@
   const PoksolApp = {
     config: {
       product: "poket-restaurants",
-      version: "future-prep-1",
       features: {
         authEnabled: true,
-        adminEnabled: false,
+        adminEnabled: true,
         deviceLimitEnabled: false,
         qrInviteEnabled: false,
-        accountPortalEnabled: false,
+        accountPortalEnabled: true,
         publicRestaurantPagesEnabled: true,
-        reservationsBackendEnabled: false
-      },
-      roadmap: [
-        "user-authentication",
-        "single-device-per-standard-user",
-        "owner-admin-console",
-        "physical-qr-user-invite",
-        "public-restaurant-pages",
-        "online-reservations"
-      ]
+        reservationsBackendEnabled: true
+      }
     },
 
     auth: {
@@ -46,51 +37,12 @@
       }
     },
 
-    admin: {
-      hasAccess: function () {
-        return false;
-      },
-      openDashboard: function () {
-        return {
-          ok: false,
-          reason: "Admin area is not implemented yet"
-        };
-      }
-    },
-
     devices: {
       getPolicy: function () {
         return {
           enabled: false,
           standardUserLimit: 1,
-          reason: "Device control will be enabled with the future backend phase"
-        };
-      }
-    },
-
-    portal: {
-      status: function () {
-        return {
-          ok: true,
-          mode: "static-preview",
-          message: "Poksol account and admin portal are prepared on the front end"
-        };
-      }
-    },
-
-    restaurants: {
-      getPublicPageModel: function () {
-        return {
-          enabled: true,
-          source: "static-preview",
-          futureDataSource: "Firestore",
-          features: [
-            "opening-hours",
-            "menu-with-photos",
-            "reservation-form",
-            "google-business-link",
-            "shareable-qr-code"
-          ]
+          reason: "Le controle d'appareil n'est pas encore actif."
         };
       }
     }
@@ -287,6 +239,50 @@
     if (element) element.textContent = value;
   }
 
+  // Liens de telechargement et version affiches d'apres latest.json : une
+  // publication n'oblige plus a modifier les pages HTML. Les valeurs ecrites
+  // dans le HTML servent de repli si le fichier est indisponible.
+  const releaseNodes = document.querySelectorAll("[data-release-link], [data-release-text]");
+  if (releaseNodes.length) {
+    fetch("/downloads/poket-restaurants/latest.json", { cache: "no-cache" })
+      .then(function (response) {
+        if (!response.ok) throw new Error("latest.json " + response.status);
+        return response.json();
+      })
+      .then(applyRelease)
+      .catch(function () {});
+  }
+
+  function sameOriginPath(url) {
+    try {
+      const parsed = new URL(url, window.location.href);
+      return /(^|\.)poksol\.com$/i.test(parsed.hostname) ? parsed.pathname : parsed.href;
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function applyRelease(release) {
+    const links = {
+      android: release.downloadUrl,
+      windows: release.windowsDownloadUrl,
+      web: release.webDownloadUrl
+    };
+    document.querySelectorAll("[data-release-link]").forEach(function (link) {
+      const target = links[link.dataset.releaseLink];
+      const href = target && sameOriginPath(target);
+      if (href) link.setAttribute("href", href);
+    });
+    const texts = {
+      version: release.releaseId,
+      notes: release.notes
+    };
+    document.querySelectorAll("[data-release-text]").forEach(function (node) {
+      const value = texts[node.dataset.releaseText];
+      if (value) node.textContent = value;
+    });
+  }
+
   document.querySelectorAll("[data-carousel]").forEach(function (carousel) {
     const track = carousel.querySelector("[data-carousel-track]");
     const slides = Array.from(carousel.querySelectorAll("[data-carousel-slide]"));
@@ -357,25 +353,12 @@
     button.addEventListener("click", function () {
       const action = button.dataset.futureAction;
       const messages = {
-        login: "Connexion utilisateur prevue en Phase 3B. Aucun backend actif pour le moment.",
-        "device-reset": "La demande de reinitialisation appareil sera reservee aux comptes connectes.",
-        "invite-user": "L'invitation par QR physique sera activee avec l'espace owner/admin.",
-        "admin-action": "Action admin preparee mais non activee sans backend securise."
+        "device-reset": "La reinitialisation d'appareil sera disponible avec le controle d'appareil. En attendant, contactez Poksol."
       };
       showPreparedNotice(
         button,
-        messages[action] || "Fonction preparee pour une prochaine phase Poksol."
+        messages[action] || "Fonction bientot disponible."
       );
-    });
-  });
-
-  document.querySelectorAll("[data-reservation-preview]").forEach(function (form) {
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
-      window.alert(
-        "Reservation preparee cote site. La prochaine phase branchera ce formulaire a Poket Restaurants."
-      );
-      form.reset();
     });
   });
 })();
