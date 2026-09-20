@@ -125,6 +125,13 @@ test("roles: personne ne se donne un role (staff, manager, inconnu)", async () =
   await assertSucceeds(setDoc(doc(as("admin1"), "restaurants/resto/staff/newstaff"), forged("newstaff", "staff")));
 });
 
+test("transition: l'ancienne collection members reste lisible par l'equipe, jamais inscriptible", async () => {
+  await assertSucceeds(getDoc(doc(as("staff1"), "restaurants/resto/members/staff1")).catch(() => null));
+  await assertFails(setDoc(doc(as("admin1"), "restaurants/resto/members/x"), { role: "owner" }));
+  await assertFails(getDoc(doc(as("rando"), "restaurants/resto/members/x")));
+  await assertFails(getDoc(doc(anon(), "restaurants/resto/members/x")));
+});
+
 test("roles: rien n'est ouvert par defaut (plus de bloc « manager ecrit partout »)", async () => {
   await assertFails(setDoc(doc(as("admin1"), "restaurants/resto/random_stuff/x"), { a: 1 }));
   await assertFails(setDoc(doc(as("admin1"), "restaurants/resto/members/x"), { a: 1 }));
@@ -227,6 +234,65 @@ test("site: creation de restaurant, invitation puis rattachement avec les donnee
   // relecture du role par le site (resolveRestaurantRole)
   await assertSucceeds(getDoc(doc(joiner, "restaurants/site-resto/staff/serveur")));
   await assertSucceeds(getDocs(collection(joiner, "restaurants/site-resto/staff")));
+});
+
+// Rattachement par invitation = demande d'acces validee par un admin (comme l'application).
+import { arrayUnion, writeBatch } from "firebase/firestore";
+
+const accessRequest = (uid, over = {}) => ({
+  userId: uid, restaurantId: "resto", restaurantName: "Resto", email: uid + "@x.com", displayName: uid, status: "pending",
+  requestType: "invite_code_join_request", requestedRole: "staff", joinInput: "CODE1", inviteCode: "CODE1",
+  provider: "google", emailVerified: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...over
+});
+
+test("acces: le code cree une demande, jamais un acces direct ; abus refuses", async () => {
+  const me = as("req1");
+  await assertSucceeds(setDoc(doc(me, "restaurants/resto/access_requests/req1"), accessRequest("req1"), { merge: true }));
+  await assertSucceeds(setDoc(doc(me, "users/req1"), { uid: "req1", displayName: "req1", updatedAt: serverTimestamp() }, { merge: true }));
+  await assertFails(getDoc(doc(me, "restaurants/resto")));
+  await assertFails(addDoc(collection(me, "restaurants/resto/customers"), { displayName: "x" }));
+  await assertSucceeds(getDoc(doc(me, "restaurants/resto/access_requests/req1")));
+  // demande au nom d'un autre, statut deja approuve, code inutilisable, ou lecture de celle d'un autre
+  await assertFails(setDoc(doc(as("req2"), "restaurants/resto/access_requests/req1"), accessRequest("req1")));
+  await assertFails(setDoc(doc(as("req3"), "restaurants/resto/access_requests/req3"), accessRequest("req3", { status: "approved" })));
+  await assertFails(setDoc(doc(as("req4"), "restaurants/resto/access_requests/req4"), accessRequest("req4", { inviteCode: "CODE_USED" })));
+  await assertFails(setDoc(doc(as("req5"), "restaurants/resto/access_requests/req5"), accessRequest("req5", { inviteCode: "NOPE" })));
+  await assertFails(getDoc(doc(as("req2"), "restaurants/resto/access_requests/req1")));
+  await assertFails(getDocs(collection(as("req2"), "restaurants/resto/access_requests")));
+  // le demandeur ne peut pas s'approuver lui-meme
+  await assertFails(updateDoc(doc(me, "restaurants/resto/access_requests/req1"), { status: "approved" }));
+});
+
+test("acces: un admin valide (ecritures groupees identiques a reviewAccessRequest) ou refuse", async () => {
+  await assertSucceeds(setDoc(doc(as("req6"), "restaurants/resto/access_requests/req6"), accessRequest("req6"), { merge: true }));
+  await assertSucceeds(setDoc(doc(as("req6"), "users/req6"), { uid: "req6", updatedAt: serverTimestamp() }, { merge: true }));
+  const admin = as("admin1");
+  await assertSucceeds(getDocs(collection(admin, "restaurants/resto/access_requests")));
+  await assertFails(getDocs(collection(as("mgr1"), "restaurants/resto/access_requests")));
+  await assertFails(getDocs(collection(as("admin2"), "restaurants/resto/access_requests")));
+  const member = { uid: "req6", email: "req6@x.com", displayName: "req6", username: "req6", phone: "", jobTitle: "Serveur", provider: "google", emailVerified: true, role: "manager", active: true, restaurantId: "resto" };
+  const nowIso = new Date().toISOString();
+  const batch = writeBatch(admin);
+  batch.set(doc(admin, "restaurants/resto/staff/req6"), { ...member, joinedAt: serverTimestamp(), approvedAt: serverTimestamp(), approvedBy: "admin1", updatedAt: serverTimestamp(), createdAt: serverTimestamp() }, { merge: true });
+  batch.set(doc(admin, "restaurants/resto/staff_users/req6"), { ...member, approvedAt: nowIso, approvedBy: "admin1", updatedAt: nowIso, createdAt: nowIso }, { merge: true });
+  batch.update(doc(admin, "users/req6"), { activeRestaurantId: "resto", restaurantIds: arrayUnion("resto"), updatedAt: serverTimestamp() });
+  batch.set(doc(admin, "restaurants/resto/access_requests/req6"), { status: "approved", approvedRole: "manager", approvedJobTitle: "Serveur", reviewedBy: "admin1", reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(setDoc(doc(admin, "restaurant_invites/CODE1"), { inviteCode: "CODE1", status: "used", active: false, usedBy: "req6", usedAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }));
+  // le nouveau manager a maintenant les droits d'un manager, pas plus
+  const manager = as("req6");
+  await assertSucceeds(getDoc(doc(manager, "restaurants/resto")));
+  await assertSucceeds(setDoc(doc(manager, "restaurants/resto/catalog_categories/cat9"), { name: "x" }));
+  await assertFails(updateDoc(doc(manager, "restaurants/resto"), { description: "x" }));
+  await assertFails(updateDoc(doc(manager, "restaurants/resto/staff/req6"), { role: "admin" }));
+  // refus
+  await assertSucceeds(setDoc(doc(as("req7"), "restaurants/resto/access_requests/req7"), accessRequest("req7", { inviteCode: "CODE_MGR" }), { merge: true }));
+  await assertSucceeds(setDoc(doc(admin, "restaurants/resto/access_requests/req7"), { status: "rejected", reviewedBy: "admin1", reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }));
+  await assertFails(getDoc(doc(as("req7"), "restaurants/resto")));
+  // un manager ne peut ni valider ni refuser
+  await assertSucceeds(setDoc(doc(as("req8"), "restaurants/resto/access_requests/req8"), accessRequest("req8", { inviteCode: "CODE_MGR" }), { merge: true }));
+  await assertFails(setDoc(doc(as("mgr1"), "restaurants/resto/access_requests/req8"), { status: "approved" }, { merge: true }));
+  await assertFails(setDoc(doc(as("mgr1"), "restaurants/resto/staff/req8"), { ...member, uid: "req8" }));
 });
 
 // =====================================================================

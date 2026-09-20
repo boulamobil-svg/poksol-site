@@ -354,70 +354,162 @@ async function createRestaurantFromForm(form, user) {
   return restaurant;
 }
 
-async function joinRestaurantWithCode(code, user) {
+// Rattachement par invitation, comme dans l'application : le code ne donne pas
+// d'acces direct, il cree une demande que valide un admin du restaurant
+// (reviewAccessRequest). La fiche staff n'est creee que par cette validation.
+async function requestRestaurantAccess(code, user) {
   const services = await getServices();
-  const { arrayUnion, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, updateDoc, where } = services.firestoreModule;
+  const { doc, getDoc, serverTimestamp, setDoc } = services.firestoreModule;
   const normalizedCode = normalizeCode(code);
   if (!normalizedCode) throw new Error("Code invitation obligatoire.");
 
-  const inviteRef = doc(services.db, "restaurant_invites", normalizedCode);
-  const inviteSnap = await getDoc(inviteRef).catch(() => null);
+  const inviteSnap = await getDoc(doc(services.db, "restaurant_invites", normalizedCode)).catch(() => null);
   if (!inviteSnap?.exists()) throw new Error("Invitation introuvable ou expiree.");
-
   const invite = inviteSnap.data();
-  if (["revoked", "expired"].includes(invite.status) || invite.active === false) {
+  if (["revoked", "expired", "cancelled", "used"].includes(invite.status) || invite.active === false) {
     throw new Error("Invitation inactive ou expiree.");
   }
   if (invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date()) {
     throw new Error("Invitation expiree.");
   }
-  if (invite.email && user.email && invite.email.toLowerCase() !== user.email.toLowerCase()) {
+  const reservedEmail = invite.invitedEmail || invite.email || "";
+  if (reservedEmail && user.email && reservedEmail.toLowerCase() !== user.email.toLowerCase()) {
     throw new Error("Cette invitation est reservee a une autre adresse email.");
   }
   const restaurantId = invite.restaurantId;
   if (!restaurantId) throw new Error("Invitation incomplete : restaurant manquant.");
-
   const role = invite.role || "staff";
   if (!["admin", "manager", "staff"].includes(role)) throw new Error("Invitation invalide : role non autorise.");
-  const staffPayload = {
-    uid: user.uid,
+
+  const staffSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "staff", user.uid)).catch(() => null);
+  if (staffSnap?.exists()) throw new Error("Vous etes deja membre de ce restaurant.");
+
+  await setDoc(doc(services.db, "restaurants", restaurantId, "access_requests", user.uid), {
     userId: user.uid,
     restaurantId,
+    restaurantName: invite.restaurantName || "",
     email: user.email || "",
-    displayName: user.displayName || "",
-    role,
-    active: true,
-    status: "active",
+    displayName: user.displayName || invite.displayName || "",
+    status: "pending",
+    requestType: "invite_code_join_request",
+    requestedRole: role,
+    joinInput: normalizedCode,
     inviteCode: normalizedCode,
-    joinedAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  };
-  await setDoc(doc(services.db, "restaurants", restaurantId, "staff", user.uid), staffPayload, { merge: true });
-  // L'ancienne fiche staff_users n'existe que pour le role staff (regle de l'application).
-  if (role === "staff") {
-    await setDoc(doc(services.db, "restaurants", restaurantId, "staff_users", user.uid), {
-      ...staffPayload,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-  }
-  await setDoc(doc(services.db, "users", user.uid), {
-    uid: user.uid,
-    email: user.email || "",
-    displayName: user.displayName || "",
-    activeRestaurantId: restaurantId,
-    restaurantIds: arrayUnion(restaurantId),
-    joinedInviteCode: normalizedCode,
+    ...(reservedEmail ? { invitedEmail: reservedEmail } : {}),
+    ...(invite.phone ? { phone: invite.phone } : {}),
+    ...(invite.jobTitle ? { jobTitle: invite.jobTitle } : {}),
+    provider: user.providerData?.[0]?.providerId || "google",
+    emailVerified: user.emailVerified === true,
+    createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true });
-  await updateDoc(inviteRef, {
-    acceptedBy: arrayUnion(user.uid),
-    lastAcceptedBy: user.uid,
-    lastAcceptedAt: serverTimestamp(),
+  await setDoc(doc(services.db, "users", user.uid), {
+    uid: user.uid,
+    displayName: user.displayName || "",
+    email: user.email || "",
     updatedAt: serverTimestamp()
-  }).catch(() => {});
-  localStorage.setItem("poksolActiveRestaurantId", restaurantId);
-  saveAccessSessionForRestaurant(user, restaurantId, normalizedCode, role);
-  return getRestaurant(restaurantId);
+  }, { merge: true });
+  return { restaurantId, restaurantName: invite.restaurantName || restaurantId };
+}
+
+async function listAccessRequests(restaurantId) {
+  const services = await getServices();
+  const { collection, getDocs } = services.firestoreModule;
+  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "access_requests"));
+  return snaps.docs
+    .map((snap) => ({ id: snap.id, ...snap.data() }))
+    .sort((a, b) => clientTimeValue(b.createdAt) - clientTimeValue(a.createdAt));
+}
+
+// Validation ou refus d'une demande par un admin : memes ecritures que l'application
+// (fiches staff et staff_users, profil utilisateur, demande, invitation).
+async function reviewAccessRequest(restaurantId, form, decision, admin) {
+  if (!admin) throw new Error("Connexion requise.");
+  const services = await getServices();
+  const { arrayUnion, doc, getDoc, serverTimestamp, setDoc, writeBatch } = services.firestoreModule;
+  const userId = form.dataset.requestId;
+  if (!userId) throw new Error("Demande introuvable.");
+  const requestRef = doc(services.db, "restaurants", restaurantId, "access_requests", userId);
+  const requestSnap = await getDoc(requestRef);
+  if (!requestSnap.exists()) throw new Error("Demande introuvable.");
+  const request = requestSnap.data();
+  if (request.status !== "pending") throw new Error("Cette demande a deja ete traitee.");
+
+  const batch = writeBatch(services.db);
+  if (decision !== "approve") {
+    batch.set(requestRef, {
+      status: "rejected",
+      reviewedBy: admin.uid,
+      reviewedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    await batch.commit();
+    return "rejected";
+  }
+
+  const data = new FormData(form);
+  const role = text(data, "role");
+  if (!["admin", "manager", "staff"].includes(role)) throw new Error("Choisissez un role.");
+  const jobTitle = text(data, "jobTitle").slice(0, 80);
+  const email = String(request.email || "");
+  const displayName = String(request.displayName || "");
+  const nowIso = new Date().toISOString();
+  const member = {
+    uid: userId,
+    email,
+    displayName,
+    username: displayName || (email.includes("@") ? email.split("@")[0] : ""),
+    phone: String(request.phone || ""),
+    jobTitle,
+    provider: String(request.provider || "google"),
+    emailVerified: request.emailVerified === true,
+    role,
+    active: true,
+    restaurantId
+  };
+  batch.set(doc(services.db, "restaurants", restaurantId, "staff", userId), {
+    ...member,
+    joinedAt: serverTimestamp(),
+    approvedAt: serverTimestamp(),
+    approvedBy: admin.uid,
+    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp()
+  }, { merge: true });
+  batch.set(doc(services.db, "restaurants", restaurantId, "staff_users", userId), {
+    ...member,
+    approvedAt: nowIso,
+    approvedBy: admin.uid,
+    updatedAt: nowIso,
+    createdAt: nowIso
+  }, { merge: true });
+  batch.update(doc(services.db, "users", userId), {
+    activeRestaurantId: restaurantId,
+    restaurantIds: arrayUnion(restaurantId),
+    updatedAt: serverTimestamp()
+  });
+  batch.set(requestRef, {
+    status: "approved",
+    approvedRole: role,
+    approvedDisplayName: displayName,
+    approvedJobTitle: jobTitle,
+    reviewedBy: admin.uid,
+    reviewedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await batch.commit();
+  if (request.inviteCode) {
+    // Invitation a usage unique. Ecriture a part : d'anciennes invitations du site
+    // n'ont pas le champ inviteCode que la regle exige, sans que cela doive bloquer.
+    await setDoc(doc(services.db, "restaurant_invites", request.inviteCode), {
+      inviteCode: request.inviteCode,
+      status: "used",
+      active: false,
+      usedBy: userId,
+      usedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true }).catch(() => {});
+  }
+  return "approved";
 }
 
 async function uploadRestaurantImage(restaurantId, file, kind) {
@@ -1089,9 +1181,9 @@ function initAccountPage() {
         window.location.href = `admin.html?restaurant=${encodeURIComponent(restaurant.id)}`;
       }
       if (form.matches("[data-join-restaurant-form]")) {
-        const restaurant = await joinRestaurantWithCode(form.code.value, currentUser);
-        status.textContent = `Restaurant rejoint : ${restaurant?.name || "OK"}.`;
-        await renderAccount(root, currentUser);
+        const request = await requestRestaurantAccess(form.code.value, currentUser);
+        status.textContent = `Demande envoyee${request.restaurantName ? ` a ${request.restaurantName}` : ""}. Un administrateur du restaurant doit la valider ; vous serez rattache ensuite.`;
+        form.reset();
       }
     } catch (error) {
       status.textContent = error.message || String(error);
@@ -1251,6 +1343,7 @@ function initDashboardPage() {
         await deleteCustomerAccount(restaurantId, form.dataset.customerId, form.dataset.customerCollection);
       }
       if (form.matches("[data-dashboard-jobtitle-form]")) await saveUserJobTitle(restaurantId, form, currentUser);
+      if (form.matches("[data-dashboard-access-form]")) await reviewAccessRequest(restaurantId, form, event.submitter?.value, currentUser);
       if (form.matches("[data-dashboard-invite-form]")) {
         const code = await createInvitation(restaurantId, form, currentUser);
         form.code.value = code;
@@ -1394,19 +1487,20 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
   root.dataset.restaurantRole = role;
-  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
     getActiveMenu(restaurant.id).catch(() => null),
     listCatalogMenu(restaurant.id).catch(() => null),
-    getUserDoc(user.uid).catch(() => null)
+    getUserDoc(user.uid).catch(() => null),
+    ["owner", "admin"].includes(role) ? listAccessRequests(restaurant.id).catch(() => []) : Promise.resolve([])
   ]);
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
   const account = currentUserSummary(user, userProfile, members, role, restaurant.id);
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests);
   applyClientTools(root);
 }
 
@@ -2064,7 +2158,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null) {
+function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = []) {
   const canEditProfile = ["owner", "admin"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -2088,7 +2182,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       <section class="dashboard-panel ${activeTab === "menu" ? "is-active" : ""}" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations, role)}</section>
-      <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
+      <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam, accessRequests)}</section>
       <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
   `;
@@ -3713,8 +3807,42 @@ function reservationSortTime(reservation = {}) {
   )?.getTime() || 0;
 }
 
-function teamHtml(members, canManageTeam) {
+function accessRequestsHtml(requests = []) {
+  const pending = requests.filter((request) => request.status === "pending");
   return `
+    <section class="access-requests" aria-labelledby="access-requests-title">
+      <div class="access-requests-head">
+        <h3 id="access-requests-title">Demandes d'acces</h3>
+        <span class="access-requests-count">${pending.length}</span>
+      </div>
+      ${pending.length ? pending.map((request) => `
+        <form class="access-request-row" data-dashboard-access-form data-request-id="${escapeAttr(request.id)}">
+          <div class="access-request-who">
+            <strong>${escapeHtml(request.displayName || request.email || request.id)}</strong>
+            <small>${escapeHtml([request.email, clientDateLabel(request.createdAt), request.inviteCode ? `code ${request.inviteCode}` : ""].filter(Boolean).join(" · "))}</small>
+          </div>
+          <label>Role
+            <select name="role">
+              ${["staff", "manager", "admin"].map((value) => `<option value="${value}" ${normalizeRole(request.requestedRole) === value ? "selected" : ""}>${escapeHtml(ROLE_LABELS[value])}</option>`).join("")}
+            </select>
+          </label>
+          <label>Poste
+            <input name="jobTitle" maxlength="80" value="${escapeAttr(request.jobTitle || "")}" placeholder="Ex : Serveur" />
+          </label>
+          <div class="access-request-actions">
+            <button class="primary-btn button-reset" type="submit" value="approve">Valider</button>
+            <button class="ghost-action button-reset" type="submit" value="reject">Refuser</button>
+          </div>
+          <small data-form-status></small>
+        </form>
+      `).join("") : `<p class="portal-muted">Aucune demande en attente.</p>`}
+    </section>
+  `;
+}
+
+function teamHtml(members, canManageTeam, accessRequests = []) {
+  return `
+    ${canManageTeam ? accessRequestsHtml(accessRequests) : ""}
     <div class="responsive-table">
       <div class="table-row table-head"><span>Nom</span><span>Email</span><span>Role</span><span>Statut</span></div>
       ${members.length ? members.map((member) => `

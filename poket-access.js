@@ -130,6 +130,7 @@ async function initializeFirebase() {
         } else {
           await loadRemoteProfile(user.uid);
         }
+        await reportPendingAccessRequest(user.uid);
         const profile = loadLocalProfile();
         if (profile && validateProfile(profile).minimumOk) {
           saveSession(true);
@@ -618,9 +619,7 @@ async function acceptInviteCode(inviteCode) {
       doc,
       getDoc,
       setDoc,
-      updateDoc,
-      serverTimestamp,
-      arrayUnion
+      serverTimestamp
     } = firebaseServices.firestoreModule;
 
     const inviteRef = doc(firebaseServices.db, INVITE_COLLECTION, code);
@@ -644,102 +643,54 @@ async function acceptInviteCode(inviteCode) {
     }
     const restaurantId = normalizeRestaurantId(invite.restaurantId);
 
-    const staffPayload = {
-      uid: currentUser.uid,
-      userId: currentUser.uid,
-      restaurantId,
-      email: currentUser.email || "",
-      displayName: currentUser.displayName || invite.displayName || "",
-      phone: invite.phone || "",
-      jobTitle: invite.jobTitle || "",
-      role,
-      active: true,
-      status: "active",
-      inviteCode: code,
-      joinedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-
-    await setDoc(
-      doc(firebaseServices.db, "restaurants", restaurantId, "staff", currentUser.uid),
-      staffPayload,
-      { merge: true }
-    );
-    if (role === "staff") {
-      await setDoc(
-        doc(firebaseServices.db, "restaurants", restaurantId, "staff_users", currentUser.uid),
-        {
-          ...staffPayload,
-          updatedAt: new Date().toISOString()
-        },
-        { merge: true }
-      );
-    }
-
-    const restaurantSnapshot = await getDoc(doc(firebaseServices.db, "restaurants", restaurantId));
-    if (!restaurantSnapshot.exists()) {
-      inviteStatus.textContent = "Restaurant associe, mais profil restaurant introuvable.";
+    // Meme parcours que l'application : le code cree une demande d'acces que valide
+    // un admin du restaurant. La fiche staff n'est creee que par cette validation.
+    const staffSnapshot = await getDoc(
+      doc(firebaseServices.db, "restaurants", restaurantId, "staff", currentUser.uid)
+    ).catch(() => null);
+    if (staffSnapshot?.exists()) {
+      inviteStatus.textContent = "Vous etes deja membre de ce restaurant.";
       return false;
     }
-
-    const restaurantData = restaurantSnapshot.data();
-    const profile = normalizeProfileFromRestaurant(restaurantData, null);
-
+    const reservedEmail = invite.invitedEmail || invite.email || "";
+    await setDoc(
+      doc(firebaseServices.db, "restaurants", restaurantId, "access_requests", currentUser.uid),
+      {
+        userId: currentUser.uid,
+        restaurantId,
+        restaurantName: invite.restaurantName || "",
+        email: currentUser.email || "",
+        displayName: currentUser.displayName || invite.displayName || "",
+        status: "pending",
+        requestType: "invite_code_join_request",
+        requestedRole: role,
+        joinInput: code,
+        inviteCode: code,
+        ...(reservedEmail ? { invitedEmail: reservedEmail } : {}),
+        ...(invite.phone ? { phone: invite.phone } : {}),
+        ...(invite.jobTitle ? { jobTitle: invite.jobTitle } : {}),
+        provider: currentUser.providerData?.[0]?.providerId || "google",
+        emailVerified: currentUser.emailVerified === true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
     await setDoc(
       doc(firebaseServices.db, "users", currentUser.uid),
       {
         uid: currentUser.uid,
         email: currentUser.email || "",
         displayName: currentUser.displayName || "",
-        activeRestaurantId: restaurantId,
-        restaurantIds: arrayUnion(restaurantId),
-        joinedInviteCode: code,
         updatedAt: serverTimestamp()
       },
       { merge: true }
     );
-
-    try {
-      await updateDoc(inviteRef, {
-        acceptedBy: arrayUnion(currentUser.uid),
-        lastAcceptedBy: currentUser.uid,
-        lastAcceptedAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-    } catch (_) {
-      // L'association utilisateur/restaurant reste valide meme si l'historique
-      // de l'invitation est bloque par des regles Firestore plus strictes.
-    }
-
-    restaurantContext = {
-      restaurantId,
-      mode: "existing",
-      source: "invite",
-      inviteCode: code,
-      role
-    };
-    saveRestaurantContext(restaurantContext);
-    if (profile) {
-      saveLocalProfile(profile);
-      hydrateForm(profile);
-    }
-    saveSession(true, {
-      restaurantId,
-      source: "invite",
-      inviteCode: code,
-      role
-    });
-    inviteStatus.textContent = `Restaurant rejoint : ${profile?.name || invite.restaurantName || restaurantId}.`;
-    if (stayOnAccessPage) {
-      statusBox.textContent = "Restaurant existant associe a votre compte. Vous pouvez maintenant verifier ou modifier ses informations.";
-      updateUi();
-    } else {
-      statusBox.textContent = "Restaurant existant associe a votre compte. Ouverture de Poket Restaurants...";
-      window.setTimeout(() => {
-        window.location.href = APP_URL;
-      }, 900);
-    }
-    return true;
+    savePendingAccessRequest({ restaurantId, restaurantName: invite.restaurantName || "" });
+    const restaurantLabel = invite.restaurantName || restaurantId;
+    inviteStatus.textContent = `Demande envoyee a ${restaurantLabel}. Un administrateur doit la valider.`;
+    statusBox.textContent = "En attente de validation par un administrateur du restaurant. Reconnectez-vous apres sa validation : le restaurant sera rattache a votre compte.";
+    return false;
   } catch (error) {
     inviteStatus.textContent = "Impossible de rejoindre le restaurant : " + (error.message || error);
     return false;
@@ -919,6 +870,36 @@ function updateSummary() {
     </dl>
     <p class="soft-warning">SIREN, TVA et RCS pourront etre completes plus tard, mais seront necessaires pour des factures completes.</p>
   `;
+}
+
+const PENDING_ACCESS_KEY = "poksolPendingAccess";
+
+function savePendingAccessRequest(pending) {
+  try {
+    window.localStorage.setItem(PENDING_ACCESS_KEY, JSON.stringify(pending));
+  } catch (_) {}
+}
+
+async function reportPendingAccessRequest(uid) {
+  let pending = null;
+  try {
+    pending = JSON.parse(window.localStorage.getItem(PENDING_ACCESS_KEY) || "null");
+  } catch (_) {}
+  if (!pending?.restaurantId || !firebaseServices || !uid) return;
+  try {
+    const { doc, getDoc } = firebaseServices.firestoreModule;
+    const snapshot = await getDoc(doc(firebaseServices.db, "restaurants", pending.restaurantId, "access_requests", uid));
+    const label = pending.restaurantName || pending.restaurantId;
+    const status = snapshot.exists() ? snapshot.data().status : "";
+    if (status === "pending") {
+      inviteStatus.textContent = `Demande en attente de validation par un administrateur de ${label}.`;
+    } else if (status === "rejected") {
+      inviteStatus.textContent = `Votre demande pour ${label} a ete refusee par un administrateur.`;
+      window.localStorage.removeItem(PENDING_ACCESS_KEY);
+    } else {
+      window.localStorage.removeItem(PENDING_ACCESS_KEY);
+    }
+  } catch (_) {}
 }
 
 function saveSession(profileComplete, extra = {}) {

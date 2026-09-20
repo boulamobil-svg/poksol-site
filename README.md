@@ -62,8 +62,10 @@ Modèle de rôles, identique partout (fonctions `isRestaurantMember`, `isAdmin`,
 
 Pour le site : les pages publiques lisent `publicRestaurants/{slug}` (le document
 `restaurants/{id}` n'est jamais public), les invitations suivent le format de l'application
-(`restaurant_invites`, statut `active`, rôle `admin|manager|staff`) et le rôle pris en
-rejoignant doit être celui de l'invitation.
+(`restaurant_invites`, statut `active`, rôle `admin|manager|staff`). Un code d'invitation ne
+donne **pas** d'accès direct : il crée une demande (`access_requests`) que valide un admin,
+dans l'onglet Équipe du site ou dans l'application, qui choisit le rôle et le poste et crée
+les fiches `staff` / `staff_users`.
 
 Les tests (`tests/rules`, Java 21 requis) doivent passer avant tout déploiement :
 

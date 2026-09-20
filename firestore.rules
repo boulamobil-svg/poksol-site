@@ -1003,6 +1003,13 @@ service cloud.firestore {
         }
       }
 
+      // TRANSITION : ancienne collection des roles du site, en lecture seule, le
+      // temps que l'ancien site soit remplace. A retirer ensuite (aucun droit
+      // n'en decoule : les roles viennent de staff / staff_users).
+      match /members/{uid} {
+        allow read: if isRestaurantMember(restaurantId);
+      }
+
       match /staff/{userId} {
         allow read: if isOwnUserDoc(userId) || isRestaurantMember(restaurantId);
         allow create: if isSelfInitialAdminCreate(restaurantId, userId)
