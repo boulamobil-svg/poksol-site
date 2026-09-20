@@ -1195,10 +1195,6 @@ function initDashboardPage() {
       setClientPage(root, 1);
       applyClientTools(root);
     }
-    if (event.target.matches("[data-client-column-filter]")) {
-      setClientPage(root, 1);
-      applyClientTools(root);
-    }
   });
   root.addEventListener("pointerdown", (event) => {
     const handle = event.target.closest("[data-category-drag-handle]");
@@ -2421,14 +2417,6 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
             <span>Created date</span>
             <span>Solde</span>
           </div>
-          <div class="table-row client-filter-row client-row">
-            <label><span>Name</span><input data-client-column-filter="name" placeholder="Filter name" /></label>
-            <label><span>Email</span><input data-client-column-filter="email" placeholder="Filter email" /></label>
-            <label><span>Phone</span><input data-client-column-filter="phone" placeholder="Filter phone" /></label>
-            <label><span>Country</span><input data-client-column-filter="country" placeholder="Filter country" /></label>
-            <label><span>Created</span><input data-client-column-filter="created" placeholder="JJ/MM/AAAA" /></label>
-            <label><span>Solde</span><input data-client-column-filter="balance" placeholder="0,00 EUR" /></label>
-          </div>
           ${clients.map((client) => clientCardHtml(client, normalizedReservations)).join("")}
         </div>
         <div class="client-empty-results is-hidden" data-client-empty-results>Aucun client ne correspond a cette recherche.</div>
@@ -2866,7 +2854,6 @@ function applyClientTools(root) {
   const query = normalizeClientSearch(tools.querySelector("[data-client-search]")?.value || "");
   const filter = tools.querySelector("[data-client-filter]")?.value || "all";
   const sort = tools.querySelector("[data-client-sort]")?.value || "updated-desc";
-  const columnFilters = clientColumnFilters(root);
   const pageSize = Number(root.querySelector("[data-client-page-size]")?.value || 25);
   const currentPage = clientCurrentPage(root);
   const cards = [...table.querySelectorAll("[data-client-card]")];
@@ -2875,8 +2862,7 @@ function applyClientTools(root) {
   const filteredCards = sortedCards.filter((card) => {
     const matchesQuery = !query || card.dataset.clientSearchText.includes(query);
     const matchesFilter = clientCardMatchesFilter(card, filter);
-    const matchesColumns = clientCardMatchesColumnFilters(card, columnFilters);
-    return matchesQuery && matchesFilter && matchesColumns;
+    return matchesQuery && matchesFilter;
   });
   const pageCount = Math.max(1, Math.ceil(filteredCards.length / pageSize));
   const page = Math.min(currentPage, pageCount);
@@ -2891,8 +2877,7 @@ function applyClientTools(root) {
   if (count) count.textContent = `${filteredCards.length} client${filteredCards.length > 1 ? "s" : ""}`;
   root.querySelector("[data-client-empty-results]")?.classList.toggle("is-hidden", filteredCards.length !== 0);
   const reset = tools.querySelector("[data-client-reset]");
-  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
-  const hasTools = !!query || filter !== "all" || sort !== "updated-desc" || hasColumnFilters;
+  const hasTools = !!query || filter !== "all" || sort !== "updated-desc";
   reset?.classList.toggle("is-hidden", !hasTools);
   const pagination = root.querySelector("[data-client-pagination]");
   if (pagination) {
@@ -2925,24 +2910,6 @@ function closeClientDetail(root) {
   dashboard.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
-function clientColumnFilters(root) {
-  const filters = {};
-  root.querySelectorAll("[data-client-column-filter]").forEach((input) => {
-    filters[input.dataset.clientColumnFilter] = normalizeClientSearch(input.value || "");
-  });
-  return filters;
-}
-
-function clientCardMatchesColumnFilters(card, filters = {}) {
-  if (filters.name && !(card.dataset.clientName || "").includes(filters.name)) return false;
-  if (filters.email && !(card.dataset.clientEmail || "").includes(filters.email)) return false;
-  if (filters.phone && !(card.dataset.clientPhone || "").includes(normalizeClientPhone(filters.phone))) return false;
-  if (filters.country && !(card.dataset.clientCountry || "").includes(filters.country)) return false;
-  if (filters.created && !(card.dataset.clientCreatedLabel || "").includes(filters.created)) return false;
-  if (filters.balance && !(card.dataset.clientBalance || "").includes(filters.balance)) return false;
-  return true;
-}
-
 function compareClientCards(a, b, sort) {
   if (sort === "name-asc") return a.dataset.clientName.localeCompare(b.dataset.clientName, "fr");
   if (sort === "name-desc") return b.dataset.clientName.localeCompare(a.dataset.clientName, "fr");
@@ -2970,9 +2937,6 @@ function resetClientTools(root) {
   if (search) search.value = "";
   if (filter) filter.value = "all";
   if (sort) sort.value = "updated-desc";
-  root.querySelectorAll("[data-client-column-filter]").forEach((input) => {
-    input.value = "";
-  });
   setClientPage(root, 1);
   applyClientTools(root);
 }
@@ -3000,10 +2964,9 @@ function exportVisibleCustomers(root) {
   const tools = root.querySelector("[data-client-tools]");
   const query = normalizeClientSearch(tools?.querySelector("[data-client-search]")?.value || "");
   const filter = tools?.querySelector("[data-client-filter]")?.value || "all";
-  const columnFilters = clientColumnFilters(root);
   const cards = [...root.querySelectorAll("[data-client-card]")].filter((card) => {
     const matchesQuery = !query || card.dataset.clientSearchText.includes(query);
-    return matchesQuery && clientCardMatchesFilter(card, filter) && clientCardMatchesColumnFilters(card, columnFilters);
+    return matchesQuery && clientCardMatchesFilter(card, filter);
   });
   const rows = cards.map(customerCsvRow);
   const headers = ["Type", "Nom affichage", "Prenom", "Nom", "Societe", "Contact", "Telephone", "Email", "Pays", "Adresse", "Tax ID", "TVA", "Statut", "Date creation", "Mis a jour", "Reservations", "Dernier passage", "Notes", "ID compte"];

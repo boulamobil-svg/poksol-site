@@ -2236,6 +2236,7 @@ select:focus-visible {
 
 .client-ledger .clients-table {
   gap: 0;
+  width: 100%;
   overflow: hidden;
   border: 1px solid #dfe3e8;
   border-radius: 12px;
@@ -2243,12 +2244,12 @@ select:focus-visible {
 }
 
 .client-ledger .clients-table .client-row {
-  grid-template-columns: minmax(190px, 1.1fr) minmax(180px, 1fr) minmax(170px, 0.9fr) minmax(120px, 0.7fr) minmax(150px, 0.8fr) minmax(130px, 0.7fr);
+  grid-template-columns: minmax(170px, 1.15fr) minmax(160px, 1fr) minmax(138px, 0.78fr) minmax(96px, 0.55fr) minmax(120px, 0.65fr) minmax(108px, 0.55fr);
 }
 
 .client-ledger .table-row {
   min-height: 68px;
-  padding: 0 28px;
+  padding: 0 24px;
   border-radius: 0;
   border-bottom: 1px solid #e5e8ec;
   background: white;
@@ -2259,39 +2260,6 @@ select:focus-visible {
   color: #23272d;
   background: #fbfbfc;
   font-weight: 900;
-}
-
-.client-ledger .client-filter-row {
-  min-height: 70px;
-  background: #ffffff;
-}
-
-.client-filter-row label {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.client-filter-row label > span {
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.client-filter-row input {
-  width: 100%;
-  min-height: 38px;
-  border: 1px solid #d9dde3;
-  border-radius: 8px;
-  padding: 8px 10px;
-  color: #17191c;
-  background: #fbfcfd;
-  font: inherit;
-}
-
-.client-filter-row input:focus {
-  outline: 3px solid rgba(25, 118, 243, 0.18);
-  border-color: var(--poksol-blue);
 }
 
 .client-ledger .customer-account-card {
@@ -2312,6 +2280,7 @@ select:focus-visible {
 .client-balance-cell {
   color: #0a2540;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .client-ledger.is-client-detail-open > .clients-section-head,
