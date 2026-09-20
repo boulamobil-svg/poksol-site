@@ -22,6 +22,69 @@ const releaseReady = fetch("/downloads/poket-restaurants/latest.json", { cache: 
   })
   .catch(() => {});
 
+// Permissions du module clients (alignees sur firestore.rules) :
+// creation / modification / desactivation : owner, admin, manager ; suppression : owner, admin.
+const CLIENT_MANAGER_ROLES = ["owner", "admin", "manager"];
+const CLIENT_DELETE_ROLES = ["owner", "admin"];
+const CLIENT_IMPORT_LIMIT = 500;
+
+const CUSTOMER_ACCOUNT_FIELDS = [
+  "movements", "accountMovements", "transactions", "ledger", "history",
+  "balance", "solde", "accountBalance", "currentBalance", "balanceDue", "amountDue",
+  "debitTotal", "totalDebits", "totalDebit", "creditTotal", "totalCredits", "totalCredit",
+  "openTicketCount", "openTickets", "unpaidTickets", "pendingTicketCount",
+  "movementCount", "movementsCount"
+];
+
+const CLIENT_COLUMNS = [
+  { key: "name", label: "Name", kind: "text", className: "col-name" },
+  { key: "email", label: "Email", kind: "text", className: "col-email" },
+  { key: "phone", label: "Phone", kind: "text", className: "col-phone" },
+  { key: "country", label: "Country", kind: "text", className: "col-country" },
+  { key: "created", label: "Created", kind: "date", className: "col-created" },
+  { key: "balance", label: "Solde", kind: "number", className: "col-balance" }
+];
+
+const CLIENT_SORT_LABELS = {
+  text: ["Trier de A a Z", "Trier de Z a A"],
+  date: ["Du plus ancien au plus recent", "Du plus recent au plus ancien"],
+  number: ["Du plus petit au plus grand", "Du plus grand au plus petit"]
+};
+
+const CLIENT_IMPORT_HEADERS = {
+  "type": "type",
+  "nom affichage": "displayName",
+  "display name": "displayName",
+  "displayname": "displayName",
+  "name": "displayName",
+  "prenom": "firstName",
+  "first name": "firstName",
+  "nom": "lastName",
+  "last name": "lastName",
+  "societe": "companyName",
+  "company": "companyName",
+  "entreprise": "companyName",
+  "contact": "contactName",
+  "telephone": "phone",
+  "phone": "phone",
+  "phone number": "phone",
+  "tel": "phone",
+  "email": "email",
+  "e-mail": "email",
+  "mail": "email",
+  "pays": "country",
+  "country": "country",
+  "adresse": "address",
+  "address": "address",
+  "tax id": "taxId",
+  "tva": "vatNumber",
+  "vat": "vatNumber",
+  "notes": "notes",
+  "note": "notes",
+  "statut": "status",
+  "status": "status"
+};
+
 const DAYS = [
   ["monday", "Lundi"],
   ["tuesday", "Mardi"],
@@ -1083,6 +1146,26 @@ function initDashboardPage() {
     }
     const copyButton = event.target.closest("[data-copy]");
     if (copyButton) navigator.clipboard?.writeText(copyButton.dataset.copy);
+    const columnToggle = event.target.closest("[data-client-col-toggle]");
+    if (columnToggle) {
+      event.preventDefault();
+      toggleClientColumnMenu(root, columnToggle.dataset.clientColToggle);
+      return;
+    }
+    const columnSort = event.target.closest("[data-client-col-sort]");
+    if (columnSort) {
+      event.preventDefault();
+      setClientColumnSort(root, columnSort.dataset.clientColSort);
+      return;
+    }
+    const columnClear = event.target.closest("[data-client-col-clear]");
+    if (columnClear) {
+      event.preventDefault();
+      clearClientColumn(root, columnClear.dataset.clientColClear);
+      closeClientColumnMenus(root);
+      return;
+    }
+    if (!event.target.closest(".client-col-head")) closeClientColumnMenus(root);
     const clientExport = event.target.closest("[data-client-export]");
     if (clientExport) {
       event.preventDefault();
@@ -1151,7 +1234,9 @@ function initDashboardPage() {
     const form = event.target;
     const restaurantId = root.dataset.restaurantId;
     const status = form.querySelector("[data-form-status]") || root.querySelector("[data-dashboard-status]");
+    const openClientId = root.querySelector("[data-client-detail]:not(.is-hidden)")?.dataset.clientDetail || "";
     try {
+      requireClientPermission(root, form);
       status.textContent = "Sauvegarde...";
       if (form.matches("[data-dashboard-profile-form]")) await saveRestaurantProfile(restaurantId, form);
       if (form.matches("[data-dashboard-hours-form]")) await saveOpeningHours(restaurantId, form);
@@ -1181,8 +1266,11 @@ function initDashboardPage() {
       status.textContent = "Enregistre.";
       const activePanel = root.querySelector("[data-dashboard-panel].is-active")?.dataset.dashboardPanel || "overview";
       await renderDashboard(root, currentUser, restaurantId, activePanel);
+      if (openClientId && !form.matches("[data-dashboard-customer-delete-form]")) openClientDetail(root, openClientId);
     } catch (error) {
-      status.textContent = error.message || String(error);
+      status.textContent = error?.code === "permission-denied"
+        ? "Action refusee par Firestore : votre role ne permet pas cette operation."
+        : (error.message || String(error));
     }
   });
   root.addEventListener("change", async (event) => {
@@ -1200,7 +1288,11 @@ function initDashboardPage() {
       autoSaveCatalogField(root, event.target, { immediate: true });
       return;
     }
-    if (event.target.matches("[data-client-filter], [data-client-sort]")) {
+    if (event.target.matches("[data-client-import-file]")) {
+      await handleClientImport(root, event.target);
+      return;
+    }
+    if (event.target.matches("[data-client-filter]")) {
       setClientPage(root, 1);
       applyClientTools(root);
       return;
@@ -1228,6 +1320,12 @@ function initDashboardPage() {
       setClientPage(root, 1);
       applyClientTools(root);
     }
+    if (event.target.matches("[data-client-col-filter]")) {
+      setClientColumnFilter(root, event.target.dataset.clientColFilter, event.target.value);
+    }
+  });
+  root.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeClientColumnMenus(root);
   });
   root.addEventListener("pointerdown", (event) => {
     const handle = event.target.closest("[data-category-drag-handle]");
@@ -1295,6 +1393,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   localStorage.setItem("poksolActiveRestaurantId", restaurant.id);
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
+  root.dataset.restaurantRole = role;
   const [reservations, customerAccounts, members, menu, catalogMenu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
@@ -1997,7 +2096,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       <section class="dashboard-panel ${activeTab === "public" ? "is-active" : ""}" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "menu" ? "is-active" : ""}" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
-      <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations)}</section>
+      <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
       <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -2359,7 +2458,7 @@ function setCatalogImagePreview(preview, src, alt, onLoad = null) {
   if (onLoad) preview.querySelector("img")?.addEventListener("load", onLoad, { once: true });
 }
 
-function clientsHtml(customerAccounts = {}, reservations = []) {
+function clientsHtml(customerAccounts = {}, reservations = [], role = "") {
   const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
   const readErrors = Array.isArray(customerAccounts.errors) ? customerAccounts.errors : [];
   const normalizedReservations = Array.isArray(reservations) ? reservations : [];
@@ -2373,6 +2472,7 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
   const withPhone = clients.filter((client) => client.phone).length;
   const withEmail = clients.filter((client) => client.email).length;
   const duplicateWarnings = clientDuplicateWarnings(clients);
+  const canManageClients = CLIENT_MANAGER_ROLES.includes(role);
   return `
     <div class="clients-dashboard client-ledger">
       <div class="clients-section-head">
@@ -2384,6 +2484,7 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
           </div>
         </div>
         <div class="client-top-actions">
+          ${canManageClients ? `
           <details class="client-add-panel">
             <summary class="client-create-btn">
               <span>+</span>
@@ -2395,11 +2496,13 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
               <small data-form-status></small>
             </form>
           </details>
+          ` : ""}
           <details class="client-more-menu">
             <summary>More</summary>
             <div>
               <button class="button-reset" type="button" data-client-export>Export contacts</button>
-              <button class="button-reset" type="button" disabled>Import contacts</button>
+              ${canManageClients ? `<label class="client-import-action">Import contacts<input type="file" accept=".csv,text/csv" data-client-import-file hidden /></label>` : ""}
+              <small class="client-import-status" data-client-import-status role="status"></small>
             </div>
           </details>
         </div>
@@ -2429,27 +2532,12 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
               <option value="individual">Particuliers</option>
             </select>
           </label>
-          <label>
-            <span>Trier</span>
-            <select data-client-sort>
-              <option value="updated-desc">Derniere mise a jour</option>
-              <option value="name-asc">Nom A-Z</option>
-              <option value="name-desc">Nom Z-A</option>
-              <option value="type-asc">Type</option>
-              <option value="status-asc">Statut</option>
-            </select>
-          </label>
           <button class="ghost-action button-reset is-hidden" type="button" data-client-reset>Reinitialiser</button>
           <span data-client-result-count>${clients.length} client${clients.length > 1 ? "s" : ""}</span>
         </div>
         <div class="responsive-table clients-table">
           <div class="table-row table-head client-row">
-            <span>Name</span>
-            <span>Email</span>
-            <span>Phone number</span>
-            <span>Country</span>
-            <span>Created date</span>
-            <span>Solde</span>
+            ${CLIENT_COLUMNS.map(clientColumnHeadHtml).join("")}
           </div>
           ${clients.map((client) => clientCardHtml(client, normalizedReservations)).join("")}
         </div>
@@ -2470,9 +2558,28 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
           </div>
         </div>
         <div class="client-detail-stack">
-          ${clients.map((client) => clientDetailHtml(client, normalizedReservations)).join("")}
+          ${clients.map((client) => clientDetailHtml(client, normalizedReservations, role)).join("")}
         </div>
       ` : `<div class="empty-state">Aucun compte client pour le moment.</div>`}
+    </div>
+  `;
+}
+
+function clientColumnHeadHtml(column) {
+  const [ascLabel, descLabel] = CLIENT_SORT_LABELS[column.kind];
+  const placeholder = column.kind === "date" ? "JJ/MM/AAAA" : "Contient...";
+  return `
+    <div class="client-col-head ${column.className}" data-client-col="${column.key}">
+      <span class="client-col-title">${escapeHtml(column.label)}</span>
+      <button class="client-col-toggle button-reset" type="button" data-client-col-toggle="${column.key}" aria-haspopup="true" aria-expanded="false" aria-label="Filtrer et trier : ${escapeAttr(column.label)}"></button>
+      <div class="client-col-menu" role="group" aria-label="Filtre et tri : ${escapeAttr(column.label)}">
+        <button class="button-reset" type="button" data-client-col-sort="${column.key}:asc" aria-pressed="false">${ascLabel}</button>
+        <button class="button-reset" type="button" data-client-col-sort="${column.key}:desc" aria-pressed="false">${descLabel}</button>
+        <label>Filtrer
+          <input type="search" data-client-col-filter="${column.key}" placeholder="${placeholder}" autocomplete="off" />
+        </label>
+        <button class="button-reset client-col-clear" type="button" data-client-col-clear="${column.key}" disabled>Effacer le filtre et le tri</button>
+      </div>
     </div>
   `;
 }
@@ -2521,21 +2628,24 @@ function clientCardHtml(client, reservations = []) {
       data-client-country="${escapeAttr(normalizeClientSearch(client.country || "France"))}"
       data-client-created-label="${escapeAttr(normalizeClientSearch(clientDateLabel(client.createdAt || client.updatedAt)))}"
       data-client-balance="${escapeAttr(normalizeClientSearch(account.balanceLabel))}"
+      data-client-balance-value="${String(account.balanceValue)}"
       data-client-search-text="${escapeAttr(normalizeClientSearch(searchText))}">
-      <span>
+      <span class="col-name">
         <strong>${escapeHtml(identity[0])}</strong>
         ${identity.slice(1).map((line) => `<small>${escapeHtml(line)}</small>`).join("")}
       </span>
-      <span>${escapeHtml(client.email || "-")}</span>
-      <span>${escapeHtml(phoneLabel || "-")}</span>
-      <span>${escapeHtml(client.country || "France")}</span>
-      <span>${escapeHtml(clientDateLabel(client.createdAt || client.updatedAt) || "-")}</span>
-      <span class="client-balance-cell">${escapeHtml(account.balanceLabel)}</span>
+      <span class="col-email">${escapeHtml(client.email || "-")}</span>
+      <span class="col-phone">${escapeHtml(phoneLabel || "-")}</span>
+      <span class="col-country">${escapeHtml(client.country || "France")}</span>
+      <span class="col-created">${escapeHtml(clientDateLabel(client.createdAt || client.updatedAt) || "-")}</span>
+      <span class="col-balance client-balance-cell">${escapeHtml(account.balanceLabel)}</span>
     </div>
   `;
 }
 
-function clientDetailHtml(client, reservations = []) {
+function clientDetailHtml(client, reservations = [], role = "") {
+  const canManageClients = CLIENT_MANAGER_ROLES.includes(role);
+  const canDeleteClients = CLIENT_DELETE_ROLES.includes(role);
   const collectionName = customerCollectionName(client.customerCollection);
   const metrics = clientAccountMetrics(client, reservations);
   const account = clientAccountSummary(client);
@@ -2549,7 +2659,7 @@ function clientDetailHtml(client, reservations = []) {
           <span>Compte client</span>
           <h2>${escapeHtml(displayName)}</h2>
         </div>
-        <button class="outline-dark-btn button-reset" type="button" data-client-edit-toggle>Modifier les informations</button>
+        ${canManageClients ? `<button class="outline-dark-btn button-reset" type="button" data-client-edit-toggle>Modifier les informations</button>` : ""}
       </header>
 
       <section class="client-account-hero">
@@ -2575,6 +2685,8 @@ function clientDetailHtml(client, reservations = []) {
         </article>
       </section>
 
+      <details class="client-info-section">
+        <summary><span>Informations du compte</span><small>Identite, contact, adresse, notes</small></summary>
       <div class="client-account-details">
         ${reservationDetailItemHtml("ID compte", client.id)}
         ${reservationDetailItemHtml("Type", client.type === "company" ? "Societe" : "Particulier")}
@@ -2593,7 +2705,9 @@ function clientDetailHtml(client, reservations = []) {
         ${reservationDetailItemHtml("Notes", client.notes)}
         ${reservationDetailItemHtml("Date creation", clientDateLabel(client.createdAt))}
       </div>
+      </details>
 
+      ${canManageClients ? `
       <section class="client-detail-edit is-hidden" data-client-edit-panel>
         <h3>Modifier les informations</h3>
           <form class="platform-form client-edit-form" data-dashboard-customer-update-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-type-scope data-customer-type="${escapeAttr(client.type === "company" ? "company" : "individual")}">
@@ -2602,6 +2716,7 @@ function clientDetailHtml(client, reservations = []) {
             <small data-form-status></small>
           </form>
       </section>
+      ` : ""}
 
       <section class="client-journal">
         <div>
@@ -2621,23 +2736,27 @@ function clientDetailHtml(client, reservations = []) {
         ` : `<div class="client-account-empty">Aucun mouvement disponible pour ce client.</div>`}
       </section>
 
+      ${canManageClients ? `
       <section class="client-danger-zone">
         <div class="client-actions">
-            <form data-dashboard-customer-state-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-active="${client.active === false ? "false" : "true"}">
-              <button class="outline-dark-btn button-reset" type="submit">${client.active === false ? "Reactiver" : "Desactiver"}</button>
-              <small data-form-status></small>
-            </form>
-            <form data-dashboard-customer-delete-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-name="${escapeAttr(displayName)}">
-              <button class="ghost-action button-reset danger-action" type="button" data-client-delete-arm>Supprimer</button>
-              <div class="client-delete-confirm">
-                <span>Suppression definitive</span>
-                <button class="ghost-action button-reset" type="button" data-client-delete-cancel>Annuler</button>
-                <button class="ghost-action button-reset danger-action" type="submit">Confirmer</button>
-              </div>
-              <small data-form-status></small>
-            </form>
-          </div>
+          <form data-dashboard-customer-state-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-active="${client.active === false ? "false" : "true"}">
+            <button class="outline-dark-btn button-reset" type="submit">${client.active === false ? "Reactiver" : "Desactiver"}</button>
+            <small data-form-status></small>
+          </form>
+          ${canDeleteClients ? `
+          <form data-dashboard-customer-delete-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-name="${escapeAttr(displayName)}">
+            <button class="ghost-action button-reset danger-action" type="button" data-client-delete-arm>Supprimer</button>
+            <div class="client-delete-confirm">
+              <span>Suppression definitive</span>
+              <button class="ghost-action button-reset" type="button" data-client-delete-cancel>Annuler</button>
+              <button class="ghost-action button-reset danger-action" type="submit">Confirmer</button>
+            </div>
+            <small data-form-status></small>
+          </form>
+          ` : `<p class="client-permission-note">La suppression est reservee aux owners et aux admins.</p>`}
+        </div>
       </section>
+      ` : `<p class="client-permission-note">Votre role permet la lecture uniquement.</p>`}
     </article>
   `;
 }
@@ -2666,6 +2785,169 @@ function customerFieldsHtml(client = {}) {
       <label class="wide-field">Notes<textarea name="notes" rows="3">${escapeHtml(client.notes)}</textarea></label>
     </div>
   `;
+}
+
+function requireClientPermission(root, target) {
+  const role = root.dataset.restaurantRole || "";
+  let needed = typeof target === "string" ? target : "";
+  if (target && typeof target !== "string") {
+    if (target.matches("[data-dashboard-customer-delete-form]")) needed = "delete";
+    else if (target.matches("[data-dashboard-customer-form], [data-dashboard-customer-update-form], [data-dashboard-customer-state-form]")) needed = "manage";
+  }
+  if (needed === "delete" && !CLIENT_DELETE_ROLES.includes(role)) {
+    throw new Error("La suppression est reservee aux owners et aux admins.");
+  }
+  if (needed === "manage" && !CLIENT_MANAGER_ROLES.includes(role)) {
+    throw new Error("Action reservee aux owners, admins et managers.");
+  }
+}
+
+function parseCsv(input) {
+  const source = String(input || "").replace(/^\uFEFF/, "");
+  const firstLine = source.split(/\r?\n/, 1)[0] || "";
+  const delimiter = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ";" : ",";
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  const endRow = () => {
+    row.push(cell);
+    cell = "";
+    if (row.some((value) => value !== "")) rows.push(row);
+    row = [];
+  };
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (quoted) {
+      if (char === '"' && source[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        cell += char;
+      }
+    } else if (char === '"') {
+      quoted = true;
+    } else if (char === delimiter) {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && source[index + 1] === "\n") index += 1;
+      endRow();
+    } else {
+      cell += char;
+    }
+  }
+  endRow();
+  return rows;
+}
+
+function planCustomerImport(rows, cards) {
+  if (rows.length < 2) return { customers: [], skipped: 0, message: "Le fichier ne contient aucune ligne de donnees." };
+  const fields = rows[0].map((header) => CLIENT_IMPORT_HEADERS[normalizeClientSearch(header)] || "");
+  if (!fields.some((field) => field && field !== "status")) {
+    return { customers: [], skipped: 0, message: "Colonnes non reconnues : utilisez l'export de contacts comme modele." };
+  }
+  const knownEmails = new Set(cards.map((card) => card.dataset.clientEmail).filter(Boolean));
+  const knownPhones = new Set(cards.map((card) => card.dataset.clientPhone).filter(Boolean));
+  const customers = [];
+  let skipped = 0;
+  rows.slice(1).forEach((row) => {
+    const data = {};
+    fields.forEach((field, index) => {
+      if (!field) return;
+      // Retire l'apostrophe ajoutee a l'export pour neutraliser les formules.
+      data[field] = String(row[index] ?? "").trim().replace(/^'(?=[=+\-@])/, "").slice(0, field === "notes" ? 2000 : 500);
+    });
+    const typeLabel = normalizeClientSearch(data.type || "");
+    const type = normalizeCustomerType(["societe", "company", "entreprise"].includes(typeLabel) ? "company" : "individual", data);
+    const payload = {
+      type,
+      displayName: data.displayName || "",
+      firstName: data.firstName || "",
+      lastName: data.lastName || "",
+      companyName: data.companyName || "",
+      contactName: data.contactName || "",
+      phone: data.phone || "",
+      email: data.email || "",
+      address: data.address || "",
+      country: data.country || "France",
+      taxId: data.taxId || "",
+      vatNumber: data.vatNumber || "",
+      notes: data.notes || "",
+      active: !["inactif", "inactive", "desactive"].includes(normalizeClientSearch(data.status || ""))
+    };
+    if (!hasCustomerIdentity(payload)) {
+      skipped += 1;
+      return;
+    }
+    if (!payload.displayName) {
+      payload.displayName = firstText([payload.firstName, payload.lastName].filter(Boolean).join(" "), payload.companyName, payload.contactName);
+    }
+    const email = normalizeClientSearch(payload.email);
+    const phone = normalizeClientPhone(payload.phone);
+    const duplicate = (email && knownEmails.has(email)) || (phone.length >= 6 && knownPhones.has(phone));
+    if (duplicate || customers.length >= CLIENT_IMPORT_LIMIT) {
+      skipped += 1;
+      return;
+    }
+    if (email) knownEmails.add(email);
+    if (phone.length >= 6) knownPhones.add(phone);
+    customers.push(payload);
+  });
+  return { customers, skipped, message: skipped ? "Toutes les lignes sont vides ou deja presentes." : "" };
+}
+
+async function importCustomerAccounts(restaurantId, customers, user) {
+  const services = await getServices();
+  const { collection, doc, serverTimestamp, writeBatch } = services.firestoreModule;
+  const target = collection(services.db, "restaurants", restaurantId, "customers");
+  for (let start = 0; start < customers.length; start += 400) {
+    const batch = writeBatch(services.db);
+    customers.slice(start, start + 400).forEach((customer) => {
+      batch.set(doc(target), {
+        ...customer,
+        source: "csv_import",
+        createdBy: user?.uid || "",
+        createdByEmail: user?.email || "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    });
+    await batch.commit();
+  }
+}
+
+async function handleClientImport(root, input) {
+  const file = input.files?.[0];
+  input.value = "";
+  const status = root.querySelector("[data-client-import-status]");
+  const setStatus = (message) => {
+    if (status) status.textContent = message;
+  };
+  if (!file) return;
+  try {
+    requireClientPermission(root, "manage");
+    if (file.size > 2 * 1024 * 1024) throw new Error("Fichier trop volumineux (2 Mo maximum).");
+    setStatus("Lecture du fichier...");
+    const plan = planCustomerImport(parseCsv(await file.text()), [...root.querySelectorAll("[data-client-card]")]);
+    if (!plan.customers.length) throw new Error(plan.message || "Aucun contact a importer.");
+    const ignored = plan.skipped ? ` ${plan.skipped} ligne${plan.skipped > 1 ? "s" : ""} ignoree${plan.skipped > 1 ? "s" : ""} (doublons ou lignes vides).` : "";
+    if (!window.confirm(`Importer ${plan.customers.length} contact${plan.customers.length > 1 ? "s" : ""} ?${ignored}`)) {
+      setStatus("Import annule.");
+      return;
+    }
+    setStatus("Import en cours...");
+    await importCustomerAccounts(root.dataset.restaurantId, plan.customers, currentUser);
+    await renderDashboard(root, currentUser, root.dataset.restaurantId, "clients");
+    const done = root.querySelector("[data-client-import-status]");
+    if (done) done.textContent = `${plan.customers.length} contact${plan.customers.length > 1 ? "s" : ""} importe${plan.customers.length > 1 ? "s" : ""}.`;
+  } catch (error) {
+    setStatus(error?.code === "permission-denied"
+      ? "Import refuse par Firestore : votre role ne permet pas cette operation."
+      : (error.message || String(error)));
+  }
 }
 
 function clientDuplicateWarnings(clients) {
@@ -2727,6 +3009,7 @@ function clientAccountSummary(client = {}) {
   const openTickets = firstNumber(client.openTicketCount, client.openTickets, client.unpaidTickets, client.pendingTicketCount);
   return {
     balanceLabel: formatMoney(effectiveBalance),
+    balanceValue: effectiveBalance,
     balanceStateLabel: Math.abs(effectiveBalance) < 0.005 ? "A jour" : effectiveBalance > 0 ? "A encaisser" : "Credit client",
     movementCountLabel: String(movements.length || firstNumber(client.movementCount, client.movementsCount) || 0),
     openTicketCountLabel: String(openTickets ?? 0),
@@ -2858,8 +3141,19 @@ function normalizeCustomerAccount(customer = {}) {
     notes: firstText(customer.notes),
     active: customer.active !== false,
     createdAt: customer.createdAt || null,
-    updatedAt: customer.updatedAt || customer.createdAt || null
+    updatedAt: customer.updatedAt || customer.createdAt || null,
+    // Solde et journal : sans ces champs, clientAccountSummary() ne voyait jamais
+    // les mouvements charges depuis Firestore et affichait toujours 0,00 EUR.
+    ...pickCustomerAccountFields(customer)
   };
+}
+
+function pickCustomerAccountFields(customer = {}) {
+  const fields = {};
+  CUSTOMER_ACCOUNT_FIELDS.forEach((key) => {
+    if (customer[key] !== undefined) fields[key] = customer[key];
+  });
+  return fields;
 }
 
 function clientTimeValue(value) {
@@ -2897,38 +3191,59 @@ function formatClientPhone(value = "") {
   return raw;
 }
 
-function applyClientTools(root) {
+function clientColumnState(root) {
+  if (!root.clientColumns) root.clientColumns = { sort: null, filters: {} };
+  return root.clientColumns;
+}
+
+function clientToolState(root) {
   const tools = root.querySelector("[data-client-tools]");
+  const columns = clientColumnState(root);
+  return {
+    tools,
+    query: normalizeClientSearch(tools?.querySelector("[data-client-search]")?.value || ""),
+    filter: tools?.querySelector("[data-client-filter]")?.value || "all",
+    sort: columns.sort,
+    columnFilters: columns.filters
+  };
+}
+
+function clientCardMatchesTools(card, state) {
+  return (!state.query || card.dataset.clientSearchText.includes(state.query))
+    && clientCardMatchesFilter(card, state.filter)
+    && clientCardMatchesColumns(card, state.columnFilters);
+}
+
+function applyClientTools(root) {
   const table = root.querySelector(".clients-table");
+  const state = clientToolState(root);
+  const tools = state.tools;
   if (!tools || !table) return;
-  const query = normalizeClientSearch(tools.querySelector("[data-client-search]")?.value || "");
-  const filter = tools.querySelector("[data-client-filter]")?.value || "all";
-  const sort = tools.querySelector("[data-client-sort]")?.value || "updated-desc";
   const pageSize = Number(root.querySelector("[data-client-page-size]")?.value || 25);
   const currentPage = clientCurrentPage(root);
   const cards = [...table.querySelectorAll("[data-client-card]")];
-  const sortedCards = cards.sort((a, b) => compareClientCards(a, b, sort));
+  const sortedCards = cards.sort((a, b) => compareClientCards(a, b, state.sort));
   sortedCards.forEach((card) => table.appendChild(card));
-  const filteredCards = sortedCards.filter((card) => {
-    const matchesQuery = !query || card.dataset.clientSearchText.includes(query);
-    const matchesFilter = clientCardMatchesFilter(card, filter);
-    return matchesQuery && matchesFilter;
-  });
+  const filteredCards = sortedCards.filter((card) => clientCardMatchesTools(card, state));
   const pageCount = Math.max(1, Math.ceil(filteredCards.length / pageSize));
   const page = Math.min(currentPage, pageCount);
   setClientPage(root, page);
   const pageStart = (page - 1) * pageSize;
   const pageEnd = pageStart + pageSize;
+  const visibleCards = new Set(filteredCards.slice(pageStart, pageEnd));
   sortedCards.forEach((card) => {
-    const isVisible = filteredCards.includes(card) && filteredCards.indexOf(card) >= pageStart && filteredCards.indexOf(card) < pageEnd;
-    card.classList.toggle("is-hidden", !isVisible);
+    card.classList.toggle("is-hidden", !visibleCards.has(card));
   });
   const count = tools.querySelector("[data-client-result-count]");
   if (count) count.textContent = `${filteredCards.length} client${filteredCards.length > 1 ? "s" : ""}`;
   root.querySelector("[data-client-empty-results]")?.classList.toggle("is-hidden", filteredCards.length !== 0);
   const reset = tools.querySelector("[data-client-reset]");
-  const hasTools = !!query || filter !== "all" || sort !== "updated-desc";
+  const hasTools = !!state.query
+    || state.filter !== "all"
+    || !!state.sort
+    || Object.values(state.columnFilters).some(Boolean);
   reset?.classList.toggle("is-hidden", !hasTools);
+  syncClientColumnUi(root);
   const pagination = root.querySelector("[data-client-pagination]");
   if (pagination) {
     pagination.querySelector("[data-client-page-label]").textContent = filteredCards.length
@@ -2941,6 +3256,101 @@ function applyClientTools(root) {
   }
 }
 
+function clientColumnValue(card, key) {
+  const data = card.dataset;
+  if (key === "name") return data.clientName || "";
+  if (key === "email") return data.clientEmail || "";
+  if (key === "phone") return data.clientPhone || "";
+  if (key === "country") return data.clientCountry || "";
+  if (key === "created") return Number(data.clientCreated || 0);
+  if (key === "balance") return Number(data.clientBalanceValue || 0);
+  return "";
+}
+
+function clientColumnFilterText(card, key) {
+  if (key === "created") return card.dataset.clientCreatedLabel || "";
+  if (key === "balance") return card.dataset.clientBalance || "";
+  return String(clientColumnValue(card, key));
+}
+
+function clientCardMatchesColumns(card, filters = {}) {
+  return Object.entries(filters).every(([key, raw]) => {
+    if (!raw) return true;
+    const needle = key === "phone" ? normalizeClientPhone(raw) : normalizeClientSearch(raw);
+    return !needle || clientColumnFilterText(card, key).includes(needle);
+  });
+}
+
+function syncClientColumnUi(root) {
+  const { sort, filters } = clientColumnState(root);
+  root.querySelectorAll("[data-client-col]").forEach((head) => {
+    const key = head.dataset.clientCol;
+    const isFiltered = !!filters[key];
+    const isSorted = sort?.key === key;
+    head.classList.toggle("is-filtered", isFiltered);
+    head.classList.toggle("is-sorted", isSorted);
+    head.dataset.sortDir = isSorted ? sort.dir : "";
+    head.querySelectorAll("[data-client-col-sort]").forEach((button) => {
+      const active = isSorted && button.dataset.clientColSort === `${key}:${sort.dir}`;
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    const input = head.querySelector("[data-client-col-filter]");
+    if (input && input.value !== (filters[key] || "")) input.value = filters[key] || "";
+    const clear = head.querySelector("[data-client-col-clear]");
+    if (clear) clear.disabled = !isFiltered && !isSorted;
+  });
+}
+
+function toggleClientColumnMenu(root, key) {
+  const head = root.querySelector(`[data-client-col="${CSS.escape(key)}"]`);
+  if (!head) return;
+  const willOpen = !head.classList.contains("is-open");
+  closeClientColumnMenus(root);
+  if (!willOpen) return;
+  head.classList.add("is-open");
+  head.querySelector("[data-client-col-toggle]")?.setAttribute("aria-expanded", "true");
+  head.querySelector("[data-client-col-filter]")?.focus();
+}
+
+function closeClientColumnMenus(root) {
+  root.querySelectorAll(".client-col-head.is-open").forEach((head) => {
+    head.classList.remove("is-open");
+    head.querySelector("[data-client-col-toggle]")?.setAttribute("aria-expanded", "false");
+  });
+}
+
+function isClientColumnKey(key) {
+  return CLIENT_COLUMNS.some((column) => column.key === key);
+}
+
+function setClientColumnSort(root, value) {
+  const [key, dir] = String(value || "").split(":");
+  if (!isClientColumnKey(key) || !["asc", "desc"].includes(dir)) return;
+  const state = clientColumnState(root);
+  state.sort = state.sort?.key === key && state.sort.dir === dir ? null : { key, dir };
+  setClientPage(root, 1);
+  closeClientColumnMenus(root);
+  applyClientTools(root);
+}
+
+function setClientColumnFilter(root, key, value) {
+  if (!isClientColumnKey(key)) return;
+  const state = clientColumnState(root);
+  if (String(value || "").trim()) state.filters[key] = String(value);
+  else delete state.filters[key];
+  setClientPage(root, 1);
+  applyClientTools(root);
+}
+
+function clearClientColumn(root, key) {
+  if (!isClientColumnKey(key)) return;
+  const state = clientColumnState(root);
+  delete state.filters[key];
+  if (state.sort?.key === key) state.sort = null;
+  setClientPage(root, 1);
+  applyClientTools(root);
+}
+
 function openClientDetail(root, clientId) {
   if (!clientId) return;
   const dashboard = root.querySelector(".client-ledger");
@@ -2948,6 +3358,7 @@ function openClientDetail(root, clientId) {
   if (!dashboard || !detail) return;
   dashboard.querySelectorAll("[data-client-detail]").forEach((panel) => panel.classList.add("is-hidden"));
   detail.classList.remove("is-hidden");
+  detail.querySelector(".client-info-section")?.removeAttribute("open");
   dashboard.classList.add("is-client-detail-open");
   detail.scrollIntoView({ block: "start", behavior: "smooth" });
 }
@@ -2961,11 +3372,19 @@ function closeClientDetail(root) {
 }
 
 function compareClientCards(a, b, sort) {
-  if (sort === "name-asc") return a.dataset.clientName.localeCompare(b.dataset.clientName, "fr");
-  if (sort === "name-desc") return b.dataset.clientName.localeCompare(a.dataset.clientName, "fr");
-  if (sort === "type-asc") return a.dataset.clientType.localeCompare(b.dataset.clientType, "fr");
-  if (sort === "status-asc") return b.dataset.clientActive.localeCompare(a.dataset.clientActive, "fr");
-  return Number(b.dataset.clientUpdated || 0) - Number(a.dataset.clientUpdated || 0);
+  const byUpdate = Number(b.dataset.clientUpdated || 0) - Number(a.dataset.clientUpdated || 0);
+  if (!sort) return byUpdate;
+  const left = clientColumnValue(a, sort.key);
+  const right = clientColumnValue(b, sort.key);
+  // Comme dans Excel, les cellules vides restent en bas quel que soit le sens du tri.
+  const leftEmpty = left === "";
+  const rightEmpty = right === "";
+  if (leftEmpty !== rightEmpty) return leftEmpty ? 1 : -1;
+  const direction = sort.dir === "desc" ? -1 : 1;
+  const result = typeof left === "number"
+    ? left - right
+    : String(left).localeCompare(String(right), "fr", { numeric: true });
+  return result * direction || byUpdate;
 }
 
 function clientCardMatchesFilter(card, filter) {
@@ -2983,20 +3402,23 @@ function resetClientTools(root) {
   if (!tools) return;
   const search = tools.querySelector("[data-client-search]");
   const filter = tools.querySelector("[data-client-filter]");
-  const sort = tools.querySelector("[data-client-sort]");
   if (search) search.value = "";
   if (filter) filter.value = "all";
-  if (sort) sort.value = "updated-desc";
+  root.clientColumns = { sort: null, filters: {} };
+  closeClientColumnMenus(root);
   setClientPage(root, 1);
   applyClientTools(root);
 }
 
+// La page courante vit dans une propriete JS : un attribut data-client-page sur la
+// racine serait retrouve par closest("[data-client-page]") dans le gestionnaire de
+// clic, qui annulerait alors chaque clic du dashboard (cases, <details>...).
 function clientCurrentPage(root) {
-  return Math.max(1, Number(root.dataset.clientPage || 1));
+  return Math.max(1, Number(root.clientPageIndex || 1));
 }
 
 function setClientPage(root, page) {
-  root.dataset.clientPage = String(Math.max(1, Number(page) || 1));
+  root.clientPageIndex = Math.max(1, Number(page) || 1);
 }
 
 function changeClientPage(root, delta) {
@@ -3011,13 +3433,10 @@ function updateCustomerTypeScope(select) {
 }
 
 function exportVisibleCustomers(root) {
-  const tools = root.querySelector("[data-client-tools]");
-  const query = normalizeClientSearch(tools?.querySelector("[data-client-search]")?.value || "");
-  const filter = tools?.querySelector("[data-client-filter]")?.value || "all";
-  const cards = [...root.querySelectorAll("[data-client-card]")].filter((card) => {
-    const matchesQuery = !query || card.dataset.clientSearchText.includes(query);
-    return matchesQuery && clientCardMatchesFilter(card, filter);
-  });
+  const state = clientToolState(root);
+  const cards = [...root.querySelectorAll("[data-client-card]")]
+    .filter((card) => clientCardMatchesTools(card, state))
+    .sort((a, b) => compareClientCards(a, b, state.sort));
   const rows = cards.map(customerCsvRow);
   const headers = ["Type", "Nom affichage", "Prenom", "Nom", "Societe", "Contact", "Telephone", "Email", "Pays", "Adresse", "Tax ID", "TVA", "Statut", "Date creation", "Mis a jour", "Reservations", "Dernier passage", "Notes", "ID compte"];
   const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
@@ -3031,7 +3450,7 @@ function exportVisibleCustomers(root) {
 }
 
 function customerCsvRow(card) {
-  const summaryCells = [...card.querySelectorAll(":scope > span")].map((cell) => cell.textContent.trim().replace(/\s+/g, " "));
+  const displayName = card.querySelector(":scope > .col-name strong")?.textContent.trim() || "";
   const detail = card.closest(".client-ledger")?.querySelector(`[data-client-detail="${CSS.escape(card.dataset.clientDetailTarget || "")}"]`);
   const detailMap = new Map([...(detail?.querySelectorAll(".client-account-details .reservation-detail-item") || [])].map((item) => {
     const label = item.querySelector("span")?.textContent.trim() || "";
@@ -3040,7 +3459,7 @@ function customerCsvRow(card) {
   }));
   return [
     detailMap.get("Type") || "",
-    summaryCells[0] || "",
+    displayName,
     detailMap.get("Prenom") || "",
     detailMap.get("Nom") || "",
     detailMap.get("Societe") || "",
@@ -3062,7 +3481,10 @@ function customerCsvRow(card) {
 }
 
 function csvCell(value) {
-  return `"${String(value || "").replace(/"/g, '""')}"`;
+  // Une cellule commencant par = + - @ serait interpretee comme une formule par Excel.
+  const text = String(value || "");
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 function reservationsHtml(reservations, role) {

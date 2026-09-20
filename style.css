@@ -4900,3 +4900,304 @@ body.menu-page-body.translated-rtl {
     width: 100%;
   }
 }
+
+/* ------------------------------------------------------------------
+   Clients : tableau adaptatif, filtres de colonne (style Excel),
+   section d'informations repliable
+   ------------------------------------------------------------------ */
+
+.client-ledger .client-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.client-ledger .client-tools .client-search-field {
+  flex: 1 1 260px;
+  max-width: 320px;
+}
+
+.client-ledger .client-tools > label:not(.client-search-field) {
+  flex: 0 1 200px;
+}
+
+/* Le tableau ne rogne plus les colonnes : les menus de colonne doivent pouvoir
+   depasser, et les colonnes secondaires se masquent selon la largeur reelle
+   du tableau (et non celle de la fenetre). */
+.client-ledger .clients-table {
+  overflow: visible;
+  container: clients / inline-size;
+}
+
+.client-ledger .clients-table .client-row {
+  grid-template-columns:
+    minmax(0, 1.25fr) minmax(0, 1.1fr) minmax(0, 0.95fr)
+    minmax(0, 0.6fr) minmax(0, 0.75fr) minmax(0, 0.65fr);
+  gap: 12px;
+  padding: 0 20px;
+}
+
+.client-ledger .clients-table .table-head {
+  position: relative;
+  z-index: 2;
+  border-radius: 12px 12px 0 0;
+}
+
+.client-ledger .clients-table .customer-account-card:last-of-type {
+  border-radius: 0 0 12px 12px;
+}
+
+@container clients (max-width: 819px) {
+  .client-ledger .clients-table .col-country {
+    display: none;
+  }
+
+  .client-ledger .clients-table .client-row {
+    grid-template-columns:
+      minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 1fr)
+      minmax(0, 0.8fr) minmax(0, 0.7fr);
+  }
+}
+
+@container clients (max-width: 639px) {
+  .client-ledger .clients-table .col-created {
+    display: none;
+  }
+
+  .client-ledger .clients-table .client-row {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.75fr);
+    padding: 0 14px;
+  }
+}
+
+@container clients (max-width: 499px) {
+  .client-ledger .clients-table .col-email,
+  .client-ledger .clients-table .col-phone {
+    display: none;
+  }
+
+  .client-ledger .clients-table .client-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+.client-col-head {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.client-col-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client-col-head.is-sorted .client-col-title::after {
+  content: " \2191";
+  color: #1976f3;
+}
+
+.client-col-head.is-sorted[data-sort-dir="desc"] .client-col-title::after {
+  content: " \2193";
+}
+
+.client-col-toggle {
+  display: inline-grid;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.client-col-toggle::before {
+  content: "";
+  border-top: 5px solid #5b6470;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+}
+
+.client-col-toggle:hover,
+.client-col-toggle:focus-visible,
+.client-col-head.is-open .client-col-toggle {
+  background: #e9edf3;
+}
+
+.client-col-head.is-filtered .client-col-toggle {
+  background: #dbeafe;
+}
+
+.client-col-head.is-filtered .client-col-toggle::before {
+  border-top-color: #1976f3;
+}
+
+.client-col-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  display: none;
+  width: 250px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  border: 1px solid #d9dde3;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 16px 40px rgba(10, 37, 64, 0.18);
+  font-weight: 700;
+}
+
+.client-col-head.is-open .client-col-menu {
+  display: grid;
+  gap: 4px;
+}
+
+.client-col-head:nth-last-child(-n + 2) .client-col-menu {
+  right: 0;
+  left: auto;
+}
+
+.client-col-menu > button {
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: #17191c;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.client-col-menu > button:hover:not(:disabled) {
+  background: #f2f4f7;
+}
+
+.client-col-menu > button[aria-pressed="true"] {
+  color: #1976f3;
+  background: #eef4ff;
+}
+
+.client-col-menu > button:disabled {
+  color: #9aa1aa;
+  cursor: default;
+}
+
+.client-col-menu label {
+  display: grid;
+  gap: 4px;
+  padding: 6px 10px;
+  color: #626a75;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.client-col-menu input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d9dde3;
+  border-radius: 8px;
+  color: #17191c;
+  font: inherit;
+  font-weight: 700;
+}
+
+.client-col-menu .client-col-clear {
+  margin-top: 4px;
+  border-top: 1px solid #e5e8ec;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Import de contacts (menu More) */
+.client-more-menu .client-import-action {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: #17191c;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.client-more-menu .client-import-action:hover {
+  background: #f2f3f5;
+}
+
+.client-import-status {
+  display: block;
+  padding: 4px 10px 0;
+  color: #626a75;
+  font-weight: 700;
+}
+
+.client-import-status:empty {
+  display: none;
+}
+
+/* Fiche client : informations du compte repliables (repliees par defaut) */
+.client-info-section {
+  margin: 0 14px 14px;
+  border: 1px solid #e5e8ec;
+  border-radius: 12px;
+  background: white;
+}
+
+.client-info-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  color: #17191c;
+  font-weight: 900;
+  cursor: pointer;
+  list-style: none;
+}
+
+.client-info-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-info-section > summary small {
+  color: #68707b;
+  font-weight: 700;
+}
+
+.client-info-section > summary::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  margin-left: auto;
+  border-right: 2px solid #5b6470;
+  border-bottom: 2px solid #5b6470;
+  transform: rotate(45deg);
+  transition: transform 0.16s ease;
+}
+
+.client-info-section[open] > summary {
+  border-bottom: 1px solid #e5e8ec;
+}
+
+.client-info-section[open] > summary::after {
+  transform: rotate(-135deg);
+}
+
+.client-info-section > .client-account-details {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  padding: 14px;
+}
+
+.client-permission-note {
+  margin: 0 14px 14px;
+  color: #68707b;
+  font-size: 14px;
+  font-weight: 700;
+}
