@@ -1,7 +1,17 @@
 # poksol-site
 
-Site officiel de Poksol (poksol.com) : site statique (HTML, CSS, JS sans build) servi par
-Firebase Hosting, avec Auth Google, Firestore et Storage (projet `restaurantpos-7a4f0d11`).
+Site officiel de Poksol (poksol.com) : site statique (HTML, CSS, JS sans build) hébergé sur
+**GitHub Pages** (domaine personnalisé via `CNAME`). Firebase ne sert que de backend : Auth
+Google, Firestore et Storage (projet `restaurantpos-7a4f0d11`).
+
+## Publication
+
+- **Site** : publié en poussant sur la branche `main` (GitHub Pages sert tout le dépôt).
+  Tout fichier du dépôt est donc public, y compris `firestore.rules` et `README.md` ; ne jamais
+  y mettre de secret. Limites de GitHub : 100 Mo par fichier (l'APK Android approche 96 Mo),
+  1 Go pour le site publié.
+- **Règles Firebase** : déployées à part avec le CLI (voir plus bas). Le bloc `hosting` de
+  `firebase.json` n'est pas utilisé.
 
 ## Structure
 
