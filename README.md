@@ -37,23 +37,36 @@ Google, Firestore et Storage (projet `restaurantpos-7a4f0d11`).
 3. Après avoir modifié `style.css`, `app.js` ou `platform.js`, changer le paramètre `?v=`
    **sur toutes les pages** (une seule valeur partagée, par exemple `20260920-2`).
 
-## Règles de sécurité
+## Règles de sécurité (site ET application)
 
-Les règles se déploient séparément du site :
+Le site et l'application Poket Restaurants partagent le même projet Firebase, donc **le même
+jeu de règles Firestore** : Firestore n'en garde qu'un d'actif, et chaque déploiement remplace
+le précédent. `firestore.rules` est le **fichier unique** ; ne jamais déployer d'autres règles
+Firestore vers ce projet (notamment depuis le projet Flutter, dont `firebase.json` doit
+pointer vers ce fichier ou ne plus déployer de règles).
 
 ```bash
 firebase deploy --only firestore:rules,storage
 ```
 
-Points à connaître avant de déployer :
+Modèle de rôles, identique partout (fonctions `isRestaurantMember`, `isAdmin`,
+`isManagerOrAdmin`) :
 
-- `restaurants/{id}` n'est plus lisible publiquement : les pages publiques lisent
-  `publicRestaurants/{slug}`. Vérifier que chaque restaurant avec une page publique a bien un
-  document `publicRestaurants` (il est créé par le dashboard et par `poket-access`).
-- Les listings `invitations` et `restaurant_invites` sont réservés aux owners/admins ; la
-  lecture par code (identifiant du document) reste ouverte aux utilisateurs connectés.
-- Les écritures Storage exigent d'être owner/admin/manager du restaurant (rôle dans
-  `members/{uid}` ou `ownerUid`). Storage ne peut lire que 2 documents Firestore par requête :
-  les anciennes collections `staff` et `staff_users` ne sont pas prises en compte.
-- Les réservations anonymes doivent avoir le statut `planned` et des champs bornés ; les
-  messages de contact n'acceptent que les champs du formulaire.
+- le rôle vient de la fiche `restaurants/{id}/staff/{uid}` (ou `staff_users`) : `admin`,
+  `manager` ou `staff` ; « owner » = admin ; le créateur du restaurant (`createdBy` ou
+  `ownerUid`) est admin ;
+- **staff** : caisse (commandes, appareils, synchronisation), création et modification des
+  clients et des réservations ; **manager** : en plus catalogue, réglages, suppression de
+  clients ; **admin** : en plus équipe, invitations, profil, page publique, menu QR ;
+- tout ce qui n'est pas listé dans le fichier est refusé (pas de règle « manager écrit partout »).
+
+Pour le site : les pages publiques lisent `publicRestaurants/{slug}` (le document
+`restaurants/{id}` n'est jamais public), les invitations suivent le format de l'application
+(`restaurant_invites`, statut `active`, rôle `admin|manager|staff`) et le rôle pris en
+rejoignant doit être celui de l'invitation.
+
+Les tests (`tests/rules`, Java 21 requis) doivent passer avant tout déploiement :
+
+```bash
+cd tests/rules && npm install && npm test
+```

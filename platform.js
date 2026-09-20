@@ -263,9 +263,11 @@ async function listUserRestaurants(uid) {
   for (const id of ids) {
     const restaurant = await getRestaurant(id);
     if (!restaurant) continue;
-    const memberSnap = await getDoc(doc(services.db, "restaurants", id, "members", uid));
-    const memberRole = memberSnap.exists() ? normalizeRole(memberSnap.data().role) : "";
-    const role = highestRole([restaurant.ownerUid === uid || restaurant.createdBy === uid ? "owner" : "", memberRole]) || "staff";
+    const staffSnap = await getDoc(doc(services.db, "restaurants", id, "staff", uid)).catch(() => null);
+    const staffUserSnap = await getDoc(doc(services.db, "restaurants", id, "staff_users", uid)).catch(() => null);
+    const staffRole = normalizeRole(staffSnap?.exists() ? staffSnap.data().role : "");
+    const staffUserRole = normalizeRole(staffUserSnap?.exists() ? staffUserSnap.data().role : "");
+    const role = highestRole([restaurant.ownerUid === uid || restaurant.createdBy === uid ? "owner" : "", staffRole, staffUserRole]) || "staff";
     restaurants.push({ ...restaurant, role });
   }
   return restaurants;
@@ -300,6 +302,7 @@ async function createRestaurantFromForm(form, user) {
     tradeName: name,
     slug,
     ownerUid: user.uid,
+    createdBy: user.uid,
     logoUrl: "",
     coverUrl: "",
     description: text(data, "description"),
@@ -324,15 +327,19 @@ async function createRestaurantFromForm(form, user) {
   };
 
   await setDoc(restaurantRef, restaurant);
-  await setDoc(doc(services.db, "restaurants", slug, "members", user.uid), {
+  // Meme modele que l'application : une fiche staff « admin » pour le createur.
+  await setDoc(doc(services.db, "restaurants", slug, "staff", user.uid), {
     uid: user.uid,
+    userId: user.uid,
+    restaurantId: slug,
     email: user.email || "",
     displayName: user.displayName || "",
-    role: "owner",
+    role: "admin",
+    active: true,
     status: "active",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
-  }, { merge: true });
+  });
   await setDoc(doc(services.db, "users", user.uid), {
     uid: user.uid,
     displayName: user.displayName || "",
@@ -353,20 +360,9 @@ async function joinRestaurantWithCode(code, user) {
   const normalizedCode = normalizeCode(code);
   if (!normalizedCode) throw new Error("Code invitation obligatoire.");
 
-  let inviteRef = doc(services.db, "invitations", normalizedCode);
-  let inviteSnap = await getDoc(inviteRef);
-  if (!inviteSnap.exists()) {
-    const topLevel = await getDocs(query(collection(services.db, "invitations"), where("code", "==", normalizedCode), limit(1))).catch(() => null);
-    if (topLevel && !topLevel.empty) {
-      inviteSnap = topLevel.docs[0];
-      inviteRef = inviteSnap.ref;
-    }
-  }
-  if (!inviteSnap.exists()) {
-    inviteRef = doc(services.db, "restaurant_invites", normalizedCode);
-    inviteSnap = await getDoc(inviteRef);
-  }
-  if (!inviteSnap.exists()) throw new Error("Invitation introuvable.");
+  const inviteRef = doc(services.db, "restaurant_invites", normalizedCode);
+  const inviteSnap = await getDoc(inviteRef).catch(() => null);
+  if (!inviteSnap?.exists()) throw new Error("Invitation introuvable ou expiree.");
 
   const invite = inviteSnap.data();
   if (["revoked", "expired"].includes(invite.status) || invite.active === false) {
@@ -382,6 +378,7 @@ async function joinRestaurantWithCode(code, user) {
   if (!restaurantId) throw new Error("Invitation incomplete : restaurant manquant.");
 
   const role = invite.role || "staff";
+  if (!["admin", "manager", "staff"].includes(role)) throw new Error("Invitation invalide : role non autorise.");
   const staffPayload = {
     uid: user.uid,
     userId: user.uid,
@@ -396,20 +393,13 @@ async function joinRestaurantWithCode(code, user) {
     updatedAt: serverTimestamp()
   };
   await setDoc(doc(services.db, "restaurants", restaurantId, "staff", user.uid), staffPayload, { merge: true });
-  await setDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid), {
-    uid: user.uid,
-    email: user.email || "",
-    displayName: user.displayName || "",
-    role,
-    status: "active",
-    inviteCode: normalizedCode,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-  await setDoc(doc(services.db, "restaurants", restaurantId, "staff_users", user.uid), {
-    ...staffPayload,
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
+  // L'ancienne fiche staff_users n'existe que pour le role staff (regle de l'application).
+  if (role === "staff") {
+    await setDoc(doc(services.db, "restaurants", restaurantId, "staff_users", user.uid), {
+      ...staffPayload,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  }
   await setDoc(doc(services.db, "users", user.uid), {
     uid: user.uid,
     email: user.email || "",
@@ -893,13 +883,12 @@ async function updateReservationStatus(restaurantId, reservationId, status) {
 async function listMembers(restaurantId) {
   const services = await getServices();
   const { collection, getDocs } = services.firestoreModule;
-  const [membersSnap, staffSnap, staffUsersSnap] = await Promise.all([
-    getDocs(collection(services.db, "restaurants", restaurantId, "members")).catch(() => null),
+  const [staffSnap, staffUsersSnap] = await Promise.all([
     getDocs(collection(services.db, "restaurants", restaurantId, "staff")).catch(() => null),
     getDocs(collection(services.db, "restaurants", restaurantId, "staff_users")).catch(() => null)
   ]);
   const byUid = new Map();
-  [membersSnap, staffSnap, staffUsersSnap].forEach((snap) => {
+  [staffSnap, staffUsersSnap].forEach((snap) => {
     snap?.docs.forEach((docSnap) => {
       const data = { id: docSnap.id, ...docSnap.data() };
       const uid = data.uid || data.userId || docSnap.id;
@@ -921,19 +910,21 @@ async function createInvitation(restaurantId, form, user) {
   const { doc, serverTimestamp, setDoc } = services.firestoreModule;
   const data = new FormData(form);
   const code = normalizeCode(text(data, "code") || `${restaurantId}-${Math.random().toString(36).slice(2, 8)}`);
+  const requestedRole = text(data, "role");
   const invite = {
-    restaurantId,
-    email: text(data, "email"),
-    role: text(data, "role") || "staff",
+    inviteCode: code,
     code,
-    createdByUid: user.uid,
-    status: "pending",
+    restaurantId,
+    email: text(data, "email").toLowerCase(),
+    role: ["admin", "manager", "staff"].includes(requestedRole) ? requestedRole : "staff",
+    status: "active",
     active: true,
+    createdBy: user.uid,
+    createdByUid: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
-  await setDoc(doc(services.db, "invitations", code), invite);
-  await setDoc(doc(services.db, "restaurant_invites", code), invite, { merge: true });
+  await setDoc(doc(services.db, "restaurant_invites", code), invite);
   return code;
 }
 
@@ -1498,28 +1489,17 @@ function setAutosaveStatus(status, label, state) {
 
 async function resolveRestaurantRole(restaurant, user) {
   if (!restaurant || !user) return "staff";
+  // Meme calcul que firestore.rules : le createur est admin (affiche « Owner »),
+  // sinon le role le plus eleve des fiches staff / staff_users.
+  if (restaurant.ownerUid === user.uid || restaurant.createdBy === user.uid) return "owner";
   const services = await getServices();
-  const { doc, getDoc, serverTimestamp, setDoc } = services.firestoreModule;
+  const { doc, getDoc } = services.firestoreModule;
   const restaurantId = restaurant.id;
-  const ownerLike = restaurant.ownerUid === user.uid || restaurant.createdBy === user.uid;
-  if (ownerLike) {
-    await setDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid), {
-      uid: user.uid,
-      email: user.email || "",
-      displayName: user.displayName || "",
-      role: "owner",
-      status: "active",
-      updatedAt: serverTimestamp()
-    }, { merge: true }).catch(() => {});
-    return "owner";
-  }
-  const memberSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "members", user.uid)).catch(() => null);
-  const memberRole = memberSnap?.exists() ? normalizeRole(memberSnap.data().role) : "";
   const staffSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "staff", user.uid)).catch(() => null);
   const staffRole = staffSnap?.exists() ? normalizeRole(staffSnap.data().role) : "";
   const staffUserSnap = await getDoc(doc(services.db, "restaurants", restaurantId, "staff_users", user.uid)).catch(() => null);
   const staffUserRole = staffUserSnap?.exists() ? normalizeRole(staffUserSnap.data().role) : "";
-  return highestRole([memberRole, staffRole, staffUserRole]) || "staff";
+  return highestRole([staffRole, staffUserRole]) || "staff";
 }
 
 function initPublicRestaurantPage() {
@@ -2085,7 +2065,7 @@ function restaurantChooserHtml(restaurants, message = "") {
 }
 
 function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null) {
-  const canEditProfile = ["owner", "admin", "manager"].includes(role);
+  const canEditProfile = ["owner", "admin"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
   return `

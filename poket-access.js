@@ -301,6 +301,7 @@ async function saveProfile({ final }) {
       };
       if (!isExisting) {
         restaurantPayload.ownerUid = currentUser.uid;
+        restaurantPayload.createdBy = currentUser.uid;
         restaurantPayload.createdAt = serverTimestamp();
         restaurantPayload.status = "active";
       }
@@ -329,22 +330,24 @@ async function saveProfile({ final }) {
         },
         { merge: true }
       );
-      const memberPayload = {
-        uid: currentUser.uid,
-        email: currentUser.email || "",
-        displayName: currentUser.displayName || "",
-        status: "active",
-        updatedAt: serverTimestamp()
-      };
       if (!isExisting) {
-        memberPayload.role = "owner";
-        memberPayload.createdAt = serverTimestamp();
+        // Meme modele que l'application : une fiche staff « admin » pour le createur.
+        await setDoc(
+          doc(firebaseServices.db, "restaurants", restaurantId, "staff", currentUser.uid),
+          {
+            uid: currentUser.uid,
+            userId: currentUser.uid,
+            restaurantId,
+            email: currentUser.email || "",
+            displayName: currentUser.displayName || "",
+            role: "admin",
+            active: true,
+            status: "active",
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          }
+        );
       }
-      await setDoc(
-        doc(firebaseServices.db, "restaurants", restaurantId, "members", currentUser.uid),
-        memberPayload,
-        { merge: true }
-      );
       await syncPublicRestaurantProfile(restaurantId, restaurantPayload).catch(() => {});
       restaurantContext = {
         restaurantId,
@@ -620,13 +623,9 @@ async function acceptInviteCode(inviteCode) {
       arrayUnion
     } = firebaseServices.firestoreModule;
 
-    let inviteRef = doc(firebaseServices.db, INVITE_COLLECTION, code);
-    let inviteSnapshot = await getDoc(inviteRef);
-    if (!inviteSnapshot.exists()) {
-      inviteRef = doc(firebaseServices.db, "invitations", code);
-      inviteSnapshot = await getDoc(inviteRef);
-    }
-    if (!inviteSnapshot.exists()) {
+    const inviteRef = doc(firebaseServices.db, INVITE_COLLECTION, code);
+    const inviteSnapshot = await getDoc(inviteRef).catch(() => null);
+    if (!inviteSnapshot?.exists()) {
       inviteStatus.textContent = "Invitation introuvable ou expiree.";
       return false;
     }
@@ -639,6 +638,10 @@ async function acceptInviteCode(inviteCode) {
     }
 
     const role = invite.role || "staff";
+    if (!["admin", "manager", "staff"].includes(role)) {
+      inviteStatus.textContent = "Invitation invalide : role non autorise.";
+      return false;
+    }
     const restaurantId = normalizeRestaurantId(invite.restaurantId);
 
     const staffPayload = {
@@ -662,20 +665,6 @@ async function acceptInviteCode(inviteCode) {
       staffPayload,
       { merge: true }
     );
-    await setDoc(
-      doc(firebaseServices.db, "restaurants", restaurantId, "members", currentUser.uid),
-      {
-        uid: currentUser.uid,
-        email: currentUser.email || "",
-        displayName: currentUser.displayName || invite.displayName || "",
-        role,
-        status: "active",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      },
-      { merge: true }
-    );
-
     if (role === "staff") {
       await setDoc(
         doc(firebaseServices.db, "restaurants", restaurantId, "staff_users", currentUser.uid),

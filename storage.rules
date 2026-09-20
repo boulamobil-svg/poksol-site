@@ -11,44 +11,49 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
-    // Storage ne peut consulter que 2 documents Firestore par requete :
-    // members/{uid} et restaurants/{id}. Les anciennes collections staff et
-    // staff_users ne sont donc pas prises en compte ici.
-    function isRestaurantManager(restaurantId) {
+    // Memes roles que firestore.rules (fiche staff ou createur du restaurant).
+    // Storage ne peut consulter que 2 documents Firestore par requete : la fiche
+    // restaurants/{id}/staff/{uid} et le document restaurant. L'ancienne
+    // collection staff_users n'est donc pas prise en compte ici.
+    function isRestaurantCreator(restaurantId) {
+      return firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId))
+        && (
+          firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)).data.get('createdBy', '') == request.auth.uid
+          || firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)).data.get('ownerUid', '') == request.auth.uid
+        );
+    }
+
+    function hasStaffRole(restaurantId, roles) {
       return signedIn()
         && (
           (
-            firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId)/members/$(request.auth.uid))
-            && firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)/members/$(request.auth.uid)).data.status == "active"
-            && firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)/members/$(request.auth.uid)).data.role in ["owner", "admin", "manager"]
+            firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId)/staff/$(request.auth.uid))
+            && firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)/staff/$(request.auth.uid)).data.get('active', true) != false
+            && firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)/staff/$(request.auth.uid)).data.role in roles
           )
-          || (
-            firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId))
-            && firestore.get(/databases/(default)/documents/restaurants/$(restaurantId)).data.ownerUid == request.auth.uid
-          )
+          || isRestaurantCreator(restaurantId)
         );
     }
 
     // A la creation d'un restaurant, le logo est envoye avant que le document
-    // Firestore n'existe : on autorise donc l'ecriture tant que l'identifiant
-    // n'est pas encore attribue. Des que le restaurant existe, seule son
-    // equipe de gestion peut modifier ses images.
-    function canWriteRestaurantImage(restaurantId) {
+    // Firestore n'existe : ecriture autorisee tant que l'identifiant est libre.
+    function restaurantNotCreatedYet(restaurantId) {
       return signedIn()
-        && (
-          !firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId))
-          || isRestaurantManager(restaurantId)
-        );
+        && !firestore.exists(/databases/(default)/documents/restaurants/$(restaurantId));
     }
 
+    // Logo et couverture = profil du restaurant : administrateurs.
     match /restaurants/{restaurantId}/branding/{fileName} {
       allow read: if true;
-      allow write: if canWriteRestaurantImage(restaurantId) && validImage();
+      allow write: if (restaurantNotCreatedYet(restaurantId) || hasStaffRole(restaurantId, ['admin', 'owner']))
+        && validImage();
     }
 
+    // Photos du catalogue : manager et administrateurs, comme catalog_categories.
     match /restaurants/{restaurantId}/catalog/{categoryId}/{fileName} {
       allow read: if true;
-      allow write: if canWriteRestaurantImage(restaurantId) && validImage();
+      allow write: if (restaurantNotCreatedYet(restaurantId) || hasStaffRole(restaurantId, ['admin', 'owner', 'manager']))
+        && validImage();
     }
   }
 }
