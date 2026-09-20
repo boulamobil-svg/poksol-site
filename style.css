@@ -1417,7 +1417,7 @@ select:focus-visible {
 
 .client-tools {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(160px, 0.8fr) auto auto auto;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(160px, 0.8fr) auto auto minmax(110px, 0.45fr) auto;
   gap: 12px;
   align-items: end;
   padding: 16px;
@@ -1448,6 +1448,28 @@ select:focus-visible {
   color: var(--text-muted);
   font-weight: 900;
   white-space: nowrap;
+}
+
+.client-empty-results,
+.client-pagination {
+  padding: 14px 16px;
+  border: 1px dashed #b9d6f7;
+  border-radius: 14px;
+  background: #fbfdff;
+  color: var(--text-muted);
+  font-weight: 900;
+}
+
+.client-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  border-style: solid;
+}
+
+.client-pagination span {
+  color: var(--poksol-navy);
 }
 
 .overview-general-info {
@@ -1693,18 +1715,84 @@ select:focus-visible {
   padding: 0 14px 14px;
 }
 
-.client-edit-form,
+.client-edit-panel,
 .client-account-side {
-  padding: 16px;
   border: 1px solid #d3e5ff;
   border-radius: 14px;
   background: #fbfdff;
 }
 
-.client-edit-form h3,
 .client-account-side h3 {
   margin: 0 0 14px;
   color: var(--poksol-navy);
+}
+
+.client-edit-panel {
+  overflow: hidden;
+}
+
+.client-edit-panel > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  color: var(--poksol-navy);
+  cursor: pointer;
+  font-weight: 900;
+  list-style: none;
+}
+
+.client-edit-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-edit-panel > summary strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--poksol-blue);
+  font-size: 14px;
+}
+
+.client-edit-panel > summary strong::after {
+  content: "+";
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--poksol-blue);
+  line-height: 1;
+}
+
+.client-edit-panel[open] > summary {
+  border-bottom: 1px solid #d3e5ff;
+}
+
+.client-edit-panel[open] > summary strong {
+  font-size: 0;
+}
+
+.client-edit-panel[open] > summary strong::before {
+  content: "Refermer";
+  font-size: 14px;
+}
+
+.client-edit-panel[open] > summary strong::after {
+  content: "-";
+  font-size: 16px;
+}
+
+.client-edit-form,
+.client-account-side {
+  padding: 16px;
+}
+
+[data-customer-type="individual"] [data-customer-field="company"],
+[data-customer-type="company"] [data-customer-field="individual"] {
+  display: none;
 }
 
 .client-account-side {
@@ -1747,6 +1835,29 @@ select:focus-visible {
 .client-actions form {
   display: grid;
   gap: 6px;
+}
+
+.client-delete-confirm {
+  display: none;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #ffd0ca;
+  border-radius: 12px;
+  background: #fff5f3;
+}
+
+.client-delete-confirm span {
+  color: #a5281b;
+  font-weight: 900;
+}
+
+.client-actions form.is-confirming > .danger-action[data-client-delete-arm] {
+  display: none;
+}
+
+.client-actions form.is-confirming .client-delete-confirm {
+  display: grid;
 }
 
 .danger-action {

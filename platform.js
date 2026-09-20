@@ -1037,6 +1037,23 @@ function initDashboardPage() {
       event.preventDefault();
       resetClientTools(root);
     }
+    const clientPage = event.target.closest("[data-client-page]");
+    if (clientPage) {
+      event.preventDefault();
+      changeClientPage(root, Number(clientPage.dataset.clientPage || 0));
+    }
+    const deleteArm = event.target.closest("[data-client-delete-arm]");
+    if (deleteArm) {
+      event.preventDefault();
+      const form = deleteArm.closest("[data-dashboard-customer-delete-form]");
+      form?.classList.add("is-confirming");
+    }
+    const deleteCancel = event.target.closest("[data-client-delete-cancel]");
+    if (deleteCancel) {
+      event.preventDefault();
+      const form = deleteCancel.closest("[data-dashboard-customer-delete-form]");
+      form?.classList.remove("is-confirming");
+    }
     const categoryMove = event.target.closest("[data-category-move]");
     if (categoryMove) {
       event.preventDefault();
@@ -1072,11 +1089,6 @@ function initDashboardPage() {
         await setCustomerAccountActive(restaurantId, form.dataset.customerId, nextActive, form.dataset.customerCollection);
       }
       if (form.matches("[data-dashboard-customer-delete-form]")) {
-        const name = form.dataset.customerName || "ce client";
-        if (!window.confirm(`Supprimer ${name} ? Cette action est definitive.`)) {
-          status.textContent = "";
-          return;
-        }
         await deleteCustomerAccount(restaurantId, form.dataset.customerId, form.dataset.customerCollection);
       }
       if (form.matches("[data-dashboard-invite-form]")) {
@@ -1114,7 +1126,17 @@ function initDashboardPage() {
       return;
     }
     if (event.target.matches("[data-client-filter], [data-client-sort]")) {
+      setClientPage(root, 1);
       applyClientTools(root);
+      return;
+    }
+    if (event.target.matches("[data-client-page-size]")) {
+      setClientPage(root, 1);
+      applyClientTools(root);
+      return;
+    }
+    if (event.target.matches("[data-customer-type-select]")) {
+      updateCustomerTypeScope(event.target);
       return;
     }
     if (!event.target.matches("[data-reservation-status]")) return;
@@ -1127,7 +1149,10 @@ function initDashboardPage() {
     if (event.target.matches("[data-catalog-image-url]")) previewCatalogImageUrl(event.target);
     if (event.target.matches("[data-catalog-autosave], [data-catalog-image-url]")) autoSaveCatalogField(root, event.target);
     if (event.target.matches("[data-color-input]")) updateColorPreview(event.target);
-    if (event.target.matches("[data-client-search]")) applyClientTools(root);
+    if (event.target.matches("[data-client-search]")) {
+      setClientPage(root, 1);
+      applyClientTools(root);
+    }
   });
   root.addEventListener("pointerdown", (event) => {
     const handle = event.target.closest("[data-category-drag-handle]");
@@ -1205,6 +1230,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
   root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab);
+  applyClientTools(root);
 }
 
 async function autoSaveCatalogField(root, field, options = {}) {
@@ -1895,7 +1921,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       <section class="dashboard-panel ${activeTab === "public" ? "is-active" : ""}" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "menu" ? "is-active" : ""}" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
-      <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers)}</section>
+      <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations)}</section>
       <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
       <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -2257,9 +2283,10 @@ function setCatalogImagePreview(preview, src, alt, onLoad = null) {
   if (onLoad) preview.querySelector("img")?.addEventListener("load", onLoad, { once: true });
 }
 
-function clientsHtml(customerAccounts = {}) {
+function clientsHtml(customerAccounts = {}, reservations = []) {
   const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
   const readErrors = Array.isArray(customerAccounts.errors) ? customerAccounts.errors : [];
+  const normalizedReservations = Array.isArray(reservations) ? reservations : [];
   const clients = customers.map(normalizeCustomerAccount).sort((a, b) => {
     const dateDiff = clientTimeValue(b.updatedAt || b.createdAt) - clientTimeValue(a.updatedAt || a.createdAt);
     if (dateDiff) return dateDiff;
@@ -2291,7 +2318,7 @@ function clientsHtml(customerAccounts = {}) {
           <span>Ajouter un client</span>
           <strong>Ouvrir</strong>
         </summary>
-        <form class="platform-form customer-account-form" data-dashboard-customer-form>
+        <form class="platform-form customer-account-form" data-dashboard-customer-form data-customer-type-scope data-customer-type="individual">
           ${customerFieldsHtml()}
           <button class="primary-btn button-reset" type="submit">Ajouter un compte client</button>
           <small data-form-status></small>
@@ -2330,7 +2357,14 @@ function clientsHtml(customerAccounts = {}) {
             </select>
           </label>
           <button class="outline-dark-btn button-reset" type="button" data-client-export>Exporter CSV</button>
-          <button class="ghost-action button-reset" type="button" data-client-reset>Reinitialiser</button>
+          <button class="ghost-action button-reset is-hidden" type="button" data-client-reset>Reinitialiser</button>
+          <label>Par page
+            <select data-client-page-size>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
           <span data-client-result-count>${clients.length} client${clients.length > 1 ? "s" : ""}</span>
         </div>
         <div class="responsive-table clients-table">
@@ -2342,14 +2376,20 @@ function clientsHtml(customerAccounts = {}) {
             <span>Mis a jour</span>
             <span>Compte</span>
           </div>
-          ${clients.map(clientCardHtml).join("")}
+          ${clients.map((client) => clientCardHtml(client, normalizedReservations)).join("")}
+        </div>
+        <div class="client-empty-results is-hidden" data-client-empty-results>Aucun client ne correspond a cette recherche.</div>
+        <div class="client-pagination ${clients.length <= 25 ? "is-hidden" : ""}" data-client-pagination>
+          <button class="outline-dark-btn button-reset" type="button" data-client-page="-1">Precedent</button>
+          <span data-client-page-label>Page 1</span>
+          <button class="outline-dark-btn button-reset" type="button" data-client-page="1">Suivant</button>
         </div>
       ` : `<div class="empty-state">Aucun compte client pour le moment.</div>`}
     </div>
   `;
 }
 
-function clientCardHtml(client) {
+function clientCardHtml(client, reservations = []) {
   const contactLines = [
     client.phone ? `Tel. ${client.phone}` : "",
     client.email || ""
@@ -2375,8 +2415,10 @@ function clientCardHtml(client) {
     client.notes
   ].join(" ");
   const updatedTime = clientTimeValue(client.updatedAt || client.createdAt);
+  const createdTime = clientTimeValue(client.createdAt);
   const statusLabel = client.active === false ? "Inactif" : "Actif";
   const collectionName = customerCollectionName(client.customerCollection);
+  const metrics = clientAccountMetrics(client, reservations);
   return `
     <details class="customer-account-card"
       data-client-card
@@ -2386,6 +2428,9 @@ function clientCardHtml(client) {
       data-client-has-phone="${client.phone ? "true" : "false"}"
       data-client-has-email="${client.email ? "true" : "false"}"
       data-client-updated="${String(updatedTime)}"
+      data-client-created="${String(createdTime)}"
+      data-client-reservations="${String(metrics.reservationCount)}"
+      data-client-last-visit="${escapeAttr(metrics.lastVisitLabel)}"
       data-client-search-text="${escapeAttr(normalizeClientSearch(searchText))}">
       <summary class="table-row client-row">
         <span>
@@ -2411,22 +2456,28 @@ function clientCardHtml(client) {
         ${reservationDetailItemHtml("Tax ID", client.taxId)}
         ${reservationDetailItemHtml("TVA", client.vatNumber)}
         ${reservationDetailItemHtml("Notes", client.notes)}
+        ${reservationDetailItemHtml("Date creation", clientDateLabel(client.createdAt))}
       </div>
       <div class="client-management-grid">
-        <form class="platform-form client-edit-form" data-dashboard-customer-update-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}">
-          <h3>Modifier le client</h3>
-          ${customerFieldsHtml(client)}
-          <button class="primary-btn button-reset" type="submit">Enregistrer le client</button>
-          <small data-form-status></small>
-        </form>
+        <details class="client-edit-panel">
+          <summary>
+            <span>Modifier le client</span>
+            <strong>Ouvrir</strong>
+          </summary>
+          <form class="platform-form client-edit-form" data-dashboard-customer-update-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-type-scope data-customer-type="${escapeAttr(client.type === "company" ? "company" : "individual")}">
+            ${customerFieldsHtml(client)}
+            <button class="primary-btn button-reset" type="submit">Enregistrer le client</button>
+            <small data-form-status></small>
+          </form>
+        </details>
         <aside class="client-account-side">
           <div>
             <h3>Compte</h3>
             <dl>
-              <div><dt>Solde</dt><dd>A connecter</dd></div>
-              <div><dt>Tickets</dt><dd>A connecter</dd></div>
-              <div><dt>Reservations</dt><dd>A connecter</dd></div>
-              <div><dt>Dernier passage</dt><dd>A connecter</dd></div>
+              <div><dt>Solde</dt><dd>Non disponible</dd></div>
+              <div><dt>Tickets</dt><dd>Non disponible</dd></div>
+              <div><dt>Reservations</dt><dd>${escapeHtml(metrics.reservationCount ? String(metrics.reservationCount) : "0")}</dd></div>
+              <div><dt>Dernier passage</dt><dd>${escapeHtml(metrics.lastVisitLabel || "Non disponible")}</dd></div>
             </dl>
           </div>
           <div class="client-actions">
@@ -2435,7 +2486,12 @@ function clientCardHtml(client) {
               <small data-form-status></small>
             </form>
             <form data-dashboard-customer-delete-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-name="${escapeAttr(identity[0])}">
-              <button class="ghost-action button-reset danger-action" type="submit">Supprimer</button>
+              <button class="ghost-action button-reset danger-action" type="button" data-client-delete-arm>Supprimer</button>
+              <div class="client-delete-confirm">
+                <span>Suppression definitive</span>
+                <button class="ghost-action button-reset" type="button" data-client-delete-cancel>Annuler</button>
+                <button class="ghost-action button-reset danger-action" type="submit">Confirmer</button>
+              </div>
               <small data-form-status></small>
             </form>
           </div>
@@ -2450,21 +2506,21 @@ function customerFieldsHtml(client = {}) {
   return `
     <div class="form-grid">
       <label>Type
-        <select name="type">
+        <select name="type" data-customer-type-select>
           <option value="individual" ${type !== "company" ? "selected" : ""}>Particulier</option>
           <option value="company" ${type === "company" ? "selected" : ""}>Societe</option>
         </select>
       </label>
       <label>Nom affichage<input name="displayName" placeholder="Nom du client" value="${escapeAttr(client.displayName)}" /></label>
-      <label>Prenom<input name="firstName" value="${escapeAttr(client.firstName)}" /></label>
-      <label>Nom<input name="lastName" value="${escapeAttr(client.lastName)}" /></label>
-      <label>Societe<input name="companyName" value="${escapeAttr(client.companyName)}" /></label>
-      <label>Contact<input name="contactName" value="${escapeAttr(client.contactName)}" /></label>
+      <label data-customer-field="individual">Prenom<input name="firstName" value="${escapeAttr(client.firstName)}" /></label>
+      <label data-customer-field="individual">Nom<input name="lastName" value="${escapeAttr(client.lastName)}" /></label>
+      <label data-customer-field="company">Societe<input name="companyName" value="${escapeAttr(client.companyName)}" /></label>
+      <label data-customer-field="company">Contact<input name="contactName" value="${escapeAttr(client.contactName)}" /></label>
       <label>Telephone<input name="phone" value="${escapeAttr(client.phone)}" /></label>
       <label>Email<input name="email" type="email" value="${escapeAttr(client.email)}" /></label>
       <label class="wide-field">Adresse<input name="address" value="${escapeAttr(client.address)}" /></label>
-      <label>Tax ID<input name="taxId" value="${escapeAttr(client.taxId)}" /></label>
-      <label>TVA<input name="vatNumber" value="${escapeAttr(client.vatNumber)}" /></label>
+      <label data-customer-field="company">Tax ID<input name="taxId" value="${escapeAttr(client.taxId)}" /></label>
+      <label data-customer-field="company">TVA<input name="vatNumber" value="${escapeAttr(client.vatNumber)}" /></label>
       <label class="wide-field">Notes<textarea name="notes" rows="3">${escapeHtml(client.notes)}</textarea></label>
     </div>
   `;
@@ -2488,6 +2544,66 @@ function clientDuplicateWarnings(clients) {
   return [...groups.values()]
     .filter((group) => group.names.length > 1)
     .map((group) => `${group.label} ${group.value} partage par ${group.names.join(", ")}`);
+}
+
+function clientAccountMetrics(client, reservations = []) {
+  const matches = reservations.filter((reservation) => reservationMatchesClient(reservation, client));
+  const lastDate = matches
+    .map((reservation) => dateFromFirestoreValue(
+      reservation.reservedAt ||
+      reservation.reservationAt ||
+      reservation.dateTime ||
+      reservation.startAt ||
+      reservation.createdFor ||
+      reservation.createdAt ||
+      reservation.updatedAt
+    ))
+    .filter(Boolean)
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  return {
+    reservationCount: matches.length,
+    lastVisitLabel: lastDate ? clientDateLabel(lastDate) : ""
+  };
+}
+
+function reservationMatchesClient(reservation = {}, client = {}) {
+  const reservationPhone = normalizeClientPhone(firstText(
+    reservation.customerPhone,
+    reservation.phone,
+    reservation.telephone,
+    reservation.mobile,
+    reservation.contactPhone,
+    reservation.customer?.phone,
+    reservation.contact?.phone
+  ));
+  const reservationEmail = normalizeClientSearch(firstText(
+    reservation.customerEmail,
+    reservation.email,
+    reservation.contactEmail,
+    reservation.customer?.email,
+    reservation.contact?.email
+  ));
+  const reservationName = normalizeClientSearch(firstText(
+    reservation.customerName,
+    reservation.name,
+    reservation.clientName,
+    reservation.customer?.name,
+    reservation.customer?.displayName,
+    reservation.contact?.name
+  ));
+  const clientPhone = normalizeClientPhone(client.phone);
+  const clientEmail = normalizeClientSearch(client.email);
+  const clientNames = [
+    client.displayName,
+    [client.firstName, client.lastName].filter(Boolean).join(" "),
+    client.companyName,
+    client.contactName
+  ].map(normalizeClientSearch).filter(Boolean);
+  return !!(
+    clientPhone && reservationPhone && clientPhone === reservationPhone ||
+    clientEmail && reservationEmail && clientEmail === reservationEmail ||
+    reservationName && clientNames.includes(reservationName)
+  );
 }
 
 function normalizeCustomerAccount(customer = {}) {
@@ -2541,6 +2657,10 @@ function normalizeClientSearch(value = "") {
     .trim();
 }
 
+function normalizeClientPhone(value = "") {
+  return String(value || "").replace(/\D/g, "");
+}
+
 function applyClientTools(root) {
   const tools = root.querySelector("[data-client-tools]");
   const table = root.querySelector(".clients-table");
@@ -2548,19 +2668,40 @@ function applyClientTools(root) {
   const query = normalizeClientSearch(tools.querySelector("[data-client-search]")?.value || "");
   const filter = tools.querySelector("[data-client-filter]")?.value || "all";
   const sort = tools.querySelector("[data-client-sort]")?.value || "updated-desc";
+  const pageSize = Number(tools.querySelector("[data-client-page-size]")?.value || 25);
+  const currentPage = clientCurrentPage(root);
   const cards = [...table.querySelectorAll("[data-client-card]")];
   const sortedCards = cards.sort((a, b) => compareClientCards(a, b, sort));
   sortedCards.forEach((card) => table.appendChild(card));
-  let visibleCount = 0;
-  sortedCards.forEach((card) => {
+  const filteredCards = sortedCards.filter((card) => {
     const matchesQuery = !query || card.dataset.clientSearchText.includes(query);
     const matchesFilter = clientCardMatchesFilter(card, filter);
-    const isVisible = matchesQuery && matchesFilter;
+    return matchesQuery && matchesFilter;
+  });
+  const pageCount = Math.max(1, Math.ceil(filteredCards.length / pageSize));
+  const page = Math.min(currentPage, pageCount);
+  setClientPage(root, page);
+  const pageStart = (page - 1) * pageSize;
+  const pageEnd = pageStart + pageSize;
+  sortedCards.forEach((card) => {
+    const isVisible = filteredCards.includes(card) && filteredCards.indexOf(card) >= pageStart && filteredCards.indexOf(card) < pageEnd;
     card.classList.toggle("is-hidden", !isVisible);
-    if (isVisible) visibleCount += 1;
   });
   const count = tools.querySelector("[data-client-result-count]");
-  if (count) count.textContent = `${visibleCount} client${visibleCount > 1 ? "s" : ""}`;
+  if (count) count.textContent = `${filteredCards.length} client${filteredCards.length > 1 ? "s" : ""}`;
+  root.querySelector("[data-client-empty-results]")?.classList.toggle("is-hidden", filteredCards.length !== 0);
+  const reset = tools.querySelector("[data-client-reset]");
+  const hasTools = !!query || filter !== "all" || sort !== "updated-desc";
+  reset?.classList.toggle("is-hidden", !hasTools);
+  const pagination = root.querySelector("[data-client-pagination]");
+  if (pagination) {
+    pagination.classList.toggle("is-hidden", filteredCards.length <= pageSize);
+    pagination.querySelector("[data-client-page-label]").textContent = `Page ${page} / ${pageCount}`;
+    const prev = pagination.querySelector('[data-client-page="-1"]');
+    const next = pagination.querySelector('[data-client-page="1"]');
+    if (prev) prev.disabled = page <= 1;
+    if (next) next.disabled = page >= pageCount;
+  }
 }
 
 function compareClientCards(a, b, sort) {
@@ -2590,19 +2731,39 @@ function resetClientTools(root) {
   if (search) search.value = "";
   if (filter) filter.value = "all";
   if (sort) sort.value = "updated-desc";
+  setClientPage(root, 1);
   applyClientTools(root);
+}
+
+function clientCurrentPage(root) {
+  return Math.max(1, Number(root.dataset.clientPage || 1));
+}
+
+function setClientPage(root, page) {
+  root.dataset.clientPage = String(Math.max(1, Number(page) || 1));
+}
+
+function changeClientPage(root, delta) {
+  setClientPage(root, clientCurrentPage(root) + delta);
+  applyClientTools(root);
+}
+
+function updateCustomerTypeScope(select) {
+  const scope = select.closest("[data-customer-type-scope]");
+  if (!scope) return;
+  scope.dataset.customerType = select.value === "company" ? "company" : "individual";
 }
 
 function exportVisibleCustomers(root) {
   const cards = [...root.querySelectorAll("[data-client-card]")].filter((card) => !card.classList.contains("is-hidden"));
   const rows = cards.map(customerCsvRow);
-  const headers = ["Client", "Contact", "Adresse", "Statut", "Mis a jour", "ID compte", "Type", "Telephone", "Email", "Notes"];
+  const headers = ["Type", "Nom affichage", "Prenom", "Nom", "Societe", "Contact", "Telephone", "Email", "Adresse", "Tax ID", "TVA", "Statut", "Date creation", "Mis a jour", "Reservations", "Dernier passage", "Notes", "ID compte"];
   const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `clients-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `clients-restaurant-${new Date().toISOString().slice(0, 10)}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -2615,16 +2776,24 @@ function customerCsvRow(card) {
     return [label, value === "-" ? "" : value];
   }));
   return [
-    summaryCells[0] || "",
-    summaryCells[1] || "",
-    summaryCells[2] || "",
-    summaryCells[3] || "",
-    summaryCells[4] || "",
-    detailMap.get("ID compte") || "",
     detailMap.get("Type") || "",
+    summaryCells[0] || "",
+    detailMap.get("Prenom") || "",
+    detailMap.get("Nom") || "",
+    detailMap.get("Societe") || "",
+    detailMap.get("Contact") || "",
     detailMap.get("Telephone") || "",
     detailMap.get("Email") || "",
-    detailMap.get("Notes") || ""
+    detailMap.get("Adresse") || "",
+    detailMap.get("Tax ID") || "",
+    detailMap.get("TVA") || "",
+    summaryCells[3] || "",
+    detailMap.get("Date creation") || "",
+    summaryCells[4] || "",
+    card.dataset.clientReservations || "",
+    card.dataset.clientLastVisit || "",
+    detailMap.get("Notes") || "",
+    detailMap.get("ID compte") || ""
   ];
 }
 
