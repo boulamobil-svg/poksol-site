@@ -239,20 +239,6 @@ async function createRestaurantFromForm(form, user) {
     qrMenuEnabled: false,
     reservationEnabled: true,
     openingHours: defaultOpeningHours(),
-    restaurantProfile: {
-      name,
-      tradeName: name,
-      restaurantId: slug,
-      slug,
-      description: text(data, "description"),
-      cuisineType: text(data, "cuisineType"),
-      addressLine1: text(data, "address"),
-      postalCode: text(data, "postalCode"),
-      city: text(data, "city"),
-      country: text(data, "country") || "France",
-      phone: text(data, "phone"),
-      email: text(data, "email") || user.email || ""
-    },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
@@ -336,6 +322,7 @@ async function joinRestaurantWithCode(code, user) {
     displayName: user.displayName || "",
     role,
     status: "active",
+    inviteCode: normalizedCode,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true });
@@ -384,6 +371,11 @@ async function saveRestaurantProfile(restaurantId, form) {
   const coverFile = form.querySelector('[name="coverFile"]')?.files?.[0];
   const logoUrl = logoFile ? await uploadRestaurantImage(restaurantId, logoFile, "logo") : text(data, "logoUrl") || existing?.logoUrl || "";
   const coverUrl = coverFile ? await uploadRestaurantImage(restaurantId, coverFile, "cover") : text(data, "coverUrl") || existing?.coverUrl || "";
+  const addressLine1 = text(data, "address");
+  const postalCode = text(data, "postalCode");
+  const city = text(data, "city");
+  const country = text(data, "country");
+  const address = fullAddress(addressLine1, postalCode, city, country);
   const payload = {
     name: text(data, "name"),
     tradeName: text(data, "name"),
@@ -391,11 +383,12 @@ async function saveRestaurantProfile(restaurantId, form) {
     coverUrl,
     description: text(data, "description"),
     cuisineType: text(data, "cuisineType"),
-    address: text(data, "address"),
-    addressLine1: text(data, "address"),
-    city: text(data, "city"),
-    postalCode: text(data, "postalCode"),
-    country: text(data, "country"),
+    address,
+    addressLine1,
+    addressLine2: "",
+    city,
+    postalCode,
+    country,
     phone: text(data, "phone"),
     email: text(data, "email"),
     website: text(data, "website"),
@@ -404,10 +397,7 @@ async function saveRestaurantProfile(restaurantId, form) {
     googleMapsUrl: text(data, "googleMapsUrl"),
     updatedAt: serverTimestamp()
   };
-  await setDoc(doc(services.db, "restaurants", restaurantId), {
-    ...payload,
-    restaurantProfile: payload
-  }, { merge: true });
+  await setDoc(doc(services.db, "restaurants", restaurantId), payload, { merge: true });
   await syncPublicRestaurant(restaurantId);
 }
 
@@ -561,39 +551,128 @@ async function listReservations(restaurantId) {
 async function listCustomers(restaurantId) {
   const services = await getServices();
   const { collection, getDocs } = services.firestoreModule;
-  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "Customers"));
-  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  const collectionNames = ["customers", "Customers"];
+  const results = await Promise.all(collectionNames.map(async (collectionName) => {
+    try {
+      const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, collectionName));
+      return {
+        collectionName,
+        customers: snaps.docs.map((snap) => ({ id: snap.id, customerCollection: collectionName, ...snap.data() }))
+      };
+    } catch (error) {
+      return { collectionName, error };
+    }
+  }));
+  const byPath = new Map();
+  const errors = [];
+  results.forEach((result) => {
+    if (result.error) {
+      errors.push(`${result.collectionName}: ${readableFirebaseError(result.error)}`);
+      return;
+    }
+    result.customers.forEach((customer) => {
+      byPath.set(`${customer.customerCollection}/${customer.id}`, customer);
+    });
+  });
+  return {
+    customers: [...byPath.values()],
+    errors,
+    checkedCollections: collectionNames
+  };
 }
 
 async function createCustomerAccount(restaurantId, form, user) {
   const services = await getServices();
   const { addDoc, collection, serverTimestamp } = services.firestoreModule;
-  const data = new FormData(form);
-  const displayName = text(data, "displayName");
-  const phone = text(data, "phone");
-  const email = text(data, "email");
-  if (!displayName && !phone && !email) {
-    throw new Error("Renseignez au moins un nom, un telephone ou un email.");
+  const data = customerAccountPayload(form);
+  if (!hasCustomerIdentity(data)) {
+    throw new Error("Renseignez au moins un nom, une societe, un telephone ou un email.");
   }
-  await addDoc(collection(services.db, "restaurants", restaurantId, "Customers"), {
-    type: text(data, "type") || "individual",
-    displayName,
-    firstName: text(data, "firstName"),
-    lastName: text(data, "lastName"),
-    companyName: text(data, "companyName"),
-    contactName: text(data, "contactName"),
-    phone,
-    email,
-    address: text(data, "address"),
-    taxId: text(data, "taxId"),
-    vatNumber: text(data, "vatNumber"),
-    notes: text(data, "notes"),
+  await addDoc(collection(services.db, "restaurants", restaurantId, "customers"), {
+    ...data,
     active: true,
     createdBy: user?.uid || "",
     createdByEmail: user?.email || "",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+}
+
+async function updateCustomerAccount(restaurantId, form) {
+  const services = await getServices();
+  const { doc, serverTimestamp, setDoc } = services.firestoreModule;
+  const customerId = form.dataset.customerId;
+  const customerCollection = customerCollectionName(form.dataset.customerCollection);
+  if (!customerId) throw new Error("Client introuvable.");
+  const data = customerAccountPayload(form);
+  if (!hasCustomerIdentity(data)) {
+    throw new Error("Renseignez au moins un nom, une societe, un telephone ou un email.");
+  }
+  await setDoc(doc(services.db, "restaurants", restaurantId, customerCollection, customerId), {
+    ...data,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+async function setCustomerAccountActive(restaurantId, customerId, active, collectionName = "customers") {
+  const services = await getServices();
+  const { doc, serverTimestamp, setDoc } = services.firestoreModule;
+  if (!customerId) throw new Error("Client introuvable.");
+  await setDoc(doc(services.db, "restaurants", restaurantId, customerCollectionName(collectionName), customerId), {
+    active,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+async function deleteCustomerAccount(restaurantId, customerId, collectionName = "customers") {
+  const services = await getServices();
+  const { deleteDoc, doc } = services.firestoreModule;
+  if (!customerId) throw new Error("Client introuvable.");
+  await deleteDoc(doc(services.db, "restaurants", restaurantId, customerCollectionName(collectionName), customerId));
+}
+
+function customerCollectionName(value) {
+  return value === "Customers" ? "Customers" : "customers";
+}
+
+function customerAccountPayload(form) {
+  const data = new FormData(form);
+  const companyName = text(data, "companyName");
+  const taxId = text(data, "taxId");
+  const vatNumber = text(data, "vatNumber");
+  const type = normalizeCustomerType(text(data, "type"), { companyName, taxId, vatNumber });
+  return {
+    type,
+    displayName: text(data, "displayName"),
+    firstName: text(data, "firstName"),
+    lastName: text(data, "lastName"),
+    companyName,
+    contactName: text(data, "contactName"),
+    phone: text(data, "phone"),
+    email: text(data, "email"),
+    address: text(data, "address"),
+    country: text(data, "country") || "France",
+    taxId,
+    vatNumber,
+    notes: text(data, "notes")
+  };
+}
+
+function hasCustomerIdentity(data = {}) {
+  return !!firstText(
+    data.displayName,
+    data.firstName,
+    data.lastName,
+    data.companyName,
+    data.contactName,
+    data.phone,
+    data.email
+  );
+}
+
+function normalizeCustomerType(type, customer = {}) {
+  if (type === "company") return "company";
+  return firstText(customer.companyName, customer.taxId, customer.vatNumber) ? "company" : "individual";
 }
 
 async function getActiveMenu(restaurantId) {
@@ -971,6 +1050,45 @@ function initDashboardPage() {
     }
     const copyButton = event.target.closest("[data-copy]");
     if (copyButton) navigator.clipboard?.writeText(copyButton.dataset.copy);
+    const clientExport = event.target.closest("[data-client-export]");
+    if (clientExport) {
+      event.preventDefault();
+      exportVisibleCustomers(root);
+    }
+    const clientReset = event.target.closest("[data-client-reset]");
+    if (clientReset) {
+      event.preventDefault();
+      resetClientTools(root);
+    }
+    const clientPage = event.target.closest("[data-client-page]");
+    if (clientPage) {
+      event.preventDefault();
+      changeClientPage(root, Number(clientPage.dataset.clientPage || 0));
+    }
+    const clientOpen = event.target.closest("[data-client-open]");
+    if (clientOpen) {
+      event.preventDefault();
+      const card = clientOpen.closest("[data-client-card]");
+      if (card) {
+        card.open = !card.open;
+        clientOpen.setAttribute("aria-expanded", card.open ? "true" : "false");
+        clientOpen.textContent = card.open ? "X" : "Ouvrir";
+        if (card.open) card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+      return;
+    }
+    const deleteArm = event.target.closest("[data-client-delete-arm]");
+    if (deleteArm) {
+      event.preventDefault();
+      const form = deleteArm.closest("[data-dashboard-customer-delete-form]");
+      form?.classList.add("is-confirming");
+    }
+    const deleteCancel = event.target.closest("[data-client-delete-cancel]");
+    if (deleteCancel) {
+      event.preventDefault();
+      const form = deleteCancel.closest("[data-dashboard-customer-delete-form]");
+      form?.classList.remove("is-confirming");
+    }
     const categoryMove = event.target.closest("[data-category-move]");
     if (categoryMove) {
       event.preventDefault();
@@ -1000,6 +1118,14 @@ function initDashboardPage() {
       if (form.matches("[data-dashboard-public-form]")) await savePublicSettings(restaurantId, form);
       if (form.matches("[data-dashboard-menu-form]")) await saveQrMenu(restaurantId, form);
       if (form.matches("[data-dashboard-customer-form]")) await createCustomerAccount(restaurantId, form, currentUser);
+      if (form.matches("[data-dashboard-customer-update-form]")) await updateCustomerAccount(restaurantId, form);
+      if (form.matches("[data-dashboard-customer-state-form]")) {
+        const nextActive = form.dataset.customerActive !== "true";
+        await setCustomerAccountActive(restaurantId, form.dataset.customerId, nextActive, form.dataset.customerCollection);
+      }
+      if (form.matches("[data-dashboard-customer-delete-form]")) {
+        await deleteCustomerAccount(restaurantId, form.dataset.customerId, form.dataset.customerCollection);
+      }
       if (form.matches("[data-dashboard-invite-form]")) {
         const code = await createInvitation(restaurantId, form, currentUser);
         form.code.value = code;
@@ -1013,7 +1139,8 @@ function initDashboardPage() {
         return;
       }
       status.textContent = "Enregistre.";
-      await renderDashboard(root, currentUser, restaurantId);
+      const activePanel = root.querySelector("[data-dashboard-panel].is-active")?.dataset.dashboardPanel || "overview";
+      await renderDashboard(root, currentUser, restaurantId, activePanel);
     } catch (error) {
       status.textContent = error.message || String(error);
     }
@@ -1033,15 +1160,38 @@ function initDashboardPage() {
       autoSaveCatalogField(root, event.target, { immediate: true });
       return;
     }
+    if (event.target.matches("[data-client-filter], [data-client-sort]")) {
+      setClientPage(root, 1);
+      applyClientTools(root);
+      return;
+    }
+    if (event.target.matches("[data-client-page-size]")) {
+      setClientPage(root, 1);
+      applyClientTools(root);
+      return;
+    }
+    if (event.target.matches("[data-customer-type-select]")) {
+      updateCustomerTypeScope(event.target);
+      return;
+    }
     if (!event.target.matches("[data-reservation-status]")) return;
     const restaurantId = root.dataset.restaurantId;
     await updateReservationStatus(restaurantId, event.target.dataset.reservationStatus, event.target.value);
-    await renderDashboard(root, currentUser, restaurantId);
+      const activePanel = root.querySelector("[data-dashboard-panel].is-active")?.dataset.dashboardPanel || "overview";
+      await renderDashboard(root, currentUser, restaurantId, activePanel);
   });
   root.addEventListener("input", (event) => {
     if (event.target.matches("[data-catalog-image-url]")) previewCatalogImageUrl(event.target);
     if (event.target.matches("[data-catalog-autosave], [data-catalog-image-url]")) autoSaveCatalogField(root, event.target);
     if (event.target.matches("[data-color-input]")) updateColorPreview(event.target);
+    if (event.target.matches("[data-client-search]")) {
+      setClientPage(root, 1);
+      applyClientTools(root);
+    }
+    if (event.target.matches("[data-client-column-filter]")) {
+      setClientPage(root, 1);
+      applyClientTools(root);
+    }
   });
   root.addEventListener("pointerdown", (event) => {
     const handle = event.target.closest("[data-category-drag-handle]");
@@ -1086,7 +1236,7 @@ function initDashboardPage() {
   });
 }
 
-async function renderDashboard(root, user, restaurantId) {
+async function renderDashboard(root, user, restaurantId, activeTab = "overview") {
   if (!user) {
     root.innerHTML = dashboardSignedOutHtml();
     return;
@@ -1108,9 +1258,9 @@ async function renderDashboard(root, user, restaurantId) {
   localStorage.setItem("poksolActiveRestaurantId", restaurant.id);
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
-  const [reservations, customers, members, menu, catalogMenu] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
-    listCustomers(restaurant.id).catch(() => []),
+    listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
     getActiveMenu(restaurant.id).catch(() => null),
     listCatalogMenu(restaurant.id).catch(() => null)
@@ -1118,7 +1268,8 @@ async function renderDashboard(root, user, restaurantId) {
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customers, members, dashboardMenu);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab);
+  applyClientTools(root);
 }
 
 async function autoSaveCatalogField(root, field, options = {}) {
@@ -1786,7 +1937,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, customers, members, menu) {
+function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview") {
   const canEditProfile = ["owner", "admin", "manager"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -1800,18 +1951,18 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu)
       <button class="dashboard-nav-backdrop button-reset" type="button" aria-label="Fermer les sections" data-dashboard-nav-backdrop></button>
       <nav class="dashboard-tabs" aria-label="Sections dashboard">
         ${["overview", "profile", "hours", "public", "menu", "reservations", "clients", "team", "downloads"].map((tab, index) => `
-          <button class="${index === 0 ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>
+          <button class="${tab === activeTab ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>
         `).join("")}
       </nav>
-      <section class="dashboard-panel is-active" data-dashboard-panel="overview">${overviewHtml(restaurant, publicUrl)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="profile">${profileFormHtml(restaurant, canEditProfile)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="hours">${hoursFormHtml(restaurant, canEditProfile)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="clients">${clientsHtml(customers)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
-      <section class="dashboard-panel" data-dashboard-panel="downloads">${downloadsHtml()}</section>
+      <section class="dashboard-panel ${activeTab === "overview" ? "is-active" : ""}" data-dashboard-panel="overview">${overviewHtml(restaurant, publicUrl)}</section>
+      <section class="dashboard-panel ${activeTab === "profile" ? "is-active" : ""}" data-dashboard-panel="profile">${profileFormHtml(restaurant, canEditProfile)}</section>
+      <section class="dashboard-panel ${activeTab === "hours" ? "is-active" : ""}" data-dashboard-panel="hours">${hoursFormHtml(restaurant, canEditProfile)}</section>
+      <section class="dashboard-panel ${activeTab === "public" ? "is-active" : ""}" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
+      <section class="dashboard-panel ${activeTab === "menu" ? "is-active" : ""}" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
+      <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
+      <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations)}</section>
+      <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam)}</section>
+      <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
   `;
 }
@@ -1869,7 +2020,7 @@ function profileFormHtml(restaurant, canEdit) {
         <label>Type cuisine<input name="cuisineType" value="${escapeAttr(restaurant.cuisineType)}" ${disabled(canEdit)} /></label>
         <label>Telephone<input name="phone" value="${escapeAttr(restaurant.phone)}" ${disabled(canEdit)} /></label>
         <label>Email<input name="email" type="email" value="${escapeAttr(restaurant.email)}" ${disabled(canEdit)} /></label>
-        <label>Adresse<input name="address" value="${escapeAttr(restaurant.address || restaurant.addressLine1)}" ${disabled(canEdit)} /></label>
+        <label>Adresse<input name="address" value="${escapeAttr(restaurant.addressLine1 || restaurant.address)}" ${disabled(canEdit)} /></label>
         <label>Ville<input name="city" value="${escapeAttr(restaurant.city)}" ${disabled(canEdit)} /></label>
         <label>Code postal<input name="postalCode" value="${escapeAttr(restaurant.postalCode)}" ${disabled(canEdit)} /></label>
         <label>Pays<input name="country" value="${escapeAttr(restaurant.country || "France")}" ${disabled(canEdit)} /></label>
@@ -1879,8 +2030,8 @@ function profileFormHtml(restaurant, canEdit) {
         <label>Google Maps URL<input name="googleMapsUrl" value="${escapeAttr(restaurant.googleMapsUrl)}" ${disabled(canEdit)} /></label>
         <input type="hidden" name="logoUrl" value="${escapeAttr(restaurant.logoUrl)}" />
         <input type="hidden" name="coverUrl" value="${escapeAttr(restaurant.coverUrl)}" />
-        <label>Logo<input name="logoFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" ${disabled(canEdit)} /></label>
-        <label>Image couverture<input name="coverFile" type="file" accept="image/png,image/jpeg,image/webp" ${disabled(canEdit)} /></label>
+        ${profileImageFieldHtml("Logo", "logoFile", restaurant.logoUrl, canEdit, "Logo restaurant")}
+        ${profileImageFieldHtml("Image couverture", "coverFile", restaurant.coverUrl, canEdit, "Image couverture")}
         <label class="wide-field">Description<textarea name="description" rows="4" ${disabled(canEdit)}>${escapeHtml(restaurant.description)}</textarea></label>
       </div>
       ${canEdit ? `<button class="primary-btn button-reset" type="submit">Enregistrer le profil</button>` : `<p class="alert-note">Votre role permet la lecture uniquement.</p>`}
@@ -1984,6 +2135,20 @@ function menuFormHtml(restaurant, menu, canEdit) {
         </div>
       ` : `<small data-form-status></small>`}
     </form>
+  `;
+}
+
+function profileImageFieldHtml(label, inputName, imageUrl, canEdit, alt) {
+  return `
+    <label class="profile-image-field">${escapeHtml(label)}
+      ${imageUrl ? `
+        <span class="profile-image-preview">
+          <img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(alt)}" loading="lazy" />
+          <a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener noreferrer">Ouvrir</a>
+        </span>
+      ` : `<span class="profile-image-empty">Aucune image enregistree</span>`}
+      <input name="${escapeAttr(inputName)}" type="file" accept="image/png,image/jpeg,image/webp${inputName === "logoFile" ? ",image/svg+xml" : ""}" ${disabled(canEdit)} />
+    </label>
   `;
 }
 
@@ -2157,75 +2322,130 @@ function setCatalogImagePreview(preview, src, alt, onLoad = null) {
   if (onLoad) preview.querySelector("img")?.addEventListener("load", onLoad, { once: true });
 }
 
-function clientsHtml(customers = []) {
+function clientsHtml(customerAccounts = {}, reservations = []) {
+  const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
+  const readErrors = Array.isArray(customerAccounts.errors) ? customerAccounts.errors : [];
+  const normalizedReservations = Array.isArray(reservations) ? reservations : [];
   const clients = customers.map(normalizeCustomerAccount).sort((a, b) => {
     const dateDiff = clientTimeValue(b.updatedAt || b.createdAt) - clientTimeValue(a.updatedAt || a.createdAt);
     if (dateDiff) return dateDiff;
     return (a.displayName || "").localeCompare(b.displayName || "", "fr");
   });
   const activeClients = clients.filter((client) => client.active !== false).length;
+  const companyClients = clients.filter((client) => client.type === "company").length;
   const withPhone = clients.filter((client) => client.phone).length;
   const withEmail = clients.filter((client) => client.email).length;
+  const duplicateWarnings = clientDuplicateWarnings(clients);
   return `
-    <div class="clients-dashboard">
-      <div class="client-stats">
-        ${statusCardHtml("Comptes clients", String(clients.length))}
-        ${statusCardHtml("Actifs", String(activeClients))}
-        ${statusCardHtml("Avec telephone", String(withPhone))}
-        ${statusCardHtml("Avec email", String(withEmail))}
-      </div>
+    <div class="clients-dashboard client-ledger">
       <div class="clients-section-head">
-        <div>
-          <p class="eyebrow">Firestore Customers</p>
-          <h2>Comptes clients</h2>
+        <div class="client-title-block">
+          <h2>Clients</h2>
+          <div class="client-tab-count">
+            <strong>Clients</strong>
+            <span>${clients.length}</span>
+          </div>
         </div>
-        <p>Ces comptes viennent uniquement de la collection Firestore <strong>Customers</strong> du restaurant actif.</p>
+        <div class="client-top-actions">
+          <details class="client-add-panel">
+            <summary class="client-create-btn">
+              <span>+</span>
+              <strong>Create contact</strong>
+            </summary>
+            <form class="platform-form customer-account-form" data-dashboard-customer-form data-customer-type-scope data-customer-type="individual">
+              ${customerFieldsHtml()}
+              <button class="primary-btn button-reset" type="submit">Ajouter le contact</button>
+              <small data-form-status></small>
+            </form>
+          </details>
+          <details class="client-more-menu">
+            <summary>More</summary>
+            <div>
+              <button class="button-reset" type="button" data-client-export>Export contacts</button>
+              <button class="button-reset" type="button" disabled>Import contacts</button>
+            </div>
+          </details>
+        </div>
       </div>
-      <form class="platform-form customer-account-form" data-dashboard-customer-form>
-        <div class="form-grid">
-          <label>Type
-            <select name="type">
-              <option value="individual">Particulier</option>
-              <option value="company">Societe</option>
+      ${readErrors.length ? `<p class="alert-note">Lecture des comptes clients incomplete ou impossible : ${escapeHtml(readErrors.join(" | "))}</p>` : ""}
+      ${duplicateWarnings.length ? `
+        <div class="client-duplicates" role="status">
+          <strong>Doublons possibles</strong>
+          ${duplicateWarnings.map((warning) => `<span>${escapeHtml(warning)}</span>`).join("")}
+        </div>
+      ` : ""}
+      ${clients.length ? `
+        <div class="client-tools" data-client-tools>
+          <label class="client-search-field">
+            <span>Rechercher</span>
+            <input data-client-search placeholder="Nom, telephone, email, societe..." />
+          </label>
+          <label>
+            <span>Filtrer</span>
+            <select data-client-filter>
+              <option value="all">Tous les clients</option>
+              <option value="active">Actifs</option>
+              <option value="inactive">Inactifs</option>
+              <option value="with-phone">Avec telephone</option>
+              <option value="with-email">Avec email</option>
+              <option value="company">Societes</option>
+              <option value="individual">Particuliers</option>
             </select>
           </label>
-          <label>Nom affichage<input name="displayName" placeholder="Nom du client" /></label>
-          <label>Prenom<input name="firstName" /></label>
-          <label>Nom<input name="lastName" /></label>
-          <label>Societe<input name="companyName" /></label>
-          <label>Contact<input name="contactName" /></label>
-          <label>Telephone<input name="phone" /></label>
-          <label>Email<input name="email" type="email" /></label>
-          <label class="wide-field">Adresse<input name="address" /></label>
-          <label>Tax ID<input name="taxId" /></label>
-          <label>TVA<input name="vatNumber" /></label>
-          <label class="wide-field">Notes<textarea name="notes" rows="3"></textarea></label>
+          <label>
+            <span>Trier</span>
+            <select data-client-sort>
+              <option value="updated-desc">Derniere mise a jour</option>
+              <option value="name-asc">Nom A-Z</option>
+              <option value="name-desc">Nom Z-A</option>
+              <option value="type-asc">Type</option>
+              <option value="status-asc">Statut</option>
+            </select>
+          </label>
+          <button class="ghost-action button-reset is-hidden" type="button" data-client-reset>Reinitialiser</button>
+          <span data-client-result-count>${clients.length} client${clients.length > 1 ? "s" : ""}</span>
         </div>
-        <button class="primary-btn button-reset" type="submit">Ajouter un compte client</button>
-        <small data-form-status></small>
-      </form>
-      ${clients.length ? `
         <div class="responsive-table clients-table">
           <div class="table-row table-head client-row">
-            <span>Client</span>
-            <span>Contact</span>
-            <span>Adresse</span>
-            <span>Statut</span>
-            <span>Mis a jour</span>
-            <span>Compte</span>
+            <span>Name</span>
+            <span>Email</span>
+            <span>Phone number</span>
+            <span>Country</span>
+            <span>Created date</span>
+            <span></span>
           </div>
-          ${clients.map(clientCardHtml).join("")}
+          <div class="table-row client-filter-row client-row">
+            <label><span>Name</span><input data-client-column-filter="name" placeholder="Filter name" /></label>
+            <label><span>Email</span><input data-client-column-filter="email" placeholder="Filter email" /></label>
+            <label><span>Phone</span><input data-client-column-filter="phone" placeholder="Filter phone" /></label>
+            <label><span>Country</span><input data-client-column-filter="country" placeholder="Filter country" /></label>
+            <label><span>Created</span><input data-client-column-filter="created" placeholder="JJ/MM/AAAA" /></label>
+            <span></span>
+          </div>
+          ${clients.map((client) => clientCardHtml(client, normalizedReservations)).join("")}
         </div>
-      ` : `<div class="empty-state">Aucun compte client dans Customers pour le moment.</div>`}
+        <div class="client-empty-results is-hidden" data-client-empty-results>Aucun client ne correspond a cette recherche.</div>
+        <div class="client-pagination" data-client-pagination>
+          <label>
+            <select data-client-page-size>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+            <span>per page</span>
+          </label>
+          <div>
+            <span data-client-page-label>Page 1</span>
+            <button class="button-reset" type="button" data-client-page="-1">&lt;</button>
+            <button class="button-reset" type="button" data-client-page="1">&gt;</button>
+          </div>
+        </div>
+      ` : `<div class="empty-state">Aucun compte client pour le moment.</div>`}
     </div>
   `;
 }
 
-function clientCardHtml(client) {
-  const contactLines = [
-    client.phone ? `Tel. ${client.phone}` : "",
-    client.email || ""
-  ].filter(Boolean);
+function clientCardHtml(client, reservations = []) {
   const identity = [
     client.displayName || "Client sans nom",
     client.companyName ? `Societe : ${client.companyName}` : "",
@@ -2233,18 +2453,53 @@ function clientCardHtml(client) {
     client.taxId ? `Tax ID : ${client.taxId}` : "",
     client.vatNumber ? `TVA : ${client.vatNumber}` : ""
   ].filter(Boolean);
+  const searchText = [
+    client.displayName,
+    client.firstName,
+    client.lastName,
+    client.companyName,
+    client.contactName,
+    client.phone,
+    client.email,
+    client.address,
+    client.taxId,
+    client.vatNumber,
+    client.notes
+  ].join(" ");
+  const updatedTime = clientTimeValue(client.updatedAt || client.createdAt);
+  const createdTime = clientTimeValue(client.createdAt);
+  const statusLabel = client.active === false ? "Inactif" : "Actif";
+  const collectionName = customerCollectionName(client.customerCollection);
+  const metrics = clientAccountMetrics(client, reservations);
+  const account = clientAccountSummary(client);
+  const phoneLabel = formatClientPhone(client.phone);
   return `
-    <details class="customer-account-card">
+    <details class="customer-account-card"
+      data-client-card
+      data-client-name="${escapeAttr(normalizeClientSearch(client.displayName || ""))}"
+      data-client-type="${escapeAttr(client.type)}"
+      data-client-active="${client.active === false ? "false" : "true"}"
+      data-client-has-phone="${client.phone ? "true" : "false"}"
+      data-client-has-email="${client.email ? "true" : "false"}"
+      data-client-updated="${String(updatedTime)}"
+      data-client-created="${String(createdTime)}"
+      data-client-reservations="${String(metrics.reservationCount)}"
+      data-client-last-visit="${escapeAttr(metrics.lastVisitLabel)}"
+      data-client-email="${escapeAttr(normalizeClientSearch(client.email))}"
+      data-client-phone="${escapeAttr(normalizeClientPhone(client.phone))}"
+      data-client-country="${escapeAttr(normalizeClientSearch(client.country || "France"))}"
+      data-client-created-label="${escapeAttr(normalizeClientSearch(clientDateLabel(client.createdAt || client.updatedAt)))}"
+      data-client-search-text="${escapeAttr(normalizeClientSearch(searchText))}">
       <summary class="table-row client-row">
         <span>
           <strong>${escapeHtml(identity[0])}</strong>
           ${identity.slice(1).map((line) => `<small>${escapeHtml(line)}</small>`).join("")}
         </span>
-        <span>${contactLines.length ? contactLines.map((line) => `<small>${escapeHtml(line)}</small>`).join("") : "Contact non renseigne"}</span>
-        <span>${escapeHtml(client.address || "-")}</span>
-        <span>${client.active === false ? "Inactif" : "Actif"}</span>
-        <span>${escapeHtml(clientDateLabel(client.updatedAt || client.createdAt) || "-")}</span>
-        <span class="client-open-label">Ouvrir compte</span>
+        <span>${escapeHtml(client.email || "-")}</span>
+        <span>${escapeHtml(phoneLabel || "-")}</span>
+        <span>${escapeHtml(client.country || "France")}</span>
+        <span>${escapeHtml(clientDateLabel(client.createdAt || client.updatedAt) || "-")}</span>
+        <span><button class="client-open-label button-reset" type="button" data-client-open aria-expanded="false">Ouvrir</button></span>
       </summary>
       <div class="client-account-details">
         ${reservationDetailItemHtml("ID compte", client.id)}
@@ -2256,12 +2511,245 @@ function clientCardHtml(client) {
         ${reservationDetailItemHtml("Telephone", client.phone)}
         ${reservationDetailItemHtml("Email", client.email)}
         ${reservationDetailItemHtml("Adresse", client.address)}
+        ${reservationDetailItemHtml("Pays", client.country || "France")}
         ${reservationDetailItemHtml("Tax ID", client.taxId)}
         ${reservationDetailItemHtml("TVA", client.vatNumber)}
+        ${reservationDetailItemHtml("Statut", statusLabel)}
+        ${reservationDetailItemHtml("Mis a jour", clientDateLabel(client.updatedAt || client.createdAt))}
         ${reservationDetailItemHtml("Notes", client.notes)}
+        ${reservationDetailItemHtml("Date creation", clientDateLabel(client.createdAt))}
+      </div>
+      <div class="client-management-grid">
+        <details class="client-edit-panel">
+          <summary>
+            <span>Modifier le client</span>
+            <strong>Ouvrir</strong>
+          </summary>
+          <form class="platform-form client-edit-form" data-dashboard-customer-update-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-type-scope data-customer-type="${escapeAttr(client.type === "company" ? "company" : "individual")}">
+            ${customerFieldsHtml(client)}
+            <button class="primary-btn button-reset" type="submit">Enregistrer le client</button>
+            <small data-form-status></small>
+          </form>
+        </details>
+        <aside class="client-account-side">
+          <div>
+            <h3>Compte</h3>
+            <dl>
+              <div><dt>Solde</dt><dd>${escapeHtml(account.balanceLabel)}</dd></div>
+              <div><dt>Balance</dt><dd>${escapeHtml(account.balanceStateLabel)}</dd></div>
+              <div><dt>Mouvements</dt><dd>${escapeHtml(account.movementCountLabel)}</dd></div>
+              <div><dt>Tickets ouverts</dt><dd>${escapeHtml(account.openTicketCountLabel)}</dd></div>
+              <div><dt>Total debits</dt><dd>${escapeHtml(account.debitLabel)}</dd></div>
+              <div><dt>Total credits</dt><dd>${escapeHtml(account.creditLabel)}</dd></div>
+              <div><dt>Reservations</dt><dd>${escapeHtml(metrics.reservationCount ? String(metrics.reservationCount) : "0")}</dd></div>
+              <div><dt>Dernier passage</dt><dd>${escapeHtml(metrics.lastVisitLabel || "Non disponible")}</dd></div>
+            </dl>
+            ${account.movements.length ? `
+              <div class="client-movements">
+                <strong>Derniers mouvements</strong>
+                ${account.movements.slice(0, 5).map((movement) => `
+                  <div>
+                    <span>${escapeHtml(movement.dateLabel)}</span>
+                    <span>${escapeHtml(movement.label)}</span>
+                    <strong>${escapeHtml(movement.amountLabel)}</strong>
+                  </div>
+                `).join("")}
+              </div>
+            ` : `<p class="client-account-empty">Aucun mouvement disponible.</p>`}
+          </div>
+          <div class="client-actions">
+            <form data-dashboard-customer-state-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-active="${client.active === false ? "false" : "true"}">
+              <button class="outline-dark-btn button-reset" type="submit">${client.active === false ? "Reactiver" : "Desactiver"}</button>
+              <small data-form-status></small>
+            </form>
+            <form data-dashboard-customer-delete-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-name="${escapeAttr(identity[0])}">
+              <button class="ghost-action button-reset danger-action" type="button" data-client-delete-arm>Supprimer</button>
+              <div class="client-delete-confirm">
+                <span>Suppression definitive</span>
+                <button class="ghost-action button-reset" type="button" data-client-delete-cancel>Annuler</button>
+                <button class="ghost-action button-reset danger-action" type="submit">Confirmer</button>
+              </div>
+              <small data-form-status></small>
+            </form>
+          </div>
+        </aside>
       </div>
     </details>
   `;
+}
+
+function customerFieldsHtml(client = {}) {
+  const type = client.type || "individual";
+  return `
+    <div class="form-grid">
+      <label>Type
+        <select name="type" data-customer-type-select>
+          <option value="individual" ${type !== "company" ? "selected" : ""}>Particulier</option>
+          <option value="company" ${type === "company" ? "selected" : ""}>Societe</option>
+        </select>
+      </label>
+      <label>Nom affichage<input name="displayName" placeholder="Nom du client" value="${escapeAttr(client.displayName)}" /></label>
+      <label data-customer-field="individual">Prenom<input name="firstName" value="${escapeAttr(client.firstName)}" /></label>
+      <label data-customer-field="individual">Nom<input name="lastName" value="${escapeAttr(client.lastName)}" /></label>
+      <label data-customer-field="company">Societe<input name="companyName" value="${escapeAttr(client.companyName)}" /></label>
+      <label data-customer-field="company">Contact<input name="contactName" value="${escapeAttr(client.contactName)}" /></label>
+      <label>Telephone<input name="phone" value="${escapeAttr(client.phone)}" /></label>
+      <label>Email<input name="email" type="email" value="${escapeAttr(client.email)}" /></label>
+      <label>Pays<input name="country" value="${escapeAttr(client.country || "France")}" /></label>
+      <label class="wide-field">Adresse<input name="address" value="${escapeAttr(client.address)}" /></label>
+      <label data-customer-field="company">Tax ID<input name="taxId" value="${escapeAttr(client.taxId)}" /></label>
+      <label data-customer-field="company">TVA<input name="vatNumber" value="${escapeAttr(client.vatNumber)}" /></label>
+      <label class="wide-field">Notes<textarea name="notes" rows="3">${escapeHtml(client.notes)}</textarea></label>
+    </div>
+  `;
+}
+
+function clientDuplicateWarnings(clients) {
+  const groups = new Map();
+  clients.forEach((client) => {
+    [
+      ["telephone", normalizeClientPhone(client.phone)],
+      ["email", client.email]
+    ].forEach(([label, value]) => {
+      const key = normalizeClientSearch(value || "");
+      if (!key) return;
+      const groupKey = `${label}:${key}`;
+      const group = groups.get(groupKey) || { label, value, names: [] };
+      group.names.push(client.displayName || client.companyName || client.id || "Client sans nom");
+      groups.set(groupKey, group);
+    });
+  });
+  return [...groups.values()]
+    .filter((group) => group.names.length > 1)
+    .map((group) => `${group.label} ${group.value} partage par ${group.names.join(", ")}`);
+}
+
+function clientAccountMetrics(client, reservations = []) {
+  const matches = reservations.filter((reservation) => reservationMatchesClient(reservation, client));
+  const lastDate = matches
+    .map((reservation) => dateFromFirestoreValue(
+      reservation.reservedAt ||
+      reservation.reservationAt ||
+      reservation.dateTime ||
+      reservation.startAt ||
+      reservation.createdFor ||
+      reservation.createdAt ||
+      reservation.updatedAt
+    ))
+    .filter(Boolean)
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  return {
+    reservationCount: matches.length,
+    lastVisitLabel: lastDate ? clientDateLabel(lastDate) : ""
+  };
+}
+
+function clientAccountSummary(client = {}) {
+  const movements = normalizeClientMovements(client);
+  const movementBalance = movements.reduce((total, movement) => total + movement.amount, 0);
+  const balance = firstNumber(
+    client.balance,
+    client.solde,
+    client.accountBalance,
+    client.currentBalance,
+    client.balanceDue,
+    client.amountDue
+  );
+  const debitTotal = firstNumber(client.debitTotal, client.totalDebits, client.totalDebit)
+    ?? movements.filter((movement) => movement.amount > 0).reduce((total, movement) => total + movement.amount, 0);
+  const creditTotal = firstNumber(client.creditTotal, client.totalCredits, client.totalCredit)
+    ?? Math.abs(movements.filter((movement) => movement.amount < 0).reduce((total, movement) => total + movement.amount, 0));
+  const effectiveBalance = balance ?? movementBalance;
+  const openTickets = firstNumber(client.openTicketCount, client.openTickets, client.unpaidTickets, client.pendingTicketCount);
+  return {
+    balanceLabel: formatMoney(effectiveBalance),
+    balanceStateLabel: Math.abs(effectiveBalance) < 0.005 ? "A jour" : effectiveBalance > 0 ? "A encaisser" : "Credit client",
+    movementCountLabel: String(movements.length || firstNumber(client.movementCount, client.movementsCount) || 0),
+    openTicketCountLabel: String(openTickets ?? 0),
+    debitLabel: formatMoney(debitTotal),
+    creditLabel: formatMoney(creditTotal),
+    movements
+  };
+}
+
+function normalizeClientMovements(client = {}) {
+  const sources = [
+    client.movements,
+    client.accountMovements,
+    client.transactions,
+    client.ledger,
+    client.history
+  ].find(Array.isArray) || [];
+  return sources.map((movement) => {
+    const amount = firstNumber(movement.amount, movement.total, movement.value, movement.balanceDelta, movement.debit, movement.credit) || 0;
+    const date = dateFromFirestoreValue(movement.createdAt || movement.date || movement.paidAt || movement.ticketAt || movement.updatedAt);
+    return {
+      amount,
+      amountLabel: formatMoney(amount),
+      dateLabel: date ? clientDateLabel(date) : "-",
+      timeValue: date?.getTime() || 0,
+      label: firstText(movement.label, movement.title, movement.reason, movement.type, movement.ticketNumber, movement.id) || "Mouvement"
+    };
+  }).sort((a, b) => b.timeValue - a.timeValue);
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value.replace(",", "."));
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function formatMoney(value) {
+  const number = Number(value || 0);
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR"
+  }).format(number);
+}
+
+function reservationMatchesClient(reservation = {}, client = {}) {
+  const reservationPhone = normalizeClientPhone(firstText(
+    reservation.customerPhone,
+    reservation.phone,
+    reservation.telephone,
+    reservation.mobile,
+    reservation.contactPhone,
+    reservation.customer?.phone,
+    reservation.contact?.phone
+  ));
+  const reservationEmail = normalizeClientSearch(firstText(
+    reservation.customerEmail,
+    reservation.email,
+    reservation.contactEmail,
+    reservation.customer?.email,
+    reservation.contact?.email
+  ));
+  const reservationName = normalizeClientSearch(firstText(
+    reservation.customerName,
+    reservation.name,
+    reservation.clientName,
+    reservation.customer?.name,
+    reservation.customer?.displayName,
+    reservation.contact?.name
+  ));
+  const clientPhone = normalizeClientPhone(client.phone);
+  const clientEmail = normalizeClientSearch(client.email);
+  const clientNames = [
+    client.displayName,
+    [client.firstName, client.lastName].filter(Boolean).join(" "),
+    client.companyName,
+    client.contactName
+  ].map(normalizeClientSearch).filter(Boolean);
+  return !!(
+    clientPhone && reservationPhone && clientPhone === reservationPhone ||
+    clientEmail && reservationEmail && clientEmail === reservationEmail ||
+    reservationName && clientNames.includes(reservationName)
+  );
 }
 
 function normalizeCustomerAccount(customer = {}) {
@@ -2274,7 +2762,8 @@ function normalizeCustomerAccount(customer = {}) {
   );
   return {
     id: customer.id,
-    type: firstText(customer.type) || "individual",
+    customerCollection: customerCollectionName(customer.customerCollection),
+    type: normalizeCustomerType(firstText(customer.type), customer),
     displayName,
     firstName: firstText(customer.firstName),
     lastName: firstText(customer.lastName),
@@ -2283,6 +2772,7 @@ function normalizeCustomerAccount(customer = {}) {
     phone: firstText(customer.phone, customer.telephone, customer.mobile),
     email: firstText(customer.email),
     address: firstText(customer.address),
+    country: firstText(customer.country, customer.countryCode) || "France",
     taxId: firstText(customer.taxId),
     vatNumber: firstText(customer.vatNumber),
     notes: firstText(customer.notes),
@@ -2304,6 +2794,199 @@ function clientDateLabel(value) {
     month: "2-digit",
     year: "numeric"
   }).format(date);
+}
+
+function normalizeClientSearch(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("fr")
+    .trim();
+}
+
+function normalizeClientPhone(value = "") {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function formatClientPhone(value = "") {
+  const raw = String(value || "").trim();
+  const digits = normalizeClientPhone(raw);
+  if (!digits) return "";
+  if (raw.startsWith("+")) return raw;
+  if (digits.length === 10) return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+  return raw;
+}
+
+function applyClientTools(root) {
+  const tools = root.querySelector("[data-client-tools]");
+  const table = root.querySelector(".clients-table");
+  if (!tools || !table) return;
+  const query = normalizeClientSearch(tools.querySelector("[data-client-search]")?.value || "");
+  const filter = tools.querySelector("[data-client-filter]")?.value || "all";
+  const sort = tools.querySelector("[data-client-sort]")?.value || "updated-desc";
+  const columnFilters = clientColumnFilters(root);
+  const pageSize = Number(root.querySelector("[data-client-page-size]")?.value || 25);
+  const currentPage = clientCurrentPage(root);
+  const cards = [...table.querySelectorAll("[data-client-card]")];
+  const sortedCards = cards.sort((a, b) => compareClientCards(a, b, sort));
+  sortedCards.forEach((card) => table.appendChild(card));
+  const filteredCards = sortedCards.filter((card) => {
+    const matchesQuery = !query || card.dataset.clientSearchText.includes(query);
+    const matchesFilter = clientCardMatchesFilter(card, filter);
+    const matchesColumns = clientCardMatchesColumnFilters(card, columnFilters);
+    return matchesQuery && matchesFilter && matchesColumns;
+  });
+  const pageCount = Math.max(1, Math.ceil(filteredCards.length / pageSize));
+  const page = Math.min(currentPage, pageCount);
+  setClientPage(root, page);
+  const pageStart = (page - 1) * pageSize;
+  const pageEnd = pageStart + pageSize;
+  sortedCards.forEach((card) => {
+    const isVisible = filteredCards.includes(card) && filteredCards.indexOf(card) >= pageStart && filteredCards.indexOf(card) < pageEnd;
+    card.classList.toggle("is-hidden", !isVisible);
+  });
+  const count = tools.querySelector("[data-client-result-count]");
+  if (count) count.textContent = `${filteredCards.length} client${filteredCards.length > 1 ? "s" : ""}`;
+  root.querySelector("[data-client-empty-results]")?.classList.toggle("is-hidden", filteredCards.length !== 0);
+  const reset = tools.querySelector("[data-client-reset]");
+  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
+  const hasTools = !!query || filter !== "all" || sort !== "updated-desc" || hasColumnFilters;
+  reset?.classList.toggle("is-hidden", !hasTools);
+  const pagination = root.querySelector("[data-client-pagination]");
+  if (pagination) {
+    pagination.querySelector("[data-client-page-label]").textContent = filteredCards.length
+      ? `${pageStart + 1} - ${Math.min(pageEnd, filteredCards.length)} of ${filteredCards.length}`
+      : "0 - 0 of 0";
+    const prev = pagination.querySelector('[data-client-page="-1"]');
+    const next = pagination.querySelector('[data-client-page="1"]');
+    if (prev) prev.disabled = page <= 1;
+    if (next) next.disabled = page >= pageCount;
+  }
+}
+
+function clientColumnFilters(root) {
+  const filters = {};
+  root.querySelectorAll("[data-client-column-filter]").forEach((input) => {
+    filters[input.dataset.clientColumnFilter] = normalizeClientSearch(input.value || "");
+  });
+  return filters;
+}
+
+function clientCardMatchesColumnFilters(card, filters = {}) {
+  if (filters.name && !(card.dataset.clientName || "").includes(filters.name)) return false;
+  if (filters.email && !(card.dataset.clientEmail || "").includes(filters.email)) return false;
+  if (filters.phone && !(card.dataset.clientPhone || "").includes(normalizeClientPhone(filters.phone))) return false;
+  if (filters.country && !(card.dataset.clientCountry || "").includes(filters.country)) return false;
+  if (filters.created && !(card.dataset.clientCreatedLabel || "").includes(filters.created)) return false;
+  return true;
+}
+
+function compareClientCards(a, b, sort) {
+  if (sort === "name-asc") return a.dataset.clientName.localeCompare(b.dataset.clientName, "fr");
+  if (sort === "name-desc") return b.dataset.clientName.localeCompare(a.dataset.clientName, "fr");
+  if (sort === "type-asc") return a.dataset.clientType.localeCompare(b.dataset.clientType, "fr");
+  if (sort === "status-asc") return b.dataset.clientActive.localeCompare(a.dataset.clientActive, "fr");
+  return Number(b.dataset.clientUpdated || 0) - Number(a.dataset.clientUpdated || 0);
+}
+
+function clientCardMatchesFilter(card, filter) {
+  if (filter === "active") return card.dataset.clientActive === "true";
+  if (filter === "inactive") return card.dataset.clientActive === "false";
+  if (filter === "with-phone") return card.dataset.clientHasPhone === "true";
+  if (filter === "with-email") return card.dataset.clientHasEmail === "true";
+  if (filter === "company") return card.dataset.clientType === "company";
+  if (filter === "individual") return card.dataset.clientType !== "company";
+  return true;
+}
+
+function resetClientTools(root) {
+  const tools = root.querySelector("[data-client-tools]");
+  if (!tools) return;
+  const search = tools.querySelector("[data-client-search]");
+  const filter = tools.querySelector("[data-client-filter]");
+  const sort = tools.querySelector("[data-client-sort]");
+  if (search) search.value = "";
+  if (filter) filter.value = "all";
+  if (sort) sort.value = "updated-desc";
+  root.querySelectorAll("[data-client-column-filter]").forEach((input) => {
+    input.value = "";
+  });
+  setClientPage(root, 1);
+  applyClientTools(root);
+}
+
+function clientCurrentPage(root) {
+  return Math.max(1, Number(root.dataset.clientPage || 1));
+}
+
+function setClientPage(root, page) {
+  root.dataset.clientPage = String(Math.max(1, Number(page) || 1));
+}
+
+function changeClientPage(root, delta) {
+  setClientPage(root, clientCurrentPage(root) + delta);
+  applyClientTools(root);
+}
+
+function updateCustomerTypeScope(select) {
+  const scope = select.closest("[data-customer-type-scope]");
+  if (!scope) return;
+  scope.dataset.customerType = select.value === "company" ? "company" : "individual";
+}
+
+function exportVisibleCustomers(root) {
+  const tools = root.querySelector("[data-client-tools]");
+  const query = normalizeClientSearch(tools?.querySelector("[data-client-search]")?.value || "");
+  const filter = tools?.querySelector("[data-client-filter]")?.value || "all";
+  const columnFilters = clientColumnFilters(root);
+  const cards = [...root.querySelectorAll("[data-client-card]")].filter((card) => {
+    const matchesQuery = !query || card.dataset.clientSearchText.includes(query);
+    return matchesQuery && clientCardMatchesFilter(card, filter) && clientCardMatchesColumnFilters(card, columnFilters);
+  });
+  const rows = cards.map(customerCsvRow);
+  const headers = ["Type", "Nom affichage", "Prenom", "Nom", "Societe", "Contact", "Telephone", "Email", "Pays", "Adresse", "Tax ID", "TVA", "Statut", "Date creation", "Mis a jour", "Reservations", "Dernier passage", "Notes", "ID compte"];
+  const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `clients-restaurant-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function customerCsvRow(card) {
+  const summaryCells = [...card.querySelectorAll(":scope > summary > span")].map((cell) => cell.textContent.trim().replace(/\s+/g, " "));
+  const detailMap = new Map([...card.querySelectorAll(".client-account-details .reservation-detail-item")].map((item) => {
+    const label = item.querySelector("span")?.textContent.trim() || "";
+    const value = item.querySelector("strong")?.textContent.trim() || "";
+    return [label, value === "-" ? "" : value];
+  }));
+  return [
+    detailMap.get("Type") || "",
+    summaryCells[0] || "",
+    detailMap.get("Prenom") || "",
+    detailMap.get("Nom") || "",
+    detailMap.get("Societe") || "",
+    detailMap.get("Contact") || "",
+    detailMap.get("Telephone") || "",
+    detailMap.get("Email") || "",
+    detailMap.get("Pays") || "",
+    detailMap.get("Adresse") || "",
+    detailMap.get("Tax ID") || "",
+    detailMap.get("TVA") || "",
+    detailMap.get("Statut") || "",
+    detailMap.get("Date creation") || "",
+    detailMap.get("Mis a jour") || "",
+    card.dataset.clientReservations || "",
+    card.dataset.clientLastVisit || "",
+    detailMap.get("Notes") || "",
+    detailMap.get("ID compte") || ""
+  ];
+}
+
+function csvCell(value) {
+  return `"${String(value || "").replace(/"/g, '""')}"`;
 }
 
 function reservationsHtml(reservations, role) {
@@ -2650,6 +3333,12 @@ function tabLabel(tab) {
 
 function normalizeRestaurant(id, data) {
   const profile = data.restaurantProfile || {};
+  const addressLine1 = data.addressLine1 || profile.addressLine1 || "";
+  const addressLine2 = data.addressLine2 || profile.addressLine2 || "";
+  const city = data.city || profile.city || "";
+  const postalCode = data.postalCode || profile.postalCode || "";
+  const country = data.country || profile.country || "France";
+  const address = data.address || profile.address || fullAddress(addressLine1, postalCode, city, country);
   return {
     id,
     ...data,
@@ -2658,14 +3347,24 @@ function normalizeRestaurant(id, data) {
     logoUrl: data.logoUrl || profile.logoUrl || "",
     description: data.description || profile.description || "",
     cuisineType: data.cuisineType || profile.cuisineType || data.businessType || profile.businessType || "",
-    address: data.address || data.addressLine1 || profile.address || profile.addressLine1 || "",
-    city: data.city || profile.city || "",
-    postalCode: data.postalCode || profile.postalCode || "",
-    country: data.country || profile.country || "France",
+    address,
+    addressLine1,
+    addressLine2,
+    city,
+    postalCode,
+    country,
     phone: data.phone || profile.phone || "",
     email: data.email || profile.email || "",
     openingHours: resolveOpeningHours(data, profile)
   };
+}
+
+function fullAddress(addressLine1, postalCode, city, country) {
+  return [
+    addressLine1,
+    [postalCode, city].filter(Boolean).join(" "),
+    country
+  ].filter(Boolean).join(", ");
 }
 
 function readableFirebaseError(error) {
@@ -3094,7 +3793,4 @@ initDashboardPage();
 initPublicRestaurantPage();
 initPublicMenuPage();
 initContactForms();
-
-
-
 
