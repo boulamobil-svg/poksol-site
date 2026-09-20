@@ -102,6 +102,14 @@ const ROLE_LABELS = {
   staff: "Staff"
 };
 
+// Ce que chaque autorite permet (aligne sur firestore.rules).
+const ROLE_SCOPES = {
+  owner: "Acces complet : restaurant, equipe, clients, suppressions.",
+  admin: "Gere l'equipe, les clients et la page publique ; peut supprimer.",
+  manager: "Modifie le restaurant, les clients et les reservations ; ne supprime pas.",
+  staff: "Consultation du dashboard, sans modification."
+};
+
 const MENU_TRANSLATION_LANGUAGES = new Set(["fr", "de", "en", "es", "it", "tr", "ar"]);
 const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -1251,6 +1259,7 @@ function initDashboardPage() {
       if (form.matches("[data-dashboard-customer-delete-form]")) {
         await deleteCustomerAccount(restaurantId, form.dataset.customerId, form.dataset.customerCollection);
       }
+      if (form.matches("[data-dashboard-jobtitle-form]")) await saveUserJobTitle(restaurantId, form, currentUser);
       if (form.matches("[data-dashboard-invite-form]")) {
         const code = await createInvitation(restaurantId, form, currentUser);
         form.code.value = code;
@@ -1394,17 +1403,19 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
   root.dataset.restaurantRole = role;
-  const [reservations, customerAccounts, members, menu, catalogMenu] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
     getActiveMenu(restaurant.id).catch(() => null),
-    listCatalogMenu(restaurant.id).catch(() => null)
+    listCatalogMenu(restaurant.id).catch(() => null),
+    getUserDoc(user.uid).catch(() => null)
   ]);
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab);
+  const account = currentUserSummary(user, userProfile, members, role, restaurant.id);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account);
   applyClientTools(root);
 }
 
@@ -2073,7 +2084,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview") {
+function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null) {
   const canEditProfile = ["owner", "admin", "manager"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -2090,7 +2101,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
           <button class="${tab === activeTab ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>
         `).join("")}
       </nav>
-      <section class="dashboard-panel ${activeTab === "overview" ? "is-active" : ""}" data-dashboard-panel="overview">${overviewHtml(restaurant, publicUrl)}</section>
+      <section class="dashboard-panel ${activeTab === "overview" ? "is-active" : ""}" data-dashboard-panel="overview">${overviewHtml(restaurant, publicUrl, account)}</section>
       <section class="dashboard-panel ${activeTab === "profile" ? "is-active" : ""}" data-dashboard-panel="profile">${profileFormHtml(restaurant, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "hours" ? "is-active" : ""}" data-dashboard-panel="hours">${hoursFormHtml(restaurant, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "public" ? "is-active" : ""}" data-dashboard-panel="public">${publicSettingsHtml(restaurant, publicUrl, canEditProfile)}</section>
@@ -2103,7 +2114,81 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
   `;
 }
 
-function overviewHtml(restaurant, publicUrl) {
+function currentUserSummary(user, profile, members = [], role = "staff", restaurantId = "") {
+  const member = members.find((item) => item.uid === user?.uid) || {};
+  return {
+    displayName: firstText(user?.displayName, member.displayName, profile?.displayName, user?.email),
+    email: firstText(user?.email, member.email, profile?.email),
+    // Poste choisi par l'utilisateur (users/{uid}), sinon celui de l'invitation.
+    jobTitle: firstText(profile?.jobTitles?.[restaurantId], member.jobTitle, member.position, member.title),
+    role,
+    roleLabel: ROLE_LABELS[role] || role || "Staff"
+  };
+}
+
+function userInitials(name, email) {
+  const parts = String(name || email || "?").trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return String(parts[0] || "?").slice(0, 2).toUpperCase();
+}
+
+function userOverviewHtml(account) {
+  return `
+    <section class="overview-general-info overview-user" aria-labelledby="overview-user-title">
+      <div class="overview-user-head">
+        <span class="profile-avatar" aria-hidden="true">${escapeHtml(userInitials(account.displayName, account.email))}</span>
+        <div>
+          <p class="eyebrow">Utilisateur connecte</p>
+          <h2 id="overview-user-title">Mon compte</h2>
+        </div>
+        <span class="role-badge role-${escapeAttr(account.role)}">${escapeHtml(account.roleLabel)}</span>
+      </div>
+      <dl class="overview-info-grid">
+        <div>
+          <dt>Nom</dt>
+          <dd>${escapeHtml(account.displayName || "Non renseigne")}</dd>
+        </div>
+        <div>
+          <dt>Poste</dt>
+          <dd>${escapeHtml(account.jobTitle || "Non renseigne")}</dd>
+        </div>
+        <div>
+          <dt>Autorite</dt>
+          <dd>${escapeHtml(account.roleLabel)}<small>${escapeHtml(ROLE_SCOPES[account.role] || "")}</small></dd>
+        </div>
+        <div>
+          <dt>Email</dt>
+          <dd>${escapeHtml(account.email || "Non renseigne")}</dd>
+        </div>
+      </dl>
+      <details class="overview-user-edit">
+        <summary>Modifier mon poste</summary>
+        <form class="platform-form" data-dashboard-jobtitle-form>
+          <label>Poste
+            <input name="jobTitle" maxlength="80" value="${escapeAttr(account.jobTitle)}" placeholder="Ex : Gerant, Chef de salle" />
+          </label>
+          <button class="primary-btn button-reset" type="submit">Enregistrer</button>
+          <small data-form-status></small>
+        </form>
+      </details>
+    </section>
+  `;
+}
+
+async function saveUserJobTitle(restaurantId, form, user) {
+  if (!user) throw new Error("Connexion requise.");
+  const services = await getServices();
+  const { doc, serverTimestamp, setDoc } = services.firestoreModule;
+  const jobTitle = text(new FormData(form), "jobTitle").slice(0, 80);
+  // Stocke dans le profil de l'utilisateur, modifiable par lui seul (firestore.rules : users/{uid}).
+  await setDoc(doc(services.db, "users", user.uid), {
+    uid: user.uid,
+    jobTitles: { [restaurantId]: jobTitle },
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+function overviewHtml(restaurant, publicUrl, account = null) {
   const generalInfo = [
     ["Nom", restaurant.name],
     ["Type cuisine", restaurant.cuisineType],
@@ -2115,6 +2200,7 @@ function overviewHtml(restaurant, publicUrl) {
     ["Site web", restaurant.website]
   ].filter(([, value]) => String(value || "").trim().length);
   return `
+    ${account ? userOverviewHtml(account) : ""}
     <div class="dashboard-stats">
       ${statusCardHtml("Page publique", restaurant.publicPageEnabled !== false ? "Active" : "Desactivee")}
       ${statusCardHtml("QR menu", restaurant.qrMenuEnabled ? "Actif" : "A completer")}

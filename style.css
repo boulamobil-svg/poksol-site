@@ -5201,3 +5201,68 @@ body.menu-page-body.translated-rtl {
   font-size: 14px;
   font-weight: 700;
 }
+
+/* Overview : utilisateur connecte (nom, poste, autorite) */
+.overview-user-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.overview-user-head > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.overview-user .role-badge {
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: #0a2540;
+  background: #dbeafe;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.overview-user .role-badge.role-owner {
+  color: #0f5132;
+  background: #d1f5df;
+}
+
+.overview-user .role-badge.role-staff {
+  color: #4b5563;
+  background: #eceff3;
+}
+
+.overview-info-grid dd small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.overview-user-edit > summary {
+  width: fit-content;
+  color: #1976f3;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.overview-user-edit form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 12px;
+}
+
+.overview-user-edit form label {
+  flex: 1 1 260px;
+}
+
+@media (max-width: 640px) {
+  .overview-user-head {
+    flex-wrap: wrap;
+  }
+}

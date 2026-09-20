@@ -213,6 +213,15 @@ for (const name of ["customers", "Customers"]) {
   });
 }
 
+// ---------- profil utilisateur (poste affiche dans l'overview) ----------
+test("users: chacun ecrit son poste, personne n'ecrit celui d'un autre", async () => {
+  await assertSucceeds(setDoc(doc(user("staff1"), "users/staff1"), { uid: "staff1", jobTitles: { resto: "Serveur" } }, { merge: true }));
+  await assertSucceeds(getDoc(doc(user("staff1"), "users/staff1")));
+  await assertFails(setDoc(doc(user("mgr1"), "users/staff1"), { jobTitles: { resto: "Directeur" } }, { merge: true }));
+  await assertFails(getDoc(doc(user("mgr1"), "users/staff1")));
+  await assertFails(getDoc(doc(anon(), "users/staff1")));
+});
+
 // ---------- escalade de privileges ----------
 test("un manager ne peut pas s'attribuer un role via members / staff / staff_users", async () => {
   await assertFails(setDoc(doc(user("mgr1"), "restaurants/resto/members/mgr1"), { uid: "mgr1", status: "active", role: "owner" }));
