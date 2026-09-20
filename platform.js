@@ -1065,16 +1065,23 @@ function initDashboardPage() {
       event.preventDefault();
       changeClientPage(root, Number(clientPage.dataset.clientPage || 0));
     }
-    const clientOpen = event.target.closest("[data-client-open]");
-    if (clientOpen) {
+    const clientBack = event.target.closest("[data-client-back]");
+    if (clientBack) {
       event.preventDefault();
-      const card = clientOpen.closest("[data-client-card]");
-      if (card) {
-        card.open = !card.open;
-        clientOpen.setAttribute("aria-expanded", card.open ? "true" : "false");
-        clientOpen.textContent = card.open ? "X" : "Ouvrir";
-        if (card.open) card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
+      closeClientDetail(root);
+      return;
+    }
+    const clientEditToggle = event.target.closest("[data-client-edit-toggle]");
+    if (clientEditToggle) {
+      event.preventDefault();
+      const detail = clientEditToggle.closest("[data-client-detail]");
+      detail?.querySelector("[data-client-edit-panel]")?.classList.toggle("is-hidden");
+      return;
+    }
+    const clientCard = event.target.closest("[data-client-card]");
+    if (clientCard && !event.target.closest("button, a, input, select, textarea, label")) {
+      event.preventDefault();
+      openClientDetail(root, clientCard.dataset.clientDetailTarget);
       return;
     }
     const deleteArm = event.target.closest("[data-client-delete-arm]");
@@ -2412,7 +2419,7 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
             <span>Phone number</span>
             <span>Country</span>
             <span>Created date</span>
-            <span></span>
+            <span>Solde</span>
           </div>
           <div class="table-row client-filter-row client-row">
             <label><span>Name</span><input data-client-column-filter="name" placeholder="Filter name" /></label>
@@ -2420,7 +2427,7 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
             <label><span>Phone</span><input data-client-column-filter="phone" placeholder="Filter phone" /></label>
             <label><span>Country</span><input data-client-column-filter="country" placeholder="Filter country" /></label>
             <label><span>Created</span><input data-client-column-filter="created" placeholder="JJ/MM/AAAA" /></label>
-            <span></span>
+            <label><span>Solde</span><input data-client-column-filter="balance" placeholder="0,00 EUR" /></label>
           </div>
           ${clients.map((client) => clientCardHtml(client, normalizedReservations)).join("")}
         </div>
@@ -2439,6 +2446,9 @@ function clientsHtml(customerAccounts = {}, reservations = []) {
             <button class="button-reset" type="button" data-client-page="-1">&lt;</button>
             <button class="button-reset" type="button" data-client-page="1">&gt;</button>
           </div>
+        </div>
+        <div class="client-detail-stack">
+          ${clients.map((client) => clientDetailHtml(client, normalizedReservations)).join("")}
         </div>
       ` : `<div class="empty-state">Aucun compte client pour le moment.</div>`}
     </div>
@@ -2468,14 +2478,13 @@ function clientCardHtml(client, reservations = []) {
   ].join(" ");
   const updatedTime = clientTimeValue(client.updatedAt || client.createdAt);
   const createdTime = clientTimeValue(client.createdAt);
-  const statusLabel = client.active === false ? "Inactif" : "Actif";
-  const collectionName = customerCollectionName(client.customerCollection);
   const metrics = clientAccountMetrics(client, reservations);
   const account = clientAccountSummary(client);
   const phoneLabel = formatClientPhone(client.phone);
   return `
-    <details class="customer-account-card"
+    <div class="customer-account-card table-row client-row"
       data-client-card
+      data-client-detail-target="${escapeAttr(client.id)}"
       data-client-name="${escapeAttr(normalizeClientSearch(client.displayName || ""))}"
       data-client-type="${escapeAttr(client.type)}"
       data-client-active="${client.active === false ? "false" : "true"}"
@@ -2489,18 +2498,61 @@ function clientCardHtml(client, reservations = []) {
       data-client-phone="${escapeAttr(normalizeClientPhone(client.phone))}"
       data-client-country="${escapeAttr(normalizeClientSearch(client.country || "France"))}"
       data-client-created-label="${escapeAttr(normalizeClientSearch(clientDateLabel(client.createdAt || client.updatedAt)))}"
+      data-client-balance="${escapeAttr(normalizeClientSearch(account.balanceLabel))}"
       data-client-search-text="${escapeAttr(normalizeClientSearch(searchText))}">
-      <summary class="table-row client-row">
-        <span>
-          <strong>${escapeHtml(identity[0])}</strong>
-          ${identity.slice(1).map((line) => `<small>${escapeHtml(line)}</small>`).join("")}
-        </span>
-        <span>${escapeHtml(client.email || "-")}</span>
-        <span>${escapeHtml(phoneLabel || "-")}</span>
-        <span>${escapeHtml(client.country || "France")}</span>
-        <span>${escapeHtml(clientDateLabel(client.createdAt || client.updatedAt) || "-")}</span>
-        <span><button class="client-open-label button-reset" type="button" data-client-open aria-expanded="false">Ouvrir</button></span>
-      </summary>
+      <span>
+        <strong>${escapeHtml(identity[0])}</strong>
+        ${identity.slice(1).map((line) => `<small>${escapeHtml(line)}</small>`).join("")}
+      </span>
+      <span>${escapeHtml(client.email || "-")}</span>
+      <span>${escapeHtml(phoneLabel || "-")}</span>
+      <span>${escapeHtml(client.country || "France")}</span>
+      <span>${escapeHtml(clientDateLabel(client.createdAt || client.updatedAt) || "-")}</span>
+      <span class="client-balance-cell">${escapeHtml(account.balanceLabel)}</span>
+    </div>
+  `;
+}
+
+function clientDetailHtml(client, reservations = []) {
+  const collectionName = customerCollectionName(client.customerCollection);
+  const metrics = clientAccountMetrics(client, reservations);
+  const account = clientAccountSummary(client);
+  const displayName = client.displayName || client.companyName || "Client sans nom";
+  const statusLabel = client.active === false ? "Inactif" : "Actif";
+  return `
+    <article class="client-detail-page is-hidden" data-client-detail="${escapeAttr(client.id)}">
+      <header class="client-detail-header">
+        <button class="button-reset client-back-btn" type="button" data-client-back aria-label="Retour aux clients">&larr;</button>
+        <div>
+          <span>Compte client</span>
+          <h2>${escapeHtml(displayName)}</h2>
+        </div>
+        <button class="outline-dark-btn button-reset" type="button" data-client-edit-toggle>Modifier les informations</button>
+      </header>
+
+      <section class="client-account-hero">
+        <article>
+          <span>Solde</span>
+          <strong>${escapeHtml(account.balanceLabel)}</strong>
+          <small>${escapeHtml(account.balanceStateLabel)}</small>
+        </article>
+        <article>
+          <span>Mouvements</span>
+          <strong>${escapeHtml(account.movementCountLabel)}</strong>
+          <small>Journal du compte</small>
+        </article>
+        <article>
+          <span>Tickets ouverts</span>
+          <strong>${escapeHtml(account.openTicketCountLabel)}</strong>
+          <small>Sur compte client</small>
+        </article>
+        <article>
+          <span>Dernier passage</span>
+          <strong>${escapeHtml(metrics.lastVisitLabel || "-")}</strong>
+          <small>${escapeHtml(metrics.reservationCount ? `${metrics.reservationCount} reservation${metrics.reservationCount > 1 ? "s" : ""}` : "Aucune reservation")}</small>
+        </article>
+      </section>
+
       <div class="client-account-details">
         ${reservationDetailItemHtml("ID compte", client.id)}
         ${reservationDetailItemHtml("Type", client.type === "company" ? "Societe" : "Particulier")}
@@ -2519,45 +2571,36 @@ function clientCardHtml(client, reservations = []) {
         ${reservationDetailItemHtml("Notes", client.notes)}
         ${reservationDetailItemHtml("Date creation", clientDateLabel(client.createdAt))}
       </div>
-      <div class="client-management-grid">
-        <details class="client-edit-panel">
-          <summary>
-            <span>Modifier le client</span>
-            <strong>Ouvrir</strong>
-          </summary>
+
+      <section class="client-detail-edit is-hidden" data-client-edit-panel>
+        <h3>Modifier les informations</h3>
           <form class="platform-form client-edit-form" data-dashboard-customer-update-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-type-scope data-customer-type="${escapeAttr(client.type === "company" ? "company" : "individual")}">
             ${customerFieldsHtml(client)}
             <button class="primary-btn button-reset" type="submit">Enregistrer le client</button>
             <small data-form-status></small>
           </form>
-        </details>
-        <aside class="client-account-side">
-          <div>
-            <h3>Compte</h3>
-            <dl>
-              <div><dt>Solde</dt><dd>${escapeHtml(account.balanceLabel)}</dd></div>
-              <div><dt>Balance</dt><dd>${escapeHtml(account.balanceStateLabel)}</dd></div>
-              <div><dt>Mouvements</dt><dd>${escapeHtml(account.movementCountLabel)}</dd></div>
-              <div><dt>Tickets ouverts</dt><dd>${escapeHtml(account.openTicketCountLabel)}</dd></div>
-              <div><dt>Total debits</dt><dd>${escapeHtml(account.debitLabel)}</dd></div>
-              <div><dt>Total credits</dt><dd>${escapeHtml(account.creditLabel)}</dd></div>
-              <div><dt>Reservations</dt><dd>${escapeHtml(metrics.reservationCount ? String(metrics.reservationCount) : "0")}</dd></div>
-              <div><dt>Dernier passage</dt><dd>${escapeHtml(metrics.lastVisitLabel || "Non disponible")}</dd></div>
-            </dl>
-            ${account.movements.length ? `
-              <div class="client-movements">
-                <strong>Derniers mouvements</strong>
-                ${account.movements.slice(0, 5).map((movement) => `
-                  <div>
-                    <span>${escapeHtml(movement.dateLabel)}</span>
-                    <span>${escapeHtml(movement.label)}</span>
-                    <strong>${escapeHtml(movement.amountLabel)}</strong>
-                  </div>
-                `).join("")}
+      </section>
+
+      <section class="client-journal">
+        <div>
+          <h3>Journal des mouvements</h3>
+          <p>Debits ${escapeHtml(account.debitLabel)} · Credits ${escapeHtml(account.creditLabel)}</p>
+        </div>
+        ${account.movements.length ? `
+          <div class="client-movement-table">
+            ${account.movements.map((movement) => `
+              <div>
+                <span>${escapeHtml(movement.dateLabel)}</span>
+                <strong>${escapeHtml(movement.label)}</strong>
+                <span>${escapeHtml(movement.amountLabel)}</span>
               </div>
-            ` : `<p class="client-account-empty">Aucun mouvement disponible.</p>`}
+            `).join("")}
           </div>
-          <div class="client-actions">
+        ` : `<div class="client-account-empty">Aucun mouvement disponible pour ce client.</div>`}
+      </section>
+
+      <section class="client-danger-zone">
+        <div class="client-actions">
             <form data-dashboard-customer-state-form data-customer-id="${escapeAttr(client.id)}" data-customer-collection="${escapeAttr(collectionName)}" data-customer-active="${client.active === false ? "false" : "true"}">
               <button class="outline-dark-btn button-reset" type="submit">${client.active === false ? "Reactiver" : "Desactiver"}</button>
               <small data-form-status></small>
@@ -2572,9 +2615,8 @@ function clientCardHtml(client, reservations = []) {
               <small data-form-status></small>
             </form>
           </div>
-        </aside>
-      </div>
-    </details>
+      </section>
+    </article>
   `;
 }
 
@@ -2864,6 +2906,25 @@ function applyClientTools(root) {
   }
 }
 
+function openClientDetail(root, clientId) {
+  if (!clientId) return;
+  const dashboard = root.querySelector(".client-ledger");
+  const detail = root.querySelector(`[data-client-detail="${CSS.escape(clientId)}"]`);
+  if (!dashboard || !detail) return;
+  dashboard.querySelectorAll("[data-client-detail]").forEach((panel) => panel.classList.add("is-hidden"));
+  detail.classList.remove("is-hidden");
+  dashboard.classList.add("is-client-detail-open");
+  detail.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function closeClientDetail(root) {
+  const dashboard = root.querySelector(".client-ledger");
+  if (!dashboard) return;
+  dashboard.classList.remove("is-client-detail-open");
+  dashboard.querySelectorAll("[data-client-detail]").forEach((panel) => panel.classList.add("is-hidden"));
+  dashboard.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
 function clientColumnFilters(root) {
   const filters = {};
   root.querySelectorAll("[data-client-column-filter]").forEach((input) => {
@@ -2878,6 +2939,7 @@ function clientCardMatchesColumnFilters(card, filters = {}) {
   if (filters.phone && !(card.dataset.clientPhone || "").includes(normalizeClientPhone(filters.phone))) return false;
   if (filters.country && !(card.dataset.clientCountry || "").includes(filters.country)) return false;
   if (filters.created && !(card.dataset.clientCreatedLabel || "").includes(filters.created)) return false;
+  if (filters.balance && !(card.dataset.clientBalance || "").includes(filters.balance)) return false;
   return true;
 }
 
@@ -2956,8 +3018,9 @@ function exportVisibleCustomers(root) {
 }
 
 function customerCsvRow(card) {
-  const summaryCells = [...card.querySelectorAll(":scope > summary > span")].map((cell) => cell.textContent.trim().replace(/\s+/g, " "));
-  const detailMap = new Map([...card.querySelectorAll(".client-account-details .reservation-detail-item")].map((item) => {
+  const summaryCells = [...card.querySelectorAll(":scope > span")].map((cell) => cell.textContent.trim().replace(/\s+/g, " "));
+  const detail = card.closest(".client-ledger")?.querySelector(`[data-client-detail="${CSS.escape(card.dataset.clientDetailTarget || "")}"]`);
+  const detailMap = new Map([...(detail?.querySelectorAll(".client-account-details .reservation-detail-item") || [])].map((item) => {
     const label = item.querySelector("span")?.textContent.trim() || "";
     const value = item.querySelector("strong")?.textContent.trim() || "";
     return [label, value === "-" ? "" : value];

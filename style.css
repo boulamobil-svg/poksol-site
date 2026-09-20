@@ -2243,7 +2243,7 @@ select:focus-visible {
 }
 
 .client-ledger .clients-table .client-row {
-  grid-template-columns: minmax(190px, 1.1fr) minmax(180px, 1fr) minmax(170px, 0.9fr) minmax(120px, 0.7fr) minmax(150px, 0.8fr) 56px;
+  grid-template-columns: minmax(190px, 1.1fr) minmax(180px, 1fr) minmax(170px, 0.9fr) minmax(120px, 0.7fr) minmax(150px, 0.8fr) minmax(130px, 0.7fr);
 }
 
 .client-ledger .table-row {
@@ -2297,18 +2297,30 @@ select:focus-visible {
 .client-ledger .customer-account-card {
   border-radius: 0;
   background: white;
+  cursor: pointer;
+  transition: background 0.16s ease;
 }
 
-.client-ledger .customer-account-card:last-child > summary {
+.client-ledger .customer-account-card:hover {
+  background: #fbfcfd;
+}
+
+.client-ledger .customer-account-card:last-child {
   border-bottom: 0;
 }
 
-.client-ledger .customer-account-card[open] {
-  box-shadow: none;
+.client-balance-cell {
+  color: #0a2540;
+  font-weight: 900;
 }
 
-.client-ledger .customer-account-card[open] > summary {
-  background: #fbfcfd;
+.client-ledger.is-client-detail-open > .clients-section-head,
+.client-ledger.is-client-detail-open > .client-duplicates,
+.client-ledger.is-client-detail-open > .client-tools,
+.client-ledger.is-client-detail-open > .clients-table,
+.client-ledger.is-client-detail-open > .client-empty-results,
+.client-ledger.is-client-detail-open > .client-pagination {
+  display: none;
 }
 
 .client-ledger .client-row strong {
@@ -2351,11 +2363,147 @@ select:focus-visible {
   background: #202327;
 }
 
+.client-detail-stack {
+  display: grid;
+}
+
+.client-detail-page {
+  display: grid;
+  gap: 22px;
+}
+
+.client-detail-header {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.client-back-btn {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid #d9dde3;
+  border-radius: 999px;
+  color: #0a2540;
+  background: white;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.client-back-btn:hover,
+.client-back-btn:focus-visible {
+  color: white;
+  background: #202327;
+}
+
+.client-detail-header span {
+  color: #68707b;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.client-detail-header h2 {
+  margin: 3px 0 0;
+  color: #050608;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.client-account-hero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.client-account-hero article {
+  display: grid;
+  gap: 8px;
+  min-height: 126px;
+  align-content: center;
+  padding: 18px;
+  border: 1px solid #e0e5ec;
+  border-radius: 8px;
+  background: white;
+}
+
+.client-account-hero span,
+.client-account-hero small {
+  color: #68707b;
+  font-weight: 800;
+}
+
+.client-account-hero strong {
+  color: #0a2540;
+  font-size: 24px;
+}
+
 .client-ledger .client-account-details,
 .client-ledger .client-management-grid {
   padding: 18px 28px;
   border-top: 1px solid #edf0f3;
   background: #fbfcfd;
+}
+
+.client-ledger .client-account-details {
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.client-detail-edit,
+.client-journal,
+.client-danger-zone {
+  padding: 20px;
+  border: 1px solid #e0e5ec;
+  border-radius: 8px;
+  background: white;
+}
+
+.client-detail-edit h3,
+.client-journal h3 {
+  margin: 0 0 14px;
+  color: #0a2540;
+}
+
+.client-journal > div:first-child {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.client-journal p {
+  margin: 0;
+  color: #68707b;
+  font-weight: 800;
+}
+
+.client-movement-table {
+  display: grid;
+  border-top: 1px solid #e5e8ec;
+}
+
+.client-movement-table div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) minmax(120px, auto);
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  border-bottom: 1px solid #e5e8ec;
+}
+
+.client-movement-table span {
+  color: #68707b;
+  font-weight: 800;
+}
+
+.client-movement-table strong {
+  min-width: 0;
+  color: #0a2540;
 }
 
 .client-movements {
@@ -4753,7 +4901,10 @@ body.menu-page-body.translated-rtl {
   .client-ledger .client-tools,
   .client-ledger .clients-table .client-row,
   .client-ledger .client-account-details,
-  .client-ledger .client-management-grid {
+  .client-ledger .client-management-grid,
+  .client-detail-header,
+  .client-account-hero,
+  .client-movement-table div {
     grid-template-columns: 1fr;
     width: 100%;
   }
