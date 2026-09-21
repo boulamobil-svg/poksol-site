@@ -5,18 +5,16 @@
       "firebase.json",
       ".firebaserc",
       "**/.*",
-      "firestore.rules",
-      "storage.rules",
       "README.md",
       "tests/**",
       "**/node_modules/**"
     ]
   },
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firebase/firestore.rules"
   },
   "storage": {
-    "rules": "storage.rules"
+    "rules": "firebase/storage.rules"
   },
   "emulators": {
     "firestore": { "host": "127.0.0.1", "port": 8080 },

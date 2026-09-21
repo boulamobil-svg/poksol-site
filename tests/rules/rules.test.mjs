@@ -19,8 +19,8 @@ const past = Timestamp.fromDate(new Date(Date.now() - 86400000));
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: "demo-poksol",
-    firestore: { rules: readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8"), host: "127.0.0.1", port: 8080 },
-    storage: { rules: readFileSync(new URL("../../storage.rules", import.meta.url), "utf8"), host: "127.0.0.1", port: 9199 }
+    firestore: { rules: readFileSync(new URL("../../firebase/firestore.rules", import.meta.url), "utf8"), host: "127.0.0.1", port: 8080 },
+    storage: { rules: readFileSync(new URL("../../firebase/storage.rules", import.meta.url), "utf8"), host: "127.0.0.1", port: 9199 }
   });
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();

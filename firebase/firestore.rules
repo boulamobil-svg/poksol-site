@@ -1,17 +1,31 @@
-// =====================================================================
+// ==========================================================================
 // FICHIER UNIQUE des regles Firestore du projet restaurantpos-7a4f0d11.
-// Il sert le site (poksol.com) ET l'application Poket Restaurants (caisse) :
-// Firestore n'a qu'un jeu de regles actif, tout deploiement remplace le
-// precedent. Ne deployer des regles Firestore que depuis ce fichier.
 //
-// Roles (une seule definition : isRestaurantMember / isAdmin / isManagerOrAdmin) :
-//   - fiche restaurants/{id}/staff ou staff_users, role admin | manager | staff ;
-//     « owner » = admin ; le createur du restaurant (createdBy / ownerUid) est admin.
-//   - tout ce qui n'est pas liste ci-dessous est refuse.
-// =====================================================================
+// Il sert le SITE (poksol.com) ET l'APPLICATION Poket Restaurants (caisse) :
+// Firestore n'a qu'un jeu de regles actif, chaque deploiement remplace le
+// precedent. Ne JAMAIS deployer d'autres regles Firestore vers ce projet ;
+// les deux projets pointent vers ce fichier (voir firebase/README.md).
+//
+// Trois sortes de regles, reperables par leur etiquette :
+//   [COMMUN] regles partagees par le site et l'application (roles, equipe,
+//            invitations, clients, reservations, reglages, catalogue) ;
+//   [APPLI]  regles propres a l'application de caisse (commandes, appareils,
+//            licences, impressions, synchronisation, mise a jour) ;
+//   [SITE]   regles propres au site (pages publiques, contact, menu QR).
+//
+// Un seul calcul de role pour tous : isRestaurantMember / isAdmin /
+// isManagerOrAdmin. « owner » = admin ; le createur du restaurant est admin.
+// Tout ce qui n'est pas liste ici est refuse. Ajouter une regle = la placer
+// dans la bonne section ; tests/rules verifie l'emplacement de chaque bloc.
+// ==========================================================================
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ==========================================================================
+    // [COMMUN] Fonctions partagees (roles, equipe, invitations, clients)
+    // ==========================================================================
+
     function signedIn() {
       return request.auth != null;
     }
@@ -94,35 +108,6 @@ service cloud.firestore {
           && roleForRestaurant(restaurantId) in ['admin', 'manager']
         )
         || isRestaurantCreator(restaurantId);
-    }
-
-    // Reservation creee depuis une page publique (visiteur anonyme ou connecte).
-    function publicReservationsOpen(restaurantId) {
-      return (
-          exists(restaurantPath(restaurantId))
-          && get(restaurantPath(restaurantId)).data.get('publicPageEnabled', false) == true
-          && get(restaurantPath(restaurantId)).data.get('reservationEnabled', false) == true
-        )
-        || (
-          exists(/databases/$(database)/documents/publicRestaurants/$(restaurantId))
-          && get(/databases/$(database)/documents/publicRestaurants/$(restaurantId)).data.get('publicPageEnabled', false) == true
-          && get(/databases/$(database)/documents/publicRestaurants/$(restaurantId)).data.get('reservationEnabled', false) == true
-        );
-    }
-
-    function validPublicReservation(restaurantId) {
-      let d = request.resource.data;
-      return d.keys().hasAll(['customerName', 'customerPhone', 'date', 'time', 'status'])
-        && d.size() <= 30
-        && d.status == 'planned'
-        && d.get('restaurantId', restaurantId) == restaurantId
-        && d.customerName is string && d.customerName.size() > 0 && d.customerName.size() <= 120
-        && d.customerPhone is string && d.customerPhone.size() >= 3 && d.customerPhone.size() <= 40
-        && d.date is string && d.date.size() <= 10
-        && d.time is string && d.time.size() <= 8
-        && d.get('customerEmail', '') is string && d.get('customerEmail', '').size() <= 254
-        && d.get('notes', '') is string && d.get('notes', '').size() <= 1000
-        && (!('guests' in d) || (d.guests is number && d.guests >= 1 && d.guests <= 50));
     }
 
     function hasValidInviteForJoin(restaurantId) {
@@ -225,15 +210,6 @@ service cloud.firestore {
         ]);
     }
 
-    function isValidStaffDeviceWrite(restaurantId, deviceId) {
-      return request.resource.data.restaurantId == restaurantId
-        && request.resource.data.token == deviceId
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.enabled is bool
-        && request.resource.data.platform is string
-        && request.resource.data.updatedAt is timestamp;
-    }
-
     function isActiveCustomerAccount(restaurantId, customerId) {
       return exists(/databases/$(database)/documents/restaurants/$(restaurantId)/customers/$(customerId))
         && get(/databases/$(database)/documents/restaurants/$(restaurantId)/customers/$(customerId)).data.active != false;
@@ -261,6 +237,19 @@ service cloud.firestore {
           'correctionCount',
           'correctionHistory'
         ]);
+    }
+
+    // ==========================================================================
+    // [APPLI] Fonctions de la caisse (commandes, appareils, licences, impressions)
+    // ==========================================================================
+
+    function isValidStaffDeviceWrite(restaurantId, deviceId) {
+      return request.resource.data.restaurantId == restaurantId
+        && request.resource.data.token == deviceId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.enabled is bool
+        && request.resource.data.platform is string
+        && request.resource.data.updatedAt is timestamp;
     }
 
     function isOwnStaffDevice() {
@@ -644,16 +633,48 @@ service cloud.firestore {
         );
     }
 
+    // ==========================================================================
+    // [SITE] Fonctions du site (reservations depuis une page publique)
+    // ==========================================================================
+
+    // Reservation creee depuis une page publique (visiteur anonyme ou connecte).
+    function publicReservationsOpen(restaurantId) {
+      return (
+          exists(restaurantPath(restaurantId))
+          && get(restaurantPath(restaurantId)).data.get('publicPageEnabled', false) == true
+          && get(restaurantPath(restaurantId)).data.get('reservationEnabled', false) == true
+        )
+        || (
+          exists(/databases/$(database)/documents/publicRestaurants/$(restaurantId))
+          && get(/databases/$(database)/documents/publicRestaurants/$(restaurantId)).data.get('publicPageEnabled', false) == true
+          && get(/databases/$(database)/documents/publicRestaurants/$(restaurantId)).data.get('reservationEnabled', false) == true
+        );
+    }
+
+    function validPublicReservation(restaurantId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['customerName', 'customerPhone', 'date', 'time', 'status'])
+        && d.size() <= 30
+        && d.status == 'planned'
+        && d.get('restaurantId', restaurantId) == restaurantId
+        && d.customerName is string && d.customerName.size() > 0 && d.customerName.size() <= 120
+        && d.customerPhone is string && d.customerPhone.size() >= 3 && d.customerPhone.size() <= 40
+        && d.date is string && d.date.size() <= 10
+        && d.time is string && d.time.size() <= 8
+        && d.get('customerEmail', '') is string && d.get('customerEmail', '').size() <= 254
+        && d.get('notes', '') is string && d.get('notes', '').size() <= 1000
+        && (!('guests' in d) || (d.guests is number && d.guests >= 1 && d.guests <= 50));
+    }
+
+    // ==========================================================================
+    // [COMMUN] Collections partagees : utilisateurs et invitations
+    // ==========================================================================
+
     match /users/{userId} {
       allow read, create: if isOwnUserDoc(userId);
       allow update: if isOwnUserDoc(userId)
         || isAdminUserRestaurantAttachUpdate();
       allow delete: if false;
-    }
-
-    match /app_release/{docId} {
-      allow read: if signedIn();
-      allow write: if false;
     }
 
     match /restaurant_invites/{inviteCode} {
@@ -690,6 +711,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ==========================================================================
+    // [COMMUN] Restaurants : document, equipe, clients, reservations, reglages, catalogue
+    // ==========================================================================
+
     match /restaurants/{restaurantId} {
       allow create: if signedIn()
         && (
@@ -705,6 +730,10 @@ service cloud.firestore {
         );
       allow update, delete: if isAdmin(restaurantId);
 
+      // ==========================================================================
+      // [COMMUN] Sous-collections d'un restaurant partagees par le site et l'application
+      // ==========================================================================
+
       match /access_requests/{userId} {
         allow read: if isOwnUserDoc(userId) || isAdmin(restaurantId);
         allow create: if isSelfAccessRequestWithValidInvite(
@@ -718,6 +747,7 @@ service cloud.firestore {
 
       match /reservations/{reservationId} {
         allow read: if isRestaurantMember(restaurantId);
+        // Membres (site et application), ou [SITE] visiteur d'une page publique.
         allow create: if (
             isRestaurantMember(restaurantId)
             && request.resource.data.restaurantId == restaurantId
@@ -729,13 +759,6 @@ service cloud.firestore {
         allow update: if isRestaurantMember(restaurantId)
           && request.resource.data.restaurantId == restaurantId;
         allow delete: if isAdmin(restaurantId);
-      }
-
-      match /staff_devices/{deviceId} {
-        allow read: if isAdmin(restaurantId);
-        allow create, update: if isRestaurantMember(restaurantId)
-          && isValidStaffDeviceWrite(restaurantId, deviceId);
-        allow delete: if isAdmin(restaurantId) || isOwnStaffDevice();
       }
 
       match /settings/{settingId} {
@@ -759,6 +782,61 @@ service cloud.firestore {
           allow update: if isValidCustomerCreditCorrection(restaurantId, customerId);
           allow delete: if false;
         }
+      }
+
+      match /catalog_categories/{categoryId} {
+        allow read: if isRestaurantMember(restaurantId);
+        allow write: if isManagerOrAdmin(restaurantId);
+
+        match /items/{itemId} {
+          allow read: if isRestaurantMember(restaurantId);
+          allow write: if isManagerOrAdmin(restaurantId);
+        }
+      }
+
+      match /staff/{userId} {
+        allow read: if isOwnUserDoc(userId) || isRestaurantMember(restaurantId);
+        allow create: if isSelfInitialAdminCreate(restaurantId, userId)
+          || isSelfStaffCreateWithValidInvite(restaurantId, userId)
+          || isAdmin(restaurantId);
+        allow update: if isAdmin(restaurantId)
+          || (
+            isOwnUserDoc(userId)
+            && isSafeSelfStaffUpdate(restaurantId)
+          );
+        allow delete: if isAdmin(restaurantId);
+      }
+
+      match /staff_users/{userId} {
+        allow read: if isOwnUserDoc(userId) || isRestaurantMember(restaurantId);
+
+        allow create: if isSelfInitialAdminCreate(restaurantId, userId)
+          || (
+            isSelfStaffCreateWithValidInvite(restaurantId, userId)
+            && request.resource.data.role == 'staff'
+          )
+          || isAdmin(restaurantId);
+
+        allow update: if isAdmin(restaurantId)
+          || (
+            isOwnUserDoc(userId)
+            && keepsSameRole()
+            && keepsSameRestaurant(restaurantId)
+            && keepsSameActive()
+          );
+
+        allow delete: if isAdmin(restaurantId);
+      }
+
+      // ==========================================================================
+      // [APPLI] Sous-collections propres a la caisse
+      // ==========================================================================
+
+      match /staff_devices/{deviceId} {
+        allow read: if isAdmin(restaurantId);
+        allow create, update: if isRestaurantMember(restaurantId)
+          && isValidStaffDeviceWrite(restaurantId, deviceId);
+        allow delete: if isAdmin(restaurantId) || isOwnStaffDevice();
       }
 
       match /quotes/{quoteId} {
@@ -789,16 +867,6 @@ service cloud.firestore {
           && counterId in ['quotes']
           && request.resource.data.next is int;
         allow delete: if isManagerOrAdmin(restaurantId);
-      }
-
-      match /catalog_categories/{categoryId} {
-        allow read: if isRestaurantMember(restaurantId);
-        allow write: if isManagerOrAdmin(restaurantId);
-
-        match /items/{itemId} {
-          allow read: if isRestaurantMember(restaurantId);
-          allow write: if isManagerOrAdmin(restaurantId);
-        }
       }
 
       match /room_orders/{tableId} {
@@ -980,6 +1048,10 @@ service cloud.firestore {
         allow delete: if isManagerOrAdmin(restaurantId);
       }
 
+      // ==========================================================================
+      // [SITE] Sous-collections propres au site
+      // ==========================================================================
+
       // Menu QR du site : lisible par le public quand la page est publiee.
       match /menus/{menuId} {
         allow read: if isRestaurantMember(restaurantId)
@@ -1009,41 +1081,20 @@ service cloud.firestore {
       match /members/{uid} {
         allow read: if isRestaurantMember(restaurantId);
       }
-
-      match /staff/{userId} {
-        allow read: if isOwnUserDoc(userId) || isRestaurantMember(restaurantId);
-        allow create: if isSelfInitialAdminCreate(restaurantId, userId)
-          || isSelfStaffCreateWithValidInvite(restaurantId, userId)
-          || isAdmin(restaurantId);
-        allow update: if isAdmin(restaurantId)
-          || (
-            isOwnUserDoc(userId)
-            && isSafeSelfStaffUpdate(restaurantId)
-          );
-        allow delete: if isAdmin(restaurantId);
-      }
-
-      match /staff_users/{userId} {
-        allow read: if isOwnUserDoc(userId) || isRestaurantMember(restaurantId);
-
-        allow create: if isSelfInitialAdminCreate(restaurantId, userId)
-          || (
-            isSelfStaffCreateWithValidInvite(restaurantId, userId)
-            && request.resource.data.role == 'staff'
-          )
-          || isAdmin(restaurantId);
-
-        allow update: if isAdmin(restaurantId)
-          || (
-            isOwnUserDoc(userId)
-            && keepsSameRole()
-            && keepsSameRestaurant(restaurantId)
-            && keepsSameActive()
-          );
-
-        allow delete: if isAdmin(restaurantId);
-      }
     }
+
+    // ==========================================================================
+    // [APPLI] Mise a jour de l'application (version cible, telechargement)
+    // ==========================================================================
+
+    match /app_release/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // ==========================================================================
+    // [SITE] Site public : formulaire de contact et miroir public des restaurants
+    // ==========================================================================
 
     // Formulaire de contact du site : ecriture seule, champs et tailles bornes.
     match /contactMessages/{messageId} {

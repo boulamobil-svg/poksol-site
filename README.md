@@ -39,36 +39,22 @@ Google, Firestore et Storage (projet `restaurantpos-7a4f0d11`).
 
 ## Règles de sécurité (site ET application)
 
-Le site et l'application Poket Restaurants partagent le même projet Firebase, donc **le même
-jeu de règles Firestore** : Firestore n'en garde qu'un d'actif, et chaque déploiement remplace
-le précédent. `firestore.rules` est le **fichier unique** ; ne jamais déployer d'autres règles
-Firestore vers ce projet (notamment depuis le projet Flutter, dont `firebase.json` doit
-pointer vers ce fichier ou ne plus déployer de règles).
+Elles vivent dans le dossier commun **`firebase/`** : `firebase/firestore.rules` est le fichier
+unique, lu par le site et par l'application, découpé en sections `[COMMUN]`, `[APPLI]` et
+`[SITE]`. Tout est expliqué dans [`firebase/README.md`](firebase/README.md) (sections, déploiement
+depuis l'un ou l'autre projet, comment ajouter une règle).
+
+Points clés :
+
+- Firestore n'a qu'un jeu de règles actif : ne jamais déployer d'autres règles vers ce projet.
+- Un seul calcul de rôle (fiche `staff` / `staff_users`, « owner » = admin, créateur = admin) :
+  un compte a les mêmes droits par le site et par l'application.
+- Les pages publiques lisent `publicRestaurants/{slug}` ; le document `restaurants/{id}` n'est
+  jamais public.
+- Un code d'invitation ne donne pas d'accès direct : il crée une demande (`access_requests`) que
+  valide un admin, dans l'onglet Équipe du site ou dans l'application.
 
 ```bash
-firebase deploy --only firestore:rules,storage
-```
-
-Modèle de rôles, identique partout (fonctions `isRestaurantMember`, `isAdmin`,
-`isManagerOrAdmin`) :
-
-- le rôle vient de la fiche `restaurants/{id}/staff/{uid}` (ou `staff_users`) : `admin`,
-  `manager` ou `staff` ; « owner » = admin ; le créateur du restaurant (`createdBy` ou
-  `ownerUid`) est admin ;
-- **staff** : caisse (commandes, appareils, synchronisation), création et modification des
-  clients et des réservations ; **manager** : en plus catalogue, réglages, suppression de
-  clients ; **admin** : en plus équipe, invitations, profil, page publique, menu QR ;
-- tout ce qui n'est pas listé dans le fichier est refusé (pas de règle « manager écrit partout »).
-
-Pour le site : les pages publiques lisent `publicRestaurants/{slug}` (le document
-`restaurants/{id}` n'est jamais public), les invitations suivent le format de l'application
-(`restaurant_invites`, statut `active`, rôle `admin|manager|staff`). Un code d'invitation ne
-donne **pas** d'accès direct : il crée une demande (`access_requests`) que valide un admin,
-dans l'onglet Équipe du site ou dans l'application, qui choisit le rôle et le poste et crée
-les fiches `staff` / `staff_users`.
-
-Les tests (`tests/rules`, Java 21 requis) doivent passer avant tout déploiement :
-
-```bash
-cd tests/rules && npm install && npm test
+cd tests/rules && npm install && npm test        # avant tout déploiement (Java 21 requis)
+firebase deploy --only firestore:rules,storage   # depuis ce dépôt
 ```
