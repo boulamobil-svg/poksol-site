@@ -44,7 +44,7 @@ l'application Poket Restaurants partagent le même projet Firebase et donc le m�
 Firestore (il n'y en a qu'un d'actif : chaque déploiement remplace le précédent). Le fichier
 unique vit dans le projet de l'application :
 
-- `C:\AI_WORKSPACE\AppLab\chez_marwan_posirestore_rules.txt` (Firestore) et `storage_rules.txt` ;
+- `C:\AI_WORKSPACE\AppLab\chez_marwan_pos\firestore_rules.txt` (Firestore) et `storage_rules.txt` ;
 - les règles propres au site y sont annotées **`[SITE]`** (les règles propres à la caisse
   `[APPLI]`, les règles partagées `[COMMUN]`) ;
 - procédure, tests et déploiement : `docs/FIREBASE_RULES.md` de ce même projet.
