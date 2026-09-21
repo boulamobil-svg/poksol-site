@@ -2560,6 +2560,10 @@ select:focus-visible {
   background: #ffffff;
 }
 
+.reservation-detail-item.is-wide {
+  grid-column: span 2;
+}
+
 .reservation-detail-item span,
 .reservation-detail-item strong {
   display: block;
@@ -4511,6 +4515,10 @@ body.menu-page-body.translated-rtl {
   .client-account-details,
   .reservation-details {
     grid-template-columns: 1fr;
+  }
+
+  .reservation-detail-item.is-wide {
+    grid-column: auto;
   }
 
   .reservation-more-label,

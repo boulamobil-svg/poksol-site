@@ -4313,14 +4313,15 @@ function reservationsHtml(reservations, role) {
           <span class="reservation-more-label">Details</span>
           </summary>
           <div class="reservation-details">
-            ${reservationDetailItemHtml("Date", reservationDate || "Date non renseignee")}
+            ${reservationDetailItemHtml("Date de la reservation", reservationDayLabel(reservation) || "Date non renseignee")}
             ${reservationDetailItemHtml("Heure", reservationTime || "Heure non renseignee")}
+            ${reservationDetailItemHtml("Enregistree le", reservationRecordedLabel(reservation) || "Non renseignee", true)}
             ${reservationDetailItemHtml("Source", source || "Source non renseignee")}
             ${reservationDetailItemHtml("Created by", createdBy || "Created by non renseigne")}
             ${reservationDetailItemHtml("Telephone", firstText(reservation.customerPhone, reservation.phone, reservation.telephone, reservation.customer?.phone))}
             ${reservationDetailItemHtml("Email", firstText(reservation.customerEmail, reservation.email, reservation.contactEmail, reservation.customer?.email))}
-            ${reservationDetailItemHtml("Notes", firstText(reservation.notes, reservation.message, reservation.comment))}
-            ${reservationDetailItemHtml("ID reservation", reservation.id)}
+            ${reservationDetailItemHtml("Notes", firstText(reservation.notes, reservation.message, reservation.comment), true)}
+            ${reservationDetailItemHtml("ID reservation", reservation.id, true)}
           </div>
         </details>
       `;
@@ -4329,9 +4330,9 @@ function reservationsHtml(reservations, role) {
   `;
 }
 
-function reservationDetailItemHtml(label, value) {
+function reservationDetailItemHtml(label, value, wide = false) {
   return `
-    <div class="reservation-detail-item">
+    <div class="reservation-detail-item${wide ? " is-wide" : ""}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value || "-")}</strong>
     </div>
@@ -4341,7 +4342,7 @@ function reservationDetailItemHtml(label, value) {
 function reservationDateLabel(reservation = {}) {
   const explicitDate = firstText(reservation.date, reservation.reservationDate, reservation.day, reservation.bookingDate);
   const explicitTime = firstText(reservation.time, reservation.reservationTime, reservation.hour, reservation.bookingTime);
-  if (explicitDate || explicitTime) return `${explicitDate} ${explicitTime}`.trim();
+  if (explicitDate || explicitTime) return `${reservationDayLabel(reservation)} ${explicitTime}`.trim();
   const date = dateFromFirestoreValue(reservation.reservedAt || reservation.reservationAt || reservation.dateTime || reservation.startAt || reservation.createdFor);
   if (!date) return "";
   return new Intl.DateTimeFormat("fr-FR", {
@@ -4351,6 +4352,27 @@ function reservationDateLabel(reservation = {}) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+// Jour du service seul (l'heure a son propre champ) : « 19/09/2026 ».
+function reservationDayLabel(reservation = {}) {
+  const explicitDate = firstText(reservation.date, reservation.reservationDate, reservation.day, reservation.bookingDate);
+  if (explicitDate) {
+    const parts = explicitDate.split("-");
+    if (parts.length === 3 && parts[0].length === 4) return `${parts[2].slice(0, 2)}/${parts[1]}/${parts[0]}`;
+    return explicitDate;
+  }
+  const date = dateFromFirestoreValue(reservation.reservedAt || reservation.reservationAt || reservation.dateTime || reservation.startAt || reservation.createdFor);
+  return date ? clientDateLabel(date) : "";
+}
+
+// Moment ou la reservation a ete prise (createdAt), pas celui du repas : « 19/09/2026 a 18:57 ».
+function reservationRecordedLabel(reservation = {}) {
+  const date = dateFromFirestoreValue(reservation.createdAt);
+  if (!date) return "";
+  const day = clientDateLabel(date);
+  const time = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date);
+  return `${day} a ${time}`;
 }
 
 function reservationTimeLabel(reservation = {}) {
