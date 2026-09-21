@@ -1816,7 +1816,7 @@ function hydratePublicRestaurant(root, restaurant, menu) {
   setText("[data-public-cuisine]", restaurant.cuisineType || "Restaurant");
   setText("[data-public-phone]", restaurant.phone);
   setText("[data-public-email]", restaurant.email);
-  setText("[data-public-address]", [restaurant.address, restaurant.postalCode, restaurant.city].filter(Boolean).join(", "));
+  setText("[data-public-address]", [restaurant.addressLine1 || restaurant.address, restaurant.postalCode, restaurant.city].filter(Boolean).join(", "));
   setHref("[data-public-phone-link]", restaurant.phone ? `tel:${restaurant.phone}` : "");
   setHref("[data-public-email-link]", restaurant.email ? `mailto:${restaurant.email}` : "");
   setHref("[data-public-maps-link]", restaurant.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name + " " + restaurant.city)}`);

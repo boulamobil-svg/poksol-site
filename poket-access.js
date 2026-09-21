@@ -295,12 +295,14 @@ async function saveProfile({ final }) {
         locale: profile.locale,
         businessType: profile.businessType,
         enabledSalesModes: profile.enabledSalesModes,
-        publicPageEnabled: true,
-        qrMenuEnabled: false,
-        reservationEnabled: true,
         updatedAt: serverTimestamp()
       };
       if (!isExisting) {
+        // Reglages de publication : valeurs par defaut a la creation seulement. Sur un restaurant
+        // existant ils sont modifies depuis le dashboard (Page publique) et ne doivent pas etre ecrases.
+        restaurantPayload.publicPageEnabled = true;
+        restaurantPayload.qrMenuEnabled = false;
+        restaurantPayload.reservationEnabled = true;
         restaurantPayload.ownerUid = currentUser.uid;
         restaurantPayload.createdBy = currentUser.uid;
         restaurantPayload.createdAt = serverTimestamp();
@@ -801,9 +803,9 @@ async function syncPublicRestaurantProfile(restaurantId, restaurantPayload) {
     instagram: restaurantPayload.instagram || profile.instagram || "",
     facebook: restaurantPayload.facebook || profile.facebook || "",
     googleMapsUrl: restaurantPayload.googleMapsUrl || profile.googleMapsUrl || "",
-    publicPageEnabled: restaurantPayload.publicPageEnabled !== false,
-    qrMenuEnabled: restaurantPayload.qrMenuEnabled === true,
-    reservationEnabled: restaurantPayload.reservationEnabled !== false,
+    ...(restaurantPayload.publicPageEnabled === undefined ? {} : { publicPageEnabled: restaurantPayload.publicPageEnabled !== false }),
+    ...(restaurantPayload.qrMenuEnabled === undefined ? {} : { qrMenuEnabled: restaurantPayload.qrMenuEnabled === true }),
+    ...(restaurantPayload.reservationEnabled === undefined ? {} : { reservationEnabled: restaurantPayload.reservationEnabled !== false }),
     openingHours: openingHoursByDay || restaurantPayload.openingHours || profile.openingHours || {},
     updatedAt: serverTimestamp()
   };
