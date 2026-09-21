@@ -554,6 +554,8 @@ async function saveRestaurantProfile(restaurantId, form) {
     phone: text(data, "phone"),
     email: text(data, "email"),
     website: text(data, "website"),
+    siret: text(data, "siret"),
+    vatNumber: text(data, "vatNumber"),
     instagram: text(data, "instagram"),
     facebook: text(data, "facebook"),
     googleMapsUrl: text(data, "googleMapsUrl"),
@@ -2279,6 +2281,8 @@ function overviewHtml(restaurant, publicUrl, account = null) {
     ["Adresse", restaurant.addressLine1],
     ["Ville", [restaurant.postalCode, restaurant.city].filter(Boolean).join(" ")],
     ["Pays", restaurant.country || "France"],
+    ["SIRET", formatSiret(restaurant.siret)],
+    ["N° TVA", restaurant.vatNumber],
     ["Site web", restaurant.website]
   ].filter(([, value]) => String(value || "").trim().length);
   return `
@@ -2328,6 +2332,8 @@ function profileFormHtml(restaurant, canEdit) {
         <label>Ville<input name="city" value="${escapeAttr(restaurant.city)}" ${disabled(canEdit)} /></label>
         <label>Code postal<input name="postalCode" value="${escapeAttr(restaurant.postalCode)}" ${disabled(canEdit)} /></label>
         <label>Pays<input name="country" value="${escapeAttr(restaurant.country || "France")}" ${disabled(canEdit)} /></label>
+        <label>SIRET<input name="siret" inputmode="numeric" placeholder="14 chiffres" value="${escapeAttr(restaurant.siret)}" ${disabled(canEdit)} /></label>
+        <label>N° TVA intracommunautaire<input name="vatNumber" placeholder="FR + 11 chiffres" value="${escapeAttr(restaurant.vatNumber)}" ${disabled(canEdit)} /></label>
         <label>Site web<input name="website" value="${escapeAttr(restaurant.website)}" ${disabled(canEdit)} /></label>
         <label>Instagram<input name="instagram" value="${escapeAttr(restaurant.instagram)}" ${disabled(canEdit)} /></label>
         <label>Facebook<input name="facebook" value="${escapeAttr(restaurant.facebook)}" ${disabled(canEdit)} /></label>
@@ -3382,6 +3388,8 @@ function buildTicketReceipt({ ticket, movement, restaurant, clientName }) {
   const cityLine = [restaurant?.postalCode, restaurant?.city].filter(Boolean).join(" ");
   if (cityLine) center(cityLine);
   if (restaurant?.phone) center(`Tel : ${formatClientPhone(restaurant.phone)}`);
+  if (restaurant?.siret) center(`SIRET : ${formatSiret(restaurant.siret)}`);
+  if (restaurant?.vatNumber) center(`TVA : ${restaurant.vatNumber}`);
   rule("=");
 
   const ticketLines = Array.isArray(ticket?.lines) ? ticket.lines : [];
@@ -3640,7 +3648,11 @@ async function openClientMovement(root, key) {
   }
   if (!document.body.contains(overlay)) return;
   const receipt = buildTicketReceipt({ ticket, movement: flat, restaurant: root.dashboardRestaurant || {}, clientName });
-  const notice = ticket ? "" : `<p class="client-modal-note">${escapeHtml(failure || "Le detail de ce ticket n'est plus disponible : seul le montant mis sur le compte est affiche.")}</p>`;
+  const restaurantInfo = root.dashboardRestaurant || {};
+  const notice = [
+    ticket ? "" : failure || "Le detail de ce ticket n'est plus disponible : seul le montant mis sur le compte est affiche.",
+    restaurantInfo.siret && restaurantInfo.vatNumber ? "" : "SIRET et/ou n° de TVA non renseignes : ajoutez-les dans Profil > Informations generales pour qu'ils figurent sur le ticket."
+  ].filter(Boolean).map((line) => `<p class="client-modal-note">${escapeHtml(line)}</p>`).join("");
   overlay.querySelector(".client-modal-body").innerHTML = `${notice}<div class="ticket-sheet">${ticketPreviewHtml(receipt)}</div>`;
   const footer = document.createElement("footer");
   footer.innerHTML = `
@@ -4679,8 +4691,18 @@ function normalizeRestaurant(id, data) {
     country,
     phone: data.phone || profile.phone || "",
     email: data.email || profile.email || "",
+    siret: data.siret || profile.siret || "",
+    vatNumber: data.vatNumber || profile.vatNumber || "",
     openingHours: resolveOpeningHours(data, profile)
   };
+}
+
+// SIRET affiche en groupes (890 295 520 00013) quand il compte bien 14 chiffres.
+function formatSiret(value = "") {
+  const raw = String(value || "").trim();
+  const digits = raw.split(" ").join("");
+  if (digits.length !== 14 || !digits.split("").every((char) => char >= "0" && char <= "9")) return raw;
+  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
 }
 
 // Ligne de rue seule. Une fiche enregistree avec « rue + code postal + ville + pays » colles
