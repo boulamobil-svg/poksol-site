@@ -1257,6 +1257,12 @@ function initDashboardPage() {
       return;
     }
     if (!event.target.closest(".client-col-head")) closeClientColumnMenus(root);
+    const clientMovement = event.target.closest("[data-client-movement]");
+    if (clientMovement) {
+      event.preventDefault();
+      openClientMovement(root, clientMovement.dataset.clientMovement);
+      return;
+    }
     const clientExport = event.target.closest("[data-client-export]");
     if (clientExport) {
       event.preventDefault();
@@ -1501,6 +1507,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
     : menu;
   const account = currentUserSummary(user, userProfile, members, role, restaurant.id);
   root.clientExportSource = { customers: customerAccounts, reservations };
+  root.dashboardRestaurant = restaurant;
   root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests);
   applyClientTools(root);
 }
@@ -3167,6 +3174,7 @@ function clientAccountSummary(client = {}) {
   const tone = balanceTone(balance);
   const openTickets = firstNumber(client.openTicketCount, client.openTickets, client.unpaidTickets, client.pendingTicketCount);
   return {
+    clientKey: `${customerCollectionName(client.customerCollection)}/${client.id}`,
     balanceValue: balance,
     debitValue: debitTotal,
     creditValue: creditTotal,
@@ -3193,6 +3201,7 @@ function normalizeClientMovements(client = {}) {
     const { direction, amount } = movementDirectionAndAmount(movement);
     const date = dateFromFirestoreValue(movement.createdAt || movement.date || movement.paidAt || movement.ticketAt || movement.updatedAt);
     return {
+      id: movement.id || "",
       direction,
       amount,
       signed: direction === "credit" ? amount : -amount,
@@ -3249,23 +3258,401 @@ function clientJournalHtml(account) {
         <div>
           <h3>Journal des mouvements</h3>
           <p>Debits ${escapeHtml(account.debitLabel)} · Credits ${escapeHtml(account.creditLabel)} · Solde (credits − debits) <strong class="is-${account.balanceTone}">${escapeHtml(account.balanceLabel)}</strong></p>
+          ${account.movements.some((movement) => movement.id) ? `<p class="client-ledger-hint">Cliquez sur une ligne : un ticket affiche son contenu (avec le PDF a telecharger), un encaissement affiche son mode de reglement.</p>` : ""}
         </div>
         ${account.movements.length ? `
           <div class="client-ledger-table">
             <div class="client-ledger-row client-ledger-head"><span>Date</span><span>Libelle</span><span>Debit</span><span>Credit</span><span>Solde</span></div>
             ${account.movements.map((movement) => `
-              <div class="client-ledger-row">
+              <${movement.id ? `button type="button" data-client-movement="${escapeAttr(`${account.clientKey}/${movement.id}`)}" title="${movement.direction === "credit" ? "Voir le mode d'encaissement" : "Voir le ticket"}"` : "div"} class="client-ledger-row${movement.id ? " is-clickable" : ""}">
                 <span>${escapeHtml(movement.dateLabel)}</span>
                 <span><strong>${escapeHtml(movement.label)}</strong>${movement.detail ? `<small>${escapeHtml(movement.detail)}</small>` : ""}</span>
                 <span class="is-debit">${movement.direction === "debit" ? escapeHtml(movement.amountLabel) : ""}</span>
                 <span class="is-credit">${movement.direction === "credit" ? escapeHtml(movement.amountLabel) : ""}</span>
                 <span class="client-ledger-balance is-${balanceTone(movement.runningValue)}">${escapeHtml(movement.runningLabel)}</span>
-              </div>
+              </${movement.id ? "button" : "div"}>
             `).join("")}
           </div>
         ` : `<div class="client-account-empty">Aucun mouvement disponible pour ce client.</div>`}
       </section>
   `;
+}
+
+
+// ---------------------------------------------------------------------------
+// Journal : detail d'un mouvement. Ligne « ticket » = ticket de caisse reconstitue
+// depuis restaurants/{id}/room_orders/{ticketId} (avec PDF A4 + filigrane COPIE) ;
+// ligne « encaissement » = mode de reglement, note et date.
+// ---------------------------------------------------------------------------
+const TICKET_WIDTH = 42;
+const NL = String.fromCharCode(10);
+const BACKSLASH = String.fromCharCode(92);
+const EURO = String.fromCharCode(8364);
+// Caracteres hors Latin-1 encodables en WinAnsi (police standard du PDF).
+const PDF_WINANSI_EXTRA = new Map([[8364, 128], [8230, 133], [8216, 145], [8217, 146], [8220, 147], [8221, 148], [8226, 149], [8211, 150], [8212, 151]]);
+
+function ticketMoney(value) {
+  return `${roundMoney(value).toFixed(2).replace(".", ",")} ${EURO}`;
+}
+
+function ticketAmount(value) {
+  return roundMoney(value).toFixed(2).replace(".", ",");
+}
+
+function ticketQuantity(value) {
+  const number = Number(value) || 0;
+  return Number.isInteger(number) ? String(number) : String(Math.round(number * 1000) / 1000).replace(".", ",");
+}
+
+function ticketWrap(text, width) {
+  const lines = [];
+  let current = "";
+  String(text || "").split(" ").filter(Boolean).forEach((word) => {
+    let rest = word;
+    while (rest.length > width) {
+      if (current) {
+        lines.push(current);
+        current = "";
+      }
+      lines.push(rest.slice(0, width));
+      rest = rest.slice(width);
+    }
+    if (!current) current = rest;
+    else if (current.length + 1 + rest.length <= width) current += ` ${rest}`;
+    else {
+      lines.push(current);
+      current = rest;
+    }
+  });
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
+// Texte a gauche, montant aligne a droite sur la derniere ligne.
+function ticketRow(left, right, width = TICKET_WIDTH, indent = 0) {
+  const amount = String(right || "");
+  const pad = " ".repeat(indent);
+  const parts = ticketWrap(left, Math.max(width - amount.length - 1 - indent, 8));
+  const last = parts.pop();
+  const rows = parts.map((part) => pad + part);
+  rows.push(pad + last + " ".repeat(Math.max(1, width - indent - last.length - amount.length)) + amount);
+  return rows;
+}
+
+function ticketLineTotal(line = {}) {
+  const quantity = Number(line.quantity) || 0;
+  const unit = Number(line.unitPrice) || 0;
+  const supplements = (line.selectedSupplements || []).reduce((sum, item) => sum + (item?.includedInBasePrice ? 0 : Number(item?.unitPrice) || 0), 0);
+  const type = String(line.lineType || "product");
+  if (type === "productCancellation") return -((unit + supplements) * quantity);
+  if (type === "supplementAddition") return supplements * quantity;
+  if (type === "supplementRemoval") return -(supplements * quantity);
+  return (unit + supplements) * quantity;
+}
+
+function ticketSupplementName(item = {}) {
+  const name = String(item.name || "").trim();
+  const prefix = String(item.categoryPrefix || "").trim();
+  if (!prefix || name.toUpperCase().startsWith(`${prefix.toUpperCase()} `)) return name;
+  return `${prefix} ${name}`;
+}
+
+function ticketDateLabel(value) {
+  const date = dateFromFirestoreValue(value);
+  if (!date) return "";
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    .format(date)
+    .split(String.fromCharCode(8239))
+    .join(" ");
+}
+
+// Le ticket est construit ligne par ligne (police a chasse fixe) : le meme contenu sert
+// a l'apercu a l'ecran et au PDF, donc les deux sont identiques.
+function buildTicketReceipt({ ticket, movement, restaurant, clientName }) {
+  const width = TICKET_WIDTH;
+  const lines = [];
+  const add = (text = "", bold = false) => lines.push({ text: String(text), bold });
+  const rule = (char = "-") => add(char.repeat(width));
+  const center = (text, bold = false) => ticketWrap(text, width).forEach((part) => add(" ".repeat(Math.floor((width - part.length) / 2)) + part, bold));
+  const row = (left, right, indent = 0, bold = false) => ticketRow(left, right, width, indent).forEach((text) => add(text, bold));
+
+  center(String(firstText(restaurant?.name, restaurant?.tradeName, "Restaurant")).toUpperCase(), true);
+  const address = [
+    firstText(restaurant?.address, restaurant?.addressLine1),
+    [restaurant?.postalCode, restaurant?.city].filter(Boolean).join(" ")
+  ].filter(Boolean).join(", ");
+  if (address) center(address);
+  if (restaurant?.phone) center(`Tel : ${restaurant.phone}`);
+  rule("=");
+
+  const ticketLines = Array.isArray(ticket?.lines) ? ticket.lines : [];
+  const payments = Array.isArray(ticket?.payments) ? ticket.payments : [];
+  const number = ticket?.continuousNumber || ticket?.dailyNumber || "";
+  row(number ? `Ticket n° ${number}` : "Ticket", firstText(ticket?.label, movement?.ticketLabel));
+  const when = ticketDateLabel(ticket?.closedAt || ticket?.paidAt || payments[0]?.createdAt || movement?.createdAt);
+  if (when) add(when);
+  if (ticket?.dailyNumber && ticket?.continuousNumber) add(`N° du jour : ${ticket.dailyNumber}`);
+  if (Number(ticket?.covers) > 0) add(`Couverts : ${ticket.covers}`);
+  if (clientName) ticketWrap(`Client : ${clientName}`, width).forEach((part) => add(part));
+  rule();
+
+  let total = 0;
+  const vatBuckets = new Map();
+  ticketLines.forEach((line) => {
+    const lineTotal = ticketLineTotal(line);
+    total += lineTotal;
+    const type = String(line.lineType || "product");
+    const quantity = Number(line.quantity) || 0;
+    const unit = Number(line.unitPrice) || 0;
+    const title = type === "productCancellation" ? `Annulation - ${line.name || ""}`
+      : type === "supplementAddition" ? "Ajout supplement"
+        : type === "supplementRemoval" ? "Annulation supplement"
+          : String(line.name || "Article");
+    row(`${ticketQuantity(quantity)} x ${title}`, ticketAmount(lineTotal));
+    if (type === "product" && quantity !== 1 && unit) add(`   ${ticketQuantity(quantity)} x ${ticketAmount(unit)}`);
+    (line.selectedSupplements || []).forEach((item) => {
+      const price = item?.includedInBasePrice ? 0 : Number(item?.unitPrice) || 0;
+      row(`+ ${ticketSupplementName(item)}`, price ? ticketAmount(price) : "", 3);
+    });
+    (line.removedConstituents || []).forEach((item) => ticketWrap(`sans ${item?.name || item?.displayName || ""}`, width - 3).forEach((part) => add(`   ${part}`)));
+    if (line.note) ticketWrap(`Note : ${line.note}`, width - 3).forEach((part) => add(`   ${part}`));
+    const takeaway = String(line.saleMode || "").toLowerCase().includes("take");
+    const rate = Number(takeaway ? line.vatTakeaway : line.vatOnSite);
+    if (Number.isFinite(rate)) vatBuckets.set(rate, (vatBuckets.get(rate) || 0) + lineTotal);
+  });
+  if (!ticketLines.length) center("Detail du ticket indisponible");
+  rule();
+
+  total = roundMoney(total);
+  const discount = ticketLines.length ? roundMoney(Math.min(Math.max(Number(ticket?.discountAmount) || 0, 0), Math.max(total, 0))) : 0;
+  const payable = roundMoney(total - discount);
+  if (ticketLines.length) {
+    if (discount > 0) {
+      row("Sous-total", ticketMoney(total));
+      row(ticket?.discountLabel ? `Remise - ${ticket.discountLabel}` : "Remise", `-${ticketMoney(discount)}`);
+    }
+    row("TOTAL A PAYER", ticketMoney(payable), 0, true);
+    rule();
+  }
+
+  const paymentRows = payments.length ? payments : (ticket?.isPaid && ticket?.paymentMethodLabel ? [{ methodLabel: ticket.paymentMethodLabel, amount: payable }] : []);
+  if (paymentRows.length) {
+    add("Reglements", true);
+    paymentRows.forEach((payment) => {
+      row(firstText(payment.methodLabel, payment.methodKey, "Reglement"), ticketMoney(payment.amount));
+      if (Number(payment.tipAmount) > 0) row("Pourboire", ticketMoney(payment.tipAmount), 3);
+      if (Number(payment.changeDue) > 0) row("Rendu monnaie", ticketMoney(payment.changeDue), 3);
+    });
+    rule();
+  }
+
+  if (vatBuckets.size && total > 0) {
+    const factor = payable / total;
+    add("TVA incluse", true);
+    [...vatBuckets.entries()].sort((a, b) => a[0] - b[0]).forEach(([rate, amount]) => {
+      const ttc = amount * factor;
+      const vat = ttc - ttc / (1 + rate / 100);
+      row(`TVA ${String(rate).replace(".", ",")} %  (HT ${ticketAmount(ttc - vat)})`, ticketMoney(vat));
+    });
+    rule();
+  }
+
+  if (movement) {
+    add("Compte client", true);
+    row(clientName ? `Mis sur le compte de ${clientName}` : "Mis sur le compte client", ticketMoney(movement.amount));
+    if (movement.correctedAt) add(`Corrige le ${ticketDateLabel(movement.correctedAt)}`);
+    rule();
+  }
+  center("Merci de votre visite");
+  center("COPIE - non contractuelle");
+  return lines;
+}
+
+function ticketPreviewHtml(lines) {
+  return `<pre class="ticket-paper">${lines.map((line) => (line.bold ? `<b>${escapeHtml(line.text)}</b>` : escapeHtml(line.text))).join(NL)}</pre>`;
+}
+
+// --- PDF ecrit a la main : pas de librairie, polices standard, ticket centre sur une A4.
+function pdfText(value) {
+  let out = "";
+  String(value || "").normalize("NFC").split("").forEach((char) => {
+    const code = char.charCodeAt(0);
+    let byte = null;
+    if (code >= 32 && code < 127) byte = code;
+    else if (code >= 160 && code <= 255) byte = code;
+    else if (PDF_WINANSI_EXTRA.has(code)) byte = PDF_WINANSI_EXTRA.get(code);
+    if (byte === null) out += "?";
+    else if (byte === 40 || byte === 41 || byte === 92) out += BACKSLASH + char;
+    else if (byte >= 127) out += BACKSLASH + byte.toString(8).padStart(3, "0");
+    else out += char;
+  });
+  return out;
+}
+
+function pdfNumber(value) {
+  return (Math.round(value * 100) / 100).toString();
+}
+
+function buildTicketPdf(lines) {
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const fontSize = 9;
+  const leading = 11.5;
+  const blockWidth = TICKET_WIDTH * fontSize * 0.6;
+  const padding = 18;
+  const perPage = 62;
+  const chunks = [];
+  for (let index = 0; index < lines.length; index += perPage) chunks.push(lines.slice(index, index + perPage));
+  if (!chunks.length) chunks.push([]);
+
+  // Filigrane « COPIE » en diagonale au centre de la page (Helvetica-Bold, gris clair).
+  const markSize = 130;
+  const markWidth = 3.112 * markSize;
+  const markHeight = markSize * 0.36;
+  const cos = Math.cos(Math.PI / 4);
+  const sin = Math.sin(Math.PI / 4);
+  const markX = pageWidth / 2 - (cos * markWidth / 2 - sin * markHeight);
+  const markY = pageHeight / 2 - (sin * markWidth / 2 + cos * markHeight);
+  const watermark = `q 0.9 g BT /F3 ${markSize} Tf ${pdfNumber(cos)} ${pdfNumber(sin)} ${pdfNumber(-sin)} ${pdfNumber(cos)} ${pdfNumber(markX)} ${pdfNumber(markY)} Tm (COPIE) Tj ET Q`;
+
+  const objects = [];
+  const addObject = (body) => {
+    objects.push(body);
+    return objects.length;
+  };
+  const catalogId = addObject("");
+  const pagesId = addObject("");
+  const fontRegular = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>");
+  const fontBold = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>");
+  const fontMark = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  const pageIds = [];
+  chunks.forEach((chunk) => {
+    const blockHeight = chunk.length * leading;
+    const left = (pageWidth - blockWidth) / 2;
+    const top = chunks.length === 1 ? (pageHeight + blockHeight) / 2 : pageHeight - 90;
+    let stream = `${watermark}${NL}`;
+    stream += `q 0.75 G 0.6 w ${pdfNumber(left - padding)} ${pdfNumber(top - blockHeight - padding + leading * 0.3)} ${pdfNumber(blockWidth + padding * 2)} ${pdfNumber(blockHeight + padding * 2)} re S Q${NL}`;
+    chunk.forEach((line, index) => {
+      const y = top - (index + 1) * leading + leading * 0.3;
+      stream += `BT /${line.bold ? "F2" : "F1"} ${fontSize} Tf ${pdfNumber(left)} ${pdfNumber(y)} Td (${pdfText(line.text)}) Tj ET${NL}`;
+    });
+    const contentId = addObject(`<< /Length ${stream.length} >>${NL}stream${NL}${stream}endstream`);
+    pageIds.push(addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegular} 0 R /F2 ${fontBold} 0 R /F3 ${fontMark} 0 R >> >> /Contents ${contentId} 0 R >>`));
+  });
+  objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+  objects[pagesId - 1] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
+
+  let pdf = `%PDF-1.4${NL}`;
+  const offsets = [];
+  objects.forEach((body, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj${NL}${body}${NL}endobj${NL}`;
+  });
+  const xrefAt = pdf.length;
+  pdf += `xref${NL}0 ${objects.length + 1}${NL}0000000000 65535 f ${NL}`;
+  offsets.forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n ${NL}`;
+  });
+  pdf += `trailer${NL}<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>${NL}startxref${NL}${xrefAt}${NL}%%EOF${NL}`;
+  const bytes = new Uint8Array(pdf.length);
+  for (let index = 0; index < pdf.length; index += 1) bytes[index] = pdf.charCodeAt(index) & 255;
+  return new Blob([bytes], { type: "application/pdf" });
+}
+
+function findClientMovement(root, key) {
+  const [collectionName, clientId, movementId] = String(key || "").split("/");
+  const source = root.clientExportSource?.customers;
+  const client = (source?.customers || source || [])
+    .find((item) => item.id === clientId && customerCollectionName(item.customerCollection) === collectionName);
+  const movement = (client?.movements || []).find((item) => item.id === movementId);
+  return { client, movement };
+}
+
+async function readRoomOrder(restaurantId, ticketId) {
+  if (!ticketId) return null;
+  const services = await getServices();
+  const { doc, getDoc } = services.firestoreModule;
+  const snap = await getDoc(doc(services.db, "restaurants", restaurantId, "room_orders", ticketId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+function closeClientMovementModal() {
+  document.querySelector("[data-client-modal]")?.remove();
+  document.removeEventListener("keydown", closeClientMovementOnEscape);
+}
+
+function closeClientMovementOnEscape(event) {
+  if (event.key === "Escape") closeClientMovementModal();
+}
+
+function showClientMovementModal(title, bodyHtml) {
+  closeClientMovementModal();
+  const overlay = document.createElement("div");
+  overlay.className = "client-modal-overlay";
+  overlay.dataset.clientModal = "";
+  overlay.innerHTML = `
+    <div class="client-modal" role="dialog" aria-modal="true" aria-label="${escapeAttr(title)}">
+      <header>
+        <h3>${escapeHtml(title)}</h3>
+        <button class="button-reset client-modal-close" type="button" data-client-modal-close aria-label="Fermer">&times;</button>
+      </header>
+      <div class="client-modal-body">${bodyHtml}</div>
+    </div>
+  `;
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest("[data-client-modal-close]")) closeClientMovementModal();
+  });
+  document.body.appendChild(overlay);
+  document.addEventListener("keydown", closeClientMovementOnEscape);
+  overlay.querySelector("[data-client-modal-close]")?.focus();
+  return overlay;
+}
+
+function paymentDetailHtml(client, movement) {
+  const date = dateFromFirestoreValue(movement.createdAt);
+  const rows = [
+    ["Client", client.displayName || client.companyName || ""],
+    ["Date", date ? ticketDateLabel(date) : ""],
+    ["Montant encaisse", formatMoney(movement.amount)],
+    ["Mode d'encaissement", firstText(movement.paymentMethodLabel, movement.paymentMethodKey) || "Non renseigne"],
+    ["Note", movement.note || ""],
+    ["Correction", movement.correctedAt ? `${ticketDateLabel(movement.correctedAt)}${movement.correctionReason ? ` - ${movement.correctionReason}` : ""}` : ""]
+  ].filter(([, value]) => String(value || "").trim());
+  return `<dl class="client-payment-detail">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>`;
+}
+
+async function openClientMovement(root, key) {
+  const { client, movement } = findClientMovement(root, key);
+  if (!client || !movement) return;
+  const { direction, amount } = movementDirectionAndAmount(movement);
+  const clientName = client.displayName || client.companyName || "";
+  const flat = { ...movement, amount };
+  if (direction === "credit") {
+    showClientMovementModal("Encaissement compte client", paymentDetailHtml(client, flat));
+    return;
+  }
+  const overlay = showClientMovementModal(movement.ticketLabel ? `Ticket ${movement.ticketLabel}` : "Ticket", `<p class="client-modal-wait">Chargement du ticket...</p>`);
+  let ticket = null;
+  let failure = "";
+  try {
+    ticket = await readRoomOrder(root.dataset.restaurantId, movement.ticketId);
+  } catch (error) {
+    failure = readableFirebaseError(error);
+  }
+  if (!document.body.contains(overlay)) return;
+  const receipt = buildTicketReceipt({ ticket, movement: flat, restaurant: root.dashboardRestaurant || {}, clientName });
+  const notice = ticket ? "" : `<p class="client-modal-note">${escapeHtml(failure || "Le detail de ce ticket n'est plus disponible : seul le montant mis sur le compte est affiche.")}</p>`;
+  overlay.querySelector(".client-modal-body").innerHTML = `${notice}<div class="ticket-sheet">${ticketPreviewHtml(receipt)}</div>`;
+  const footer = document.createElement("footer");
+  footer.innerHTML = `
+    <button class="primary-btn button-reset" type="button" data-ticket-download>Telecharger le ticket (PDF)</button>
+    <button class="outline-dark-btn button-reset" type="button" data-client-modal-close>Fermer</button>
+  `;
+  overlay.querySelector(".client-modal").appendChild(footer);
+  footer.querySelector("[data-ticket-download]").addEventListener("click", () => {
+    const stamp = String(ticket?.continuousNumber || ticket?.dailyNumber || movement.ticketId || "ticket").replace(/[^a-zA-Z0-9_-]/g, "_");
+    downloadClientFile(buildTicketPdf(receipt), `ticket-${stamp}-copie.pdf`, "application/pdf");
+  });
 }
 
 

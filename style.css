@@ -5501,3 +5501,163 @@ body.menu-page-body.translated-rtl {
 .client-ledger-balance {
   font-weight: 900;
 }
+
+/* Journal cliquable, fenetre ticket / encaissement */
+.client-ledger-hint {
+  margin: 4px 0 0;
+  color: #68707b;
+  font-size: 13px;
+}
+
+button.client-ledger-row {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid #edf0f3;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.client-ledger-row:last-child {
+  border-bottom: 0;
+}
+
+button.client-ledger-row:hover,
+button.client-ledger-row:focus-visible {
+  background: #f1f7ff;
+  outline: none;
+}
+
+.client-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 37, 64, 0.55);
+}
+
+.client-modal {
+  display: flex;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 24px 60px rgba(10, 37, 64, 0.35);
+}
+
+.client-modal header,
+.client-modal footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+}
+
+.client-modal header {
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e8ec;
+}
+
+.client-modal header h3 {
+  margin: 0;
+  color: #0a2540;
+}
+
+.client-modal footer {
+  border-top: 1px solid #e5e8ec;
+}
+
+.client-modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: #4a525d;
+  background: #eef1f4;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.client-modal-body {
+  padding: 16px 18px;
+  overflow: auto;
+}
+
+.client-modal-note,
+.client-modal-wait {
+  margin: 0 0 12px;
+  color: #68707b;
+  font-weight: 700;
+}
+
+.ticket-sheet {
+  padding: 18px;
+  overflow: auto;
+  border-radius: 12px;
+  background: #eef1f4;
+}
+
+.ticket-paper {
+  position: relative;
+  width: max-content;
+  max-width: none;
+  margin: 0 auto;
+  padding: 18px 16px;
+  overflow: hidden;
+  color: #111;
+  background: white;
+  box-shadow: 0 6px 18px rgba(10, 37, 64, 0.18);
+  font: 12.5px/1.45 "Courier New", Courier, monospace;
+  white-space: pre;
+}
+
+.ticket-paper::after {
+  content: "COPIE";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(10, 37, 64, 0.07);
+  font: 900 86px/1 Arial, sans-serif;
+  transform: rotate(-45deg);
+  pointer-events: none;
+}
+
+.client-payment-detail {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.client-payment-detail div {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.client-payment-detail div:last-child {
+  border-bottom: 0;
+}
+
+.client-payment-detail dt {
+  color: #68707b;
+  font-weight: 800;
+}
+
+.client-payment-detail dd {
+  margin: 0;
+  color: #0a2540;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
