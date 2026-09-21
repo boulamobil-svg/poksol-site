@@ -1507,7 +1507,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
     : menu;
   const account = currentUserSummary(user, userProfile, members, role, restaurant.id);
   root.clientExportSource = { customers: customerAccounts, reservations };
-  root.dashboardRestaurant = restaurantWithLegalInfo(restaurant, userProfile);
+  root.dashboardRestaurant = restaurant;
   root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests);
   applyClientTools(root);
 }
@@ -4705,20 +4705,6 @@ function normalizeRestaurant(id, data) {
 }
 
 // SIRET affiche en groupes (890 295 520 00013) quand il compte bien 14 chiffres.
-const LEGAL_INFO_KEYS = ["siren", "siret", "vatNumber", "legalForm", "shareCapital", "rcsCity", "apeCode"];
-
-// Les informations legales (section Facturation) sont enregistrees avec le profil du
-// proprietaire tant que la fiche du restaurant ne les porte pas : on les reprend de la.
-function restaurantWithLegalInfo(restaurant, userProfile) {
-  const own = userProfile?.restaurantProfile || {};
-  const sameRestaurant = !own.restaurantId || own.restaurantId === restaurant.id;
-  const merged = { ...restaurant };
-  LEGAL_INFO_KEYS.forEach((key) => {
-    if (!merged[key] && sameRestaurant && own[key]) merged[key] = own[key];
-  });
-  return merged;
-}
-
 function formatSiret(value = "") {
   const raw = String(value || "").trim();
   const digits = raw.split(" ").join("");

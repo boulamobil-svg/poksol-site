@@ -266,7 +266,7 @@ async function saveProfile({ final }) {
 
   if (firebaseServices && currentUser && !previewMode) {
     try {
-      const { doc, setDoc, serverTimestamp, arrayUnion } = firebaseServices.firestoreModule;
+      const { doc, setDoc, serverTimestamp, arrayUnion, deleteField } = firebaseServices.firestoreModule;
       const isExisting = restaurantContext.mode === "existing";
       const restaurantPayload = {
         id: restaurantId,
@@ -322,11 +322,9 @@ async function saveProfile({ final }) {
           photoURL: currentUser.photoURL || "",
           activeRestaurantId: restaurantId,
           restaurantIds: arrayUnion(restaurantId),
-          restaurantProfile: {
-            ...profile,
-            restaurantId,
-            updatedAt: serverTimestamp()
-          },
+          // Le profil (dont les informations legales) appartient au restaurant, pas a l'utilisateur :
+          // il vient d'etre enregistre sur restaurants/{id}, on retire l'ancienne copie du compte.
+          restaurantProfile: deleteField(),
           updatedAt: serverTimestamp()
         },
         { merge: true }
