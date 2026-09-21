@@ -39,22 +39,25 @@ Google, Firestore et Storage (projet `restaurantpos-7a4f0d11`).
 
 ## Règles de sécurité (site ET application)
 
-Elles vivent dans le dossier commun **`firebase/`** : `firebase/firestore.rules` est le fichier
-unique, lu par le site et par l'application, découpé en sections `[COMMUN]`, `[APPLI]` et
-`[SITE]`. Tout est expliqué dans [`firebase/README.md`](firebase/README.md) (sections, déploiement
-depuis l'un ou l'autre projet, comment ajouter une règle).
+**Les règles Firebase ne se modifient et ne se déploient pas depuis ce dépôt.** Le site et
+l'application Poket Restaurants partagent le même projet Firebase et donc le même jeu de règles
+Firestore (il n'y en a qu'un d'actif : chaque déploiement remplace le précédent). Le fichier
+unique vit dans le projet de l'application :
 
-Points clés :
+- `C:\AI_WORKSPACE\AppLab\chez_marwan_posirestore_rules.txt` (Firestore) et `storage_rules.txt` ;
+- les règles propres au site y sont annotées **`[SITE]`** (les règles propres à la caisse
+  `[APPLI]`, les règles partagées `[COMMUN]`) ;
+- procédure, tests et déploiement : `docs/FIREBASE_RULES.md` de ce même projet.
 
-- Firestore n'a qu'un jeu de règles actif : ne jamais déployer d'autres règles vers ce projet.
-- Un seul calcul de rôle (fiche `staff` / `staff_users`, « owner » = admin, créateur = admin) :
-  un compte a les mêmes droits par le site et par l'application.
-- Les pages publiques lisent `publicRestaurants/{slug}` ; le document `restaurants/{id}` n'est
-  jamais public.
-- Un code d'invitation ne donne pas d'accès direct : il crée une demande (`access_requests`) que
-  valide un admin, dans l'onglet Équipe du site ou dans l'application.
+Ce que le site attend de ces règles :
 
-```bash
-cd tests/rules && npm install && npm test        # avant tout déploiement (Java 21 requis)
-firebase deploy --only firestore:rules,storage   # depuis ce dépôt
-```
+- les pages publiques lisent `publicRestaurants/{slug}` ; le document `restaurants/{id}` n'est
+  jamais public ;
+- un seul calcul de rôle (fiche `staff` / `staff_users`, « owner » = admin, créateur = admin) :
+  un compte a les mêmes droits par le site et par l'application ;
+- un code d'invitation ne donne pas d'accès direct : il crée une demande (`access_requests`) que
+  valide un admin, dans l'onglet Équipe du site ou dans l'application ;
+- profil, horaires, page publique et menu QR : administrateurs seulement.
+
+Si le site a besoin d'une nouvelle règle, la modifier dans le projet de l'application (section
+`[SITE]`), lancer ses tests, puis déployer depuis ce dossier-là.
