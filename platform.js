@@ -2276,7 +2276,7 @@ function overviewHtml(restaurant, publicUrl, account = null) {
     ["Type cuisine", restaurant.cuisineType],
     ["Telephone", restaurant.phone],
     ["Email", restaurant.email],
-    ["Adresse", restaurant.addressLine1 || restaurant.address],
+    ["Adresse", restaurant.addressLine1],
     ["Ville", [restaurant.postalCode, restaurant.city].filter(Boolean).join(" ")],
     ["Pays", restaurant.country || "France"],
     ["Site web", restaurant.website]
@@ -2324,7 +2324,7 @@ function profileFormHtml(restaurant, canEdit) {
         <label>Type cuisine<input name="cuisineType" value="${escapeAttr(restaurant.cuisineType)}" ${disabled(canEdit)} /></label>
         <label>Telephone<input name="phone" value="${escapeAttr(restaurant.phone)}" ${disabled(canEdit)} /></label>
         <label>Email<input name="email" type="email" value="${escapeAttr(restaurant.email)}" ${disabled(canEdit)} /></label>
-        <label>Adresse<input name="address" value="${escapeAttr(restaurant.addressLine1 || restaurant.address)}" ${disabled(canEdit)} /></label>
+        <label>Adresse<input name="address" value="${escapeAttr(restaurant.addressLine1)}" ${disabled(canEdit)} /></label>
         <label>Ville<input name="city" value="${escapeAttr(restaurant.city)}" ${disabled(canEdit)} /></label>
         <label>Code postal<input name="postalCode" value="${escapeAttr(restaurant.postalCode)}" ${disabled(canEdit)} /></label>
         <label>Pays<input name="country" value="${escapeAttr(restaurant.country || "France")}" ${disabled(canEdit)} /></label>
@@ -3377,12 +3377,11 @@ function buildTicketReceipt({ ticket, movement, restaurant, clientName }) {
   const row = (left, right, indent = 0, bold = false) => ticketRow(left, right, width, indent).forEach((text) => add(text, bold));
 
   center(String(firstText(restaurant?.name, restaurant?.tradeName, "Restaurant")).toUpperCase(), true);
-  const address = [
-    firstText(restaurant?.address, restaurant?.addressLine1),
-    [restaurant?.postalCode, restaurant?.city].filter(Boolean).join(" ")
-  ].filter(Boolean).join(", ");
-  if (address) center(address);
-  if (restaurant?.phone) center(`Tel : ${restaurant.phone}`);
+  const street = cleanStreetLine(firstText(restaurant?.addressLine1, restaurant?.address), restaurant?.postalCode);
+  if (street) center(street);
+  const cityLine = [restaurant?.postalCode, restaurant?.city].filter(Boolean).join(" ");
+  if (cityLine) center(cityLine);
+  if (restaurant?.phone) center(`Tel : ${formatClientPhone(restaurant.phone)}`);
   rule("=");
 
   const ticketLines = Array.isArray(ticket?.lines) ? ticket.lines : [];
@@ -4656,12 +4655,14 @@ function tabLabel(tab) {
 
 function normalizeRestaurant(id, data) {
   const profile = data.restaurantProfile || {};
-  const addressLine1 = data.addressLine1 || profile.addressLine1 || "";
   const addressLine2 = data.addressLine2 || profile.addressLine2 || "";
   const city = data.city || profile.city || "";
   const postalCode = data.postalCode || profile.postalCode || "";
   const country = data.country || profile.country || "France";
-  const address = data.address || profile.address || fullAddress(addressLine1, postalCode, city, country);
+  const addressLine1 = cleanStreetLine(data.addressLine1 || profile.addressLine1 || data.address || profile.address || "", postalCode);
+  const address = addressLine1
+    ? fullAddress(addressLine1, postalCode, city, country)
+    : String(data.address || profile.address || "").split(String.fromCharCode(10)).join(", ");
   return {
     id,
     ...data,
@@ -4680,6 +4681,17 @@ function normalizeRestaurant(id, data) {
     email: data.email || profile.email || "",
     openingHours: resolveOpeningHours(data, profile)
   };
+}
+
+// Ligne de rue seule. Une fiche enregistree avec « rue + code postal + ville + pays » colles
+// (retours a la ligne perdus dans un champ texte) est ramenee a la rue : premiere ligne
+// seulement, coupee au code postal quand il s'y trouve. Sans code postal dans la ligne,
+// la rue est laissee telle quelle (« Rue de Marseille » reste intacte).
+function cleanStreetLine(value, postalCode = "") {
+  const street = String(value || "").split(String.fromCharCode(13)).join("").split(String.fromCharCode(10))[0].trim();
+  const zip = String(postalCode || "").trim();
+  const at = zip ? street.indexOf(zip) : -1;
+  return (at > 0 ? street.slice(0, at) : street).replace(/[ ,;-]+$/, "").trim();
 }
 
 function fullAddress(addressLine1, postalCode, city, country) {
