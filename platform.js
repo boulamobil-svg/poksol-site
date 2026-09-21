@@ -1260,7 +1260,7 @@ function initDashboardPage() {
     const clientExport = event.target.closest("[data-client-export]");
     if (clientExport) {
       event.preventDefault();
-      exportVisibleCustomers(root);
+      exportVisibleCustomers(root, clientExport.dataset.clientExport || "xlsx");
     }
     const clientReset = event.target.closest("[data-client-reset]");
     if (clientReset) {
@@ -1500,6 +1500,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
     : menu;
   const account = currentUserSummary(user, userProfile, members, role, restaurant.id);
+  root.clientExportSource = { customers: customerAccounts, reservations };
   root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests);
   applyClientTools(root);
 }
@@ -2647,7 +2648,7 @@ function clientsHtml(customerAccounts = {}, reservations = [], role = "") {
           ${canManageClients ? `
           <details class="client-add-panel">
             <summary class="client-create-btn">
-              <span>+</span>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M19 8v6M16 11h6"/></svg>
               <strong>Create contact</strong>
             </summary>
             <form class="platform-form customer-account-form" data-dashboard-customer-form data-customer-type-scope data-customer-type="individual">
@@ -2660,7 +2661,8 @@ function clientsHtml(customerAccounts = {}, reservations = [], role = "") {
           <details class="client-more-menu">
             <summary>More</summary>
             <div>
-              <button class="button-reset" type="button" data-client-export>Export contacts</button>
+              <button class="button-reset" type="button" data-client-export="xlsx">Exporter en Excel (.xlsx)</button>
+              <button class="button-reset" type="button" data-client-export="csv">Exporter en CSV</button>
               ${canManageClients ? `<label class="client-import-action">Import contacts<input type="file" accept=".csv,text/csv" data-client-import-file hidden /></label>` : ""}
               <small class="client-import-status" data-client-import-status role="status"></small>
             </div>
@@ -2688,6 +2690,8 @@ function clientsHtml(customerAccounts = {}, reservations = [], role = "") {
               <option value="inactive">Inactifs</option>
               <option value="with-phone">Avec telephone</option>
               <option value="with-email">Avec email</option>
+              <option value="owing">Solde a encaisser</option>
+              <option value="credit">Credit client</option>
               <option value="company">Societes</option>
               <option value="individual">Particuliers</option>
             </select>
@@ -2798,7 +2802,7 @@ function clientCardHtml(client, reservations = []) {
       <span class="col-phone">${escapeHtml(phoneLabel || "-")}</span>
       <span class="col-country">${escapeHtml(client.country || "France")}</span>
       <span class="col-created">${escapeHtml(clientDateLabel(client.createdAt || client.updatedAt) || "-")}</span>
-      <span class="col-balance client-balance-cell">${escapeHtml(account.balanceLabel)}</span>
+      <span class="col-balance client-balance-cell is-${account.balanceTone}">${escapeHtml(account.balanceLabel)}</span>
     </div>
   `;
 }
@@ -2825,7 +2829,7 @@ function clientDetailHtml(client, reservations = [], role = "") {
       <section class="client-account-hero">
         <article>
           <span>Solde</span>
-          <strong>${escapeHtml(account.balanceLabel)}</strong>
+          <strong class="is-${account.balanceTone}">${escapeHtml(account.balanceLabel)}</strong>
           <small>${escapeHtml(account.balanceStateLabel)}</small>
         </article>
         <article>
@@ -2878,23 +2882,7 @@ function clientDetailHtml(client, reservations = [], role = "") {
       </section>
       ` : ""}
 
-      <section class="client-journal">
-        <div>
-          <h3>Journal des mouvements</h3>
-          <p>Debits ${escapeHtml(account.debitLabel)} · Credits ${escapeHtml(account.creditLabel)}</p>
-        </div>
-        ${account.movements.length ? `
-          <div class="client-movement-table">
-            ${account.movements.map((movement) => `
-              <div>
-                <span>${escapeHtml(movement.dateLabel)}</span>
-                <strong>${escapeHtml(movement.label)}</strong>
-                <span>${escapeHtml(movement.amountLabel)}</span>
-              </div>
-            `).join("")}
-          </div>
-        ` : `<div class="client-account-empty">Aucun mouvement disponible pour ce client.</div>`}
-      </section>
+${clientJournalHtml(account)}
 
       ${canManageClients ? `
       <section class="client-danger-zone">
@@ -3150,32 +3138,46 @@ function clientAccountMetrics(client, reservations = []) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Solde d'un compte client : CREDITS - DEBITS.
+// Chaque mouvement est un debit (ticket mis sur le compte) ou un credit (paiement
+// recu), avec un montant toujours positif. Solde = total des credits - total des
+// debits : negatif = le client doit de l'argent, positif = credit disponible.
+// ---------------------------------------------------------------------------
+function roundMoney(value) {
+  const rounded = Math.round((Number(value) || 0) * 100) / 100;
+  return rounded === 0 ? 0 : rounded;
+}
+
+function balanceTone(value) {
+  if (value < -0.004) return "owed";
+  if (value > 0.004) return "credit";
+  return "even";
+}
+
 function clientAccountSummary(client = {}) {
   const movements = normalizeClientMovements(client);
-  const movementBalance = movements.reduce((total, movement) => total + movement.amount, 0);
-  const balance = firstNumber(
-    client.balance,
-    client.solde,
-    client.accountBalance,
-    client.currentBalance,
-    client.balanceDue,
-    client.amountDue
-  );
-  const debitTotal = firstNumber(client.debitTotal, client.totalDebits, client.totalDebit)
-    ?? movements.filter((movement) => movement.amount > 0).reduce((total, movement) => total + movement.amount, 0);
-  const creditTotal = firstNumber(client.creditTotal, client.totalCredits, client.totalCredit)
-    ?? Math.abs(movements.filter((movement) => movement.amount < 0).reduce((total, movement) => total + movement.amount, 0));
-  const effectiveBalance = balance ?? movementBalance;
+  const debitFromMovements = movements.filter((movement) => movement.direction === "debit").reduce((total, movement) => total + movement.amount, 0);
+  const creditFromMovements = movements.filter((movement) => movement.direction === "credit").reduce((total, movement) => total + movement.amount, 0);
+  const debitTotal = roundMoney(firstNumber(client.debitTotal, client.totalDebits, client.totalDebit) ?? debitFromMovements);
+  const creditTotal = roundMoney(firstNumber(client.creditTotal, client.totalCredits, client.totalCredit) ?? creditFromMovements);
+  const storedBalance = firstNumber(client.balance, client.solde);
+  // Sans journal, un solde enregistre sur la fiche sert de repli.
+  const balance = movements.length || storedBalance === null ? roundMoney(creditTotal - debitTotal) : roundMoney(storedBalance);
+  const tone = balanceTone(balance);
   const openTickets = firstNumber(client.openTicketCount, client.openTickets, client.unpaidTickets, client.pendingTicketCount);
   return {
-    balanceLabel: formatMoney(effectiveBalance),
-    balanceValue: effectiveBalance,
-    balanceStateLabel: Math.abs(effectiveBalance) < 0.005 ? "A jour" : effectiveBalance > 0 ? "A encaisser" : "Credit client",
+    balanceValue: balance,
+    debitValue: debitTotal,
+    creditValue: creditTotal,
+    balanceLabel: formatMoney(balance),
+    balanceTone: tone,
+    balanceStateLabel: tone === "owed" ? "A encaisser" : tone === "credit" ? "Credit client" : "A jour",
     movementCountLabel: String(movements.length || firstNumber(client.movementCount, client.movementsCount) || 0),
     openTicketCountLabel: String(openTickets ?? 0),
     debitLabel: formatMoney(debitTotal),
     creditLabel: formatMoney(creditTotal),
-    movements
+    movements: withRunningBalance(movements)
   };
 }
 
@@ -3188,20 +3190,28 @@ function normalizeClientMovements(client = {}) {
     client.history
   ].find(Array.isArray) || [];
   return sources.map((movement) => {
-    const amount = movementAmountValue(movement);
+    const { direction, amount } = movementDirectionAndAmount(movement);
     const date = dateFromFirestoreValue(movement.createdAt || movement.date || movement.paidAt || movement.ticketAt || movement.updatedAt);
     return {
+      direction,
       amount,
+      signed: direction === "credit" ? amount : -amount,
       amountLabel: formatMoney(amount),
       dateLabel: date ? clientDateLabel(date) : "-",
       timeValue: date?.getTime() || 0,
-      label: firstText(movement.label, movement.title, movement.reason, movement.type, movement.ticketNumber, movement.id) || "Mouvement"
+      label: firstText(movement.label, movement.title, movement.reason) || (direction === "credit" ? "Encaissement" : "Ticket mis sur compte"),
+      detail: [movement.ticketLabel, movement.paymentMethodLabel, movement.note]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .join(" · ")
     };
-  }).sort((a, b) => b.timeValue - a.timeValue);
+  });
 }
 
-function movementAmountValue(movement = {}) {
-  const signed = firstNumber(
+// Le type (« debit » / « credit ») decide du sens ; le montant est toujours positif.
+function movementDirectionAndAmount(movement = {}) {
+  const type = String(movement.type || movement.kind || "").trim().toLowerCase();
+  const raw = firstNumber(
     movement.amount,
     movement.total,
     movement.value,
@@ -3210,11 +3220,54 @@ function movementAmountValue(movement = {}) {
     movement.remainingDue,
     movement.due
   );
-  if (signed !== null) return signed;
-  const debit = firstNumber(movement.debit, movement.debitAmount, movement.charge, movement.ticketTotal) || 0;
-  const credit = firstNumber(movement.credit, movement.creditAmount, movement.payment, movement.paidAmount) || 0;
-  return debit - credit;
+  if (type === "credit" || type === "debit") return { direction: type, amount: Math.abs(raw ?? 0) };
+  const debit = firstNumber(movement.debit, movement.debitAmount, movement.charge, movement.ticketTotal);
+  const credit = firstNumber(movement.credit, movement.creditAmount, movement.payment, movement.paidAmount);
+  if (raw === null) {
+    const net = (credit || 0) - (debit || 0);
+    return net >= 0 ? { direction: "credit", amount: net } : { direction: "debit", amount: -net };
+  }
+  // Ancien format sans type : montant positif = debit, negatif = credit.
+  return raw >= 0 ? { direction: "debit", amount: raw } : { direction: "credit", amount: Math.abs(raw) };
 }
+
+// Solde cumule apres chaque mouvement (calcule dans l'ordre du temps), affiche du plus recent au plus ancien.
+function withRunningBalance(movements) {
+  let running = 0;
+  const chronological = [...movements].sort((a, b) => a.timeValue - b.timeValue);
+  chronological.forEach((movement) => {
+    running = roundMoney(running + movement.signed);
+    movement.runningValue = running;
+    movement.runningLabel = formatMoney(running);
+  });
+  return chronological.reverse();
+}
+
+function clientJournalHtml(account) {
+  return `
+      <section class="client-journal">
+        <div>
+          <h3>Journal des mouvements</h3>
+          <p>Debits ${escapeHtml(account.debitLabel)} · Credits ${escapeHtml(account.creditLabel)} · Solde (credits − debits) <strong class="is-${account.balanceTone}">${escapeHtml(account.balanceLabel)}</strong></p>
+        </div>
+        ${account.movements.length ? `
+          <div class="client-ledger-table">
+            <div class="client-ledger-row client-ledger-head"><span>Date</span><span>Libelle</span><span>Debit</span><span>Credit</span><span>Solde</span></div>
+            ${account.movements.map((movement) => `
+              <div class="client-ledger-row">
+                <span>${escapeHtml(movement.dateLabel)}</span>
+                <span><strong>${escapeHtml(movement.label)}</strong>${movement.detail ? `<small>${escapeHtml(movement.detail)}</small>` : ""}</span>
+                <span class="is-debit">${movement.direction === "debit" ? escapeHtml(movement.amountLabel) : ""}</span>
+                <span class="is-credit">${movement.direction === "credit" ? escapeHtml(movement.amountLabel) : ""}</span>
+                <span class="client-ledger-balance is-${balanceTone(movement.runningValue)}">${escapeHtml(movement.runningLabel)}</span>
+              </div>
+            `).join("")}
+          </div>
+        ` : `<div class="client-account-empty">Aucun mouvement disponible pour ce client.</div>`}
+      </section>
+  `;
+}
+
 
 function firstNumber(...values) {
   for (const value of values) {
@@ -3552,6 +3605,8 @@ function clientCardMatchesFilter(card, filter) {
   if (filter === "inactive") return card.dataset.clientActive === "false";
   if (filter === "with-phone") return card.dataset.clientHasPhone === "true";
   if (filter === "with-email") return card.dataset.clientHasEmail === "true";
+  if (filter === "owing") return Number(card.dataset.clientBalanceValue || 0) < -0.004;
+  if (filter === "credit") return Number(card.dataset.clientBalanceValue || 0) > 0.004;
   if (filter === "company") return card.dataset.clientType === "company";
   if (filter === "individual") return card.dataset.clientType !== "company";
   return true;
@@ -3592,52 +3647,96 @@ function updateCustomerTypeScope(select) {
   scope.dataset.customerType = select.value === "company" ? "company" : "individual";
 }
 
-function exportVisibleCustomers(root) {
+// ---------------------------------------------------------------------------
+// Export des contacts : un vrai tableau (Excel .xlsx) ou un CSV ouvrable dans Excel
+// en francais (separateur « ; », UTF-8 avec BOM). Chaque client = une ligne.
+// ---------------------------------------------------------------------------
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+// [libelle, largeur de colonne, type : "money" | "int" | texte par defaut]
+const CLIENT_EXPORT_COLUMNS = [
+  ["Type", 14],
+  ["Nom affichage", 26],
+  ["Prénom", 16],
+  ["Nom", 18],
+  ["Société", 24],
+  ["Contact", 20],
+  ["Téléphone", 16],
+  ["Email", 30],
+  ["Pays", 12],
+  ["Adresse", 36],
+  ["Tax ID", 18],
+  ["TVA", 18],
+  ["Statut", 10],
+  ["Total débits (€)", 16, "money"],
+  ["Total crédits (€)", 16, "money"],
+  ["Solde (€) = crédits − débits", 26, "money"],
+  ["Réservations", 13, "int"],
+  ["Dernier passage", 16],
+  ["Date création", 14],
+  ["Mis à jour", 14],
+  ["Notes", 36],
+  ["ID compte", 24]
+];
+
+function clientExportRow(rawCustomer, reservations = []) {
+  const client = normalizeCustomerAccount(rawCustomer);
+  const account = clientAccountSummary(client);
+  const metrics = clientAccountMetrics(client, reservations);
+  return [
+    client.type === "company" ? "Société" : "Particulier",
+    client.displayName,
+    client.firstName,
+    client.lastName,
+    client.companyName,
+    client.contactName,
+    formatClientPhone(client.phone),
+    client.email,
+    client.country || "France",
+    client.address,
+    client.taxId,
+    client.vatNumber,
+    client.active === false ? "Inactif" : "Actif",
+    account.debitValue,
+    account.creditValue,
+    account.balanceValue,
+    metrics.reservationCount,
+    metrics.lastVisitLabel,
+    clientDateLabel(client.createdAt),
+    clientDateLabel(client.updatedAt || client.createdAt),
+    client.notes,
+    client.id
+  ];
+}
+
+function exportVisibleCustomers(root, format = "xlsx") {
   const state = clientToolState(root);
-  const cards = [...root.querySelectorAll("[data-client-card]")]
+  const source = root.clientExportSource || { customers: [], reservations: [] };
+  const customers = Array.isArray(source.customers) ? source.customers : source.customers?.customers || [];
+  const reservations = Array.isArray(source.reservations) ? source.reservations : [];
+  const byId = new Map(customers.map((customer) => [customer.id, customer]));
+  const rows = [...root.querySelectorAll("[data-client-card]")]
     .filter((card) => clientCardMatchesTools(card, state))
-    .sort((a, b) => compareClientCards(a, b, state.sort));
-  const rows = cards.map(customerCsvRow);
-  const headers = ["Type", "Nom affichage", "Prenom", "Nom", "Societe", "Contact", "Telephone", "Email", "Pays", "Adresse", "Tax ID", "TVA", "Statut", "Date creation", "Mis a jour", "Reservations", "Dernier passage", "Notes", "ID compte"];
-  const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    .sort((a, b) => compareClientCards(a, b, state.sort))
+    .map((card) => byId.get(card.dataset.clientDetailTarget))
+    .filter(Boolean)
+    .map((customer) => clientExportRow(customer, reservations));
+  const day = new Date().toISOString().slice(0, 10);
+  if (format === "csv") {
+    downloadClientFile(buildClientCsv(rows), `clients-restaurant-${day}.csv`, "text/csv;charset=utf-8");
+  } else {
+    downloadClientFile(buildClientXlsx(rows), `clients-restaurant-${day}.xlsx`, XLSX_MIME);
+  }
+}
+
+function downloadClientFile(content, filename, mime) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `clients-restaurant-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
-}
-
-function customerCsvRow(card) {
-  const displayName = card.querySelector(":scope > .col-name strong")?.textContent.trim() || "";
-  const detail = card.closest(".client-ledger")?.querySelector(`[data-client-detail="${CSS.escape(card.dataset.clientDetailTarget || "")}"]`);
-  const detailMap = new Map([...(detail?.querySelectorAll(".client-account-details .reservation-detail-item") || [])].map((item) => {
-    const label = item.querySelector("span")?.textContent.trim() || "";
-    const value = item.querySelector("strong")?.textContent.trim() || "";
-    return [label, value === "-" ? "" : value];
-  }));
-  return [
-    detailMap.get("Type") || "",
-    displayName,
-    detailMap.get("Prenom") || "",
-    detailMap.get("Nom") || "",
-    detailMap.get("Societe") || "",
-    detailMap.get("Contact") || "",
-    detailMap.get("Telephone") || "",
-    detailMap.get("Email") || "",
-    detailMap.get("Pays") || "",
-    detailMap.get("Adresse") || "",
-    detailMap.get("Tax ID") || "",
-    detailMap.get("TVA") || "",
-    detailMap.get("Statut") || "",
-    detailMap.get("Date creation") || "",
-    detailMap.get("Mis a jour") || "",
-    card.dataset.clientReservations || "",
-    card.dataset.clientLastVisit || "",
-    detailMap.get("Notes") || "",
-    detailMap.get("ID compte") || ""
-  ];
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function csvCell(value) {
@@ -3646,6 +3745,151 @@ function csvCell(value) {
   const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
   return `"${safe.replace(/"/g, '""')}"`;
 }
+
+function buildClientCsv(rows) {
+  const format = (value, index) => {
+    if (typeof value === "number") {
+      return CLIENT_EXPORT_COLUMNS[index][2] === "money" ? value.toFixed(2).replace(".", ",") : String(value);
+    }
+    return csvCell(value);
+  };
+  const lines = [
+    CLIENT_EXPORT_COLUMNS.map(([label]) => csvCell(label)).join(";"),
+    ...rows.map((row) => row.map(format).join(";"))
+  ];
+  return "\uFEFF" + lines.join("\r\n") + "\r\n";
+}
+
+function xlsxColumn(index) {
+  let number = index + 1;
+  let name = "";
+  while (number > 0) {
+    const remainder = (number - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    number = Math.floor((number - 1) / 26);
+  }
+  return name;
+}
+
+function xmlText(value) {
+  return String(value ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Classeur Excel minimal (OOXML) : en-tete fige et colore, filtres, largeurs de colonnes,
+// montants en vrais nombres. Aucune bibliotheque : un zip « stocke » ecrit a la main.
+function buildClientXlsx(rows) {
+  const columns = CLIENT_EXPORT_COLUMNS;
+  const lastColumn = xlsxColumn(columns.length - 1);
+  const lastRow = rows.length + 1;
+  const sheetRows = [
+    `<row r="1" ht="26" customHeight="1">${columns.map(([label], index) => `<c r="${xlsxColumn(index)}1" s="1" t="inlineStr"><is><t>${xmlText(label)}</t></is></c>`).join("")}</row>`
+  ];
+  rows.forEach((row, rowIndex) => {
+    const number = rowIndex + 2;
+    const cells = row.map((value, index) => {
+      const reference = `${xlsxColumn(index)}${number}`;
+      const kind = columns[index][2];
+      if ((kind === "money" || kind === "int") && typeof value === "number") {
+        return `<c r="${reference}" s="${kind === "money" ? 2 : 3}"><v>${value}</v></c>`;
+      }
+      const text = String(value ?? "");
+      return text === "" ? "" : `<c r="${reference}" t="inlineStr"><is><t xml:space="preserve">${xmlText(text)}</t></is></c>`;
+    }).join("");
+    sheetRows.push(`<row r="${number}">${cells}</row>`);
+  });
+  const header = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const relationships = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  const packageRelationships = "http://schemas.openxmlformats.org/package/2006/relationships";
+  const sheet = `${header}<worksheet xmlns="${main}"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${columns.map(([, width], index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join("")}</cols><sheetData>${sheetRows.join("")}</sheetData><autoFilter ref="A1:${lastColumn}${lastRow}"/></worksheet>`;
+  const styles = `${header}<styleSheet xmlns="${main}"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0A2540"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const workbook = `${header}<workbook xmlns="${main}" xmlns:r="${relationships}"><sheets><sheet name="Clients" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">Clients!$A$1:$${lastColumn}$${lastRow}</definedName></definedNames></workbook>`;
+  const workbookRelationships = `${header}<Relationships xmlns="${packageRelationships}"><Relationship Id="rId1" Type="${relationships}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="${relationships}/styles" Target="styles.xml"/></Relationships>`;
+  const rootRelationships = `${header}<Relationships xmlns="${packageRelationships}"><Relationship Id="rId1" Type="${relationships}/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+  const contentTypes = `${header}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
+  const encoder = new TextEncoder();
+  return new Blob(zipStore([
+    { name: "[Content_Types].xml", data: encoder.encode(contentTypes) },
+    { name: "_rels/.rels", data: encoder.encode(rootRelationships) },
+    { name: "xl/workbook.xml", data: encoder.encode(workbook) },
+    { name: "xl/_rels/workbook.xml.rels", data: encoder.encode(workbookRelationships) },
+    { name: "xl/styles.xml", data: encoder.encode(styles) },
+    { name: "xl/worksheets/sheet1.xml", data: encoder.encode(sheet) }
+  ]), { type: XLSX_MIME });
+}
+
+let crcTable = null;
+function crc32(bytes) {
+  if (!crcTable) {
+    crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n += 1) {
+      let value = n;
+      for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+      crcTable[n] = value >>> 0;
+    }
+  }
+  let crc = 0xffffffff;
+  for (let index = 0; index < bytes.length; index += 1) crc = crcTable[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+// Ecrit un fichier zip sans compression ; renvoie la liste des morceaux binaires.
+function zipStore(files) {
+  const encoder = new TextEncoder();
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  files.forEach((file) => {
+    const name = encoder.encode(file.name);
+    const data = file.data;
+    const crc = crc32(data);
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true);
+    local.setUint16(4, 20, true);
+    local.setUint16(6, 0x0800, true);
+    local.setUint16(8, 0, true);
+    local.setUint16(10, dosTime, true);
+    local.setUint16(12, dosDate, true);
+    local.setUint32(14, crc, true);
+    local.setUint32(18, data.length, true);
+    local.setUint32(22, data.length, true);
+    local.setUint16(26, name.length, true);
+    local.setUint16(28, 0, true);
+    parts.push(new Uint8Array(local.buffer), name, data);
+    const head = new DataView(new ArrayBuffer(46));
+    head.setUint32(0, 0x02014b50, true);
+    head.setUint16(4, 20, true);
+    head.setUint16(6, 20, true);
+    head.setUint16(8, 0x0800, true);
+    head.setUint16(10, 0, true);
+    head.setUint16(12, dosTime, true);
+    head.setUint16(14, dosDate, true);
+    head.setUint32(16, crc, true);
+    head.setUint32(20, data.length, true);
+    head.setUint32(24, data.length, true);
+    head.setUint16(28, name.length, true);
+    head.setUint32(42, offset, true);
+    central.push(new Uint8Array(head.buffer), name);
+    offset += 30 + name.length + data.length;
+  });
+  const centralSize = central.reduce((total, chunk) => total + chunk.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, files.length, true);
+  end.setUint16(10, files.length, true);
+  end.setUint32(12, centralSize, true);
+  end.setUint32(16, offset, true);
+  return [...parts, ...central, new Uint8Array(end.buffer)];
+}
+
 
 function reservationsHtml(reservations, role) {
   const canUpdate = ["owner", "admin", "manager"].includes(role);

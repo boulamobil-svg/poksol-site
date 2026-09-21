@@ -5370,3 +5370,134 @@ body.menu-page-body.translated-rtl {
     grid-template-columns: 1fr;
   }
 }
+
+/* ------------------------------------------------------------------
+   Clients : bouton « Create contact », solde credits - debits, journal en tableau
+   ------------------------------------------------------------------ */
+.client-ledger .client-add-panel > summary.client-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 22px 0 16px;
+  border-radius: 14px;
+  color: white;
+  background: linear-gradient(180deg, #2f8bff, #1968e0);
+  box-shadow: 0 8px 20px rgba(25, 118, 243, 0.28);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+.client-ledger .client-add-panel > summary.client-create-btn strong {
+  color: white;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.client-ledger .client-add-panel > summary.client-create-btn svg {
+  flex: none;
+}
+
+.client-ledger .client-add-panel > summary.client-create-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(25, 118, 243, 0.34);
+}
+
+.client-ledger .client-add-panel[open] > summary.client-create-btn {
+  background: linear-gradient(180deg, #1d78f0, #1456b8);
+}
+
+.client-ledger .client-more-menu > summary {
+  border-radius: 14px;
+}
+
+/* Solde : credits - debits (negatif = le client doit de l'argent) */
+.is-owed {
+  color: #b42318 !important;
+}
+
+.is-credit {
+  color: #0f7b47 !important;
+}
+
+.is-even {
+  color: #0a2540;
+}
+
+.client-balance-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.client-journal p strong {
+  font-weight: 900;
+}
+
+/* Journal des mouvements : vrai tableau Date | Libelle | Debit | Credit | Solde */
+.client-ledger-table {
+  display: grid;
+  overflow-x: auto;
+  border: 1px solid #e5e8ec;
+  border-radius: 10px;
+}
+
+.client-ledger-row {
+  display: grid;
+  min-width: 620px;
+  grid-template-columns: 104px minmax(180px, 1fr) 116px 116px 128px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf0f3;
+  font-variant-numeric: tabular-nums;
+}
+
+.client-ledger-row:last-child {
+  border-bottom: 0;
+}
+
+.client-ledger-row > span {
+  min-width: 0;
+  color: #4a525d;
+  font-weight: 700;
+}
+
+.client-ledger-row > span:nth-child(n + 3) {
+  text-align: right;
+}
+
+.client-ledger-row strong {
+  display: block;
+  color: #0a2540;
+  font-weight: 900;
+}
+
+.client-ledger-row small {
+  display: block;
+  margin-top: 2px;
+  color: #68707b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.client-ledger-head {
+  background: #f6f8fa;
+}
+
+.client-ledger-head > span {
+  color: #68707b;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.client-ledger-row .is-debit {
+  color: #b42318;
+}
+
+.client-ledger-row .is-credit {
+  color: #0f7b47;
+}
+
+.client-ledger-balance {
+  font-weight: 900;
+}
