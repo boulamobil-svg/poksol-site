@@ -554,8 +554,6 @@ async function saveRestaurantProfile(restaurantId, form) {
     phone: text(data, "phone"),
     email: text(data, "email"),
     website: text(data, "website"),
-    siret: text(data, "siret"),
-    vatNumber: text(data, "vatNumber"),
     instagram: text(data, "instagram"),
     facebook: text(data, "facebook"),
     googleMapsUrl: text(data, "googleMapsUrl"),
@@ -1509,7 +1507,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
     : menu;
   const account = currentUserSummary(user, userProfile, members, role, restaurant.id);
   root.clientExportSource = { customers: customerAccounts, reservations };
-  root.dashboardRestaurant = restaurant;
+  root.dashboardRestaurant = restaurantWithLegalInfo(restaurant, userProfile);
   root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests);
   applyClientTools(root);
 }
@@ -2281,8 +2279,6 @@ function overviewHtml(restaurant, publicUrl, account = null) {
     ["Adresse", restaurant.addressLine1],
     ["Ville", [restaurant.postalCode, restaurant.city].filter(Boolean).join(" ")],
     ["Pays", restaurant.country || "France"],
-    ["SIRET", formatSiret(restaurant.siret)],
-    ["N° TVA", restaurant.vatNumber],
     ["Site web", restaurant.website]
   ].filter(([, value]) => String(value || "").trim().length);
   return `
@@ -2332,8 +2328,6 @@ function profileFormHtml(restaurant, canEdit) {
         <label>Ville<input name="city" value="${escapeAttr(restaurant.city)}" ${disabled(canEdit)} /></label>
         <label>Code postal<input name="postalCode" value="${escapeAttr(restaurant.postalCode)}" ${disabled(canEdit)} /></label>
         <label>Pays<input name="country" value="${escapeAttr(restaurant.country || "France")}" ${disabled(canEdit)} /></label>
-        <label>SIRET<input name="siret" inputmode="numeric" placeholder="14 chiffres" value="${escapeAttr(restaurant.siret)}" ${disabled(canEdit)} /></label>
-        <label>N° TVA intracommunautaire<input name="vatNumber" placeholder="FR + 11 chiffres" value="${escapeAttr(restaurant.vatNumber)}" ${disabled(canEdit)} /></label>
         <label>Site web<input name="website" value="${escapeAttr(restaurant.website)}" ${disabled(canEdit)} /></label>
         <label>Instagram<input name="instagram" value="${escapeAttr(restaurant.instagram)}" ${disabled(canEdit)} /></label>
         <label>Facebook<input name="facebook" value="${escapeAttr(restaurant.facebook)}" ${disabled(canEdit)} /></label>
@@ -3388,8 +3382,16 @@ function buildTicketReceipt({ ticket, movement, restaurant, clientName }) {
   const cityLine = [restaurant?.postalCode, restaurant?.city].filter(Boolean).join(" ");
   if (cityLine) center(cityLine);
   if (restaurant?.phone) center(`Tel : ${formatClientPhone(restaurant.phone)}`);
-  if (restaurant?.siret) center(`SIRET : ${formatSiret(restaurant.siret)}`);
+  const { siret, siren } = legalIdentifiers(restaurant);
+  if (siret) center(`SIRET : ${formatSiret(siret)}`);
+  else if (siren) center(`SIREN : ${formatSiret(siren)}`);
   if (restaurant?.vatNumber) center(`TVA : ${restaurant.vatNumber}`);
+  const legalForm = restaurant?.legalForm && restaurant?.shareCapital ? `${restaurant.legalForm} au capital de ${restaurant.shareCapital}` : restaurant?.legalForm;
+  const registry = [
+    restaurant?.rcsCity && siren ? `RCS ${restaurant.rcsCity} ${formatSiret(siren)}` : "",
+    restaurant?.apeCode ? `APE ${restaurant.apeCode}` : ""
+  ].filter(Boolean).join(" - ");
+  [legalForm, registry].filter(Boolean).forEach((legalLine) => center(legalLine));
   rule("=");
 
   const ticketLines = Array.isArray(ticket?.lines) ? ticket.lines : [];
@@ -3651,7 +3653,7 @@ async function openClientMovement(root, key) {
   const restaurantInfo = root.dashboardRestaurant || {};
   const notice = [
     ticket ? "" : failure || "Le detail de ce ticket n'est plus disponible : seul le montant mis sur le compte est affiche.",
-    restaurantInfo.siret && restaurantInfo.vatNumber ? "" : "SIRET et/ou n° de TVA non renseignes : ajoutez-les dans Profil > Informations generales pour qu'ils figurent sur le ticket."
+    legalIdentifiers(restaurantInfo).siret && restaurantInfo.vatNumber ? "" : "SIRET et/ou n° de TVA non renseignes : completez la section Facturation du profil restaurant pour qu'ils figurent sur le ticket."
   ].filter(Boolean).map((line) => `<p class="client-modal-note">${escapeHtml(line)}</p>`).join("");
   overlay.querySelector(".client-modal-body").innerHTML = `${notice}<div class="ticket-sheet">${ticketPreviewHtml(receipt)}</div>`;
   const footer = document.createElement("footer");
@@ -4691,18 +4693,47 @@ function normalizeRestaurant(id, data) {
     country,
     phone: data.phone || profile.phone || "",
     email: data.email || profile.email || "",
+    siren: data.siren || profile.siren || "",
     siret: data.siret || profile.siret || "",
     vatNumber: data.vatNumber || profile.vatNumber || "",
+    legalForm: data.legalForm || profile.legalForm || "",
+    shareCapital: data.shareCapital || profile.shareCapital || "",
+    rcsCity: data.rcsCity || profile.rcsCity || "",
+    apeCode: data.apeCode || profile.apeCode || "",
     openingHours: resolveOpeningHours(data, profile)
   };
 }
 
 // SIRET affiche en groupes (890 295 520 00013) quand il compte bien 14 chiffres.
+const LEGAL_INFO_KEYS = ["siren", "siret", "vatNumber", "legalForm", "shareCapital", "rcsCity", "apeCode"];
+
+// Les informations legales (section Facturation) sont enregistrees avec le profil du
+// proprietaire tant que la fiche du restaurant ne les porte pas : on les reprend de la.
+function restaurantWithLegalInfo(restaurant, userProfile) {
+  const own = userProfile?.restaurantProfile || {};
+  const sameRestaurant = !own.restaurantId || own.restaurantId === restaurant.id;
+  const merged = { ...restaurant };
+  LEGAL_INFO_KEYS.forEach((key) => {
+    if (!merged[key] && sameRestaurant && own[key]) merged[key] = own[key];
+  });
+  return merged;
+}
+
 function formatSiret(value = "") {
   const raw = String(value || "").trim();
   const digits = raw.split(" ").join("");
-  if (digits.length !== 14 || !digits.split("").every((char) => char >= "0" && char <= "9")) return raw;
-  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
+  if ((digits.length !== 14 && digits.length !== 9) || !digits.split("").every((char) => char >= "0" && char <= "9")) return raw;
+  return [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9), digits.slice(9)].filter(Boolean).join(" ");
+}
+
+// Le SIRET compte 14 chiffres, le SIREN 9 : on les reconnait a leur longueur, meme si les
+// deux ont ete saisis dans la mauvaise case du formulaire Facturation.
+function legalIdentifiers(restaurant = {}) {
+  const digitsOf = (value) => String(value || "").split("").filter((char) => char >= "0" && char <= "9").join("");
+  const found = [restaurant.siret, restaurant.siren].map(digitsOf).filter(Boolean);
+  const siret = found.find((digits) => digits.length === 14) || "";
+  const siren = found.find((digits) => digits.length === 9) || siret.slice(0, 9);
+  return { siret, siren };
 }
 
 // Ligne de rue seule. Une fiche enregistree avec « rue + code postal + ville + pays » colles
