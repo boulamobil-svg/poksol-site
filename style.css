@@ -4754,6 +4754,19 @@ body.menu-page-body.translated-rtl {
     gap: 6px;
   }
 
+  .quote-draft-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quote-form-actions {
+    flex-direction: column;
+  }
+
+  .quote-form-actions button {
+    width: 100%;
+  }
+
   button.quote-row {
     text-align: left;
   }
@@ -6088,6 +6101,83 @@ button.quote-row:focus-visible {
   color: var(--poksol-navy);
 }
 
+.quote-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 6px 0 10px;
+}
+
+.quote-preview-note {
+  flex: 1;
+  margin: 0;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.quote-drafts {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #fdf8ec;
+  border: 1px solid #f1e2b6;
+}
+
+.quote-drafts h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--poksol-navy);
+}
+
+.quote-drafts-count {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f1e2b6;
+  color: #6b5115;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.quote-drafts-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quote-draft-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid #f1e2b6;
+}
+
+.quote-draft-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quote-draft-info strong {
+  color: var(--poksol-navy);
+}
+
+.quote-draft-info small {
+  color: var(--text-muted);
+}
+
+.quote-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
 .quote-catalog-picker {
   display: flex;
   flex-direction: column;
@@ -6145,8 +6235,42 @@ button.quote-row:focus-visible {
 }
 
 .quote-catalog-picker-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-weight: 800;
   color: var(--poksol-navy);
+}
+
+.quote-catalog-piece-tag {
+  color: var(--poksol-blue);
+  font-weight: 800;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.quote-catalog-mode-toggle {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  border-radius: 12px;
+  background: #eef1f4;
+  gap: 2px;
+}
+
+.quote-catalog-mode-toggle button {
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.quote-catalog-mode-toggle button.is-active {
+  background: white;
+  color: var(--poksol-navy);
+  box-shadow: 0 1px 3px rgba(10, 37, 64, 0.18);
 }
 
 .quote-catalog-picker-price {

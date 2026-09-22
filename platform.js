@@ -875,6 +875,15 @@ async function getActiveMenu(restaurantId) {
   return { id: snap.id, ...snap.data() };
 }
 
+// Reglage global de l'application (restaurants/{id}/settings/catalogRules, meme doc que le POS) :
+// coupe-circuit qui masque le mode "par piece" partout sans toucher a la config des categories.
+async function getCatalogPieceSaleEnabled(restaurantId) {
+  const services = await getServices();
+  const { doc, getDoc } = services.firestoreModule;
+  const snap = await getDoc(doc(services.db, "restaurants", restaurantId, "settings", "catalogRules")).catch(() => null);
+  return snap?.exists() ? snap.data()?.pieceSale?.pieceSaleOrderingEnabled === true : false;
+}
+
 async function listCatalogMenu(restaurantId, options = {}) {
   const services = await getServices();
   const { collection, getDocs } = services.firestoreModule;
@@ -1218,7 +1227,7 @@ function initDashboardPage() {
   const root = document.querySelector("[data-dashboard-root]");
   if (!root) return;
   root.innerHTML = alertHtml("Chargement du dashboard...");
-  root.addEventListener("click", (event) => {
+  root.addEventListener("click", async (event) => {
     const login = event.target.closest("[data-platform-login]");
     if (login) signIn();
     const tabButton = event.target.closest("[data-dashboard-tab]");
@@ -1274,6 +1283,7 @@ function initDashboardPage() {
     if (quoteCreateOpen) {
       event.preventDefault();
       const section = quoteCreateOpen.closest("[data-quotes-section]");
+      resetQuoteCreateForm(root, section?.querySelector("[data-dashboard-quote-form]"));
       section?.querySelector("[data-quotes-list-view]")?.classList.add("is-hidden");
       section?.querySelector("[data-quote-create-page]")?.classList.remove("is-hidden");
       return;
@@ -1310,6 +1320,49 @@ function initDashboardPage() {
     if (quoteLineCatalog) {
       event.preventDefault();
       openQuoteCatalogPicker(root, quoteLineCatalog.closest("form"), quoteLineCatalog.closest("[data-quote-line]"));
+      return;
+    }
+    const quotePreview = event.target.closest("[data-quote-preview]");
+    if (quotePreview) {
+      event.preventDefault();
+      const form = quotePreview.closest("form");
+      const status = form?.querySelector("[data-form-status]");
+      try {
+        await previewQuoteFromForm(root, form);
+      } catch (error) {
+        if (status) status.textContent = error.message || String(error);
+      }
+      return;
+    }
+    const quoteSaveDraft = event.target.closest("[data-quote-save-draft]");
+    if (quoteSaveDraft) {
+      event.preventDefault();
+      const form = quoteSaveDraft.closest("form");
+      const status = form?.querySelector("[data-form-status]");
+      try {
+        await saveQuoteFormAsDraft(root, form);
+      } catch (error) {
+        if (status) status.textContent = error.message || String(error);
+      }
+      return;
+    }
+    const quoteDraftResume = event.target.closest("[data-quote-draft-resume]");
+    if (quoteDraftResume) {
+      event.preventDefault();
+      const draftId = quoteDraftResume.closest("[data-quote-draft-id]")?.dataset.quoteDraftId;
+      resumeQuoteDraft(root, draftId);
+      return;
+    }
+    const quoteDraftDelete = event.target.closest("[data-quote-draft-delete]");
+    if (quoteDraftDelete) {
+      event.preventDefault();
+      const draftRow = quoteDraftDelete.closest("[data-quote-draft-id]");
+      const draftId = draftRow?.dataset.quoteDraftId;
+      if (draftId && window.confirm("Supprimer ce brouillon ?")) {
+        await deleteQuoteDraft(root.dataset.restaurantId, draftId).catch(() => {});
+        root.quoteDrafts = (root.quoteDrafts || []).filter((item) => item.id !== draftId);
+        draftRow.remove();
+      }
       return;
     }
     const clientMovement = event.target.closest("[data-client-movement]");
@@ -1595,7 +1648,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
   root.dataset.restaurantRole = role;
-  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests, quotes] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests, quotes, pieceSaleEnabled, quoteDrafts] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
@@ -1603,7 +1656,9 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
     listCatalogMenu(restaurant.id).catch(() => null),
     getUserDoc(user.uid).catch(() => null),
     ["owner", "admin"].includes(role) ? listAccessRequests(restaurant.id).catch(() => []) : Promise.resolve([]),
-    listQuotes(restaurant.id).catch(() => [])
+    listQuotes(restaurant.id).catch(() => []),
+    getCatalogPieceSaleEnabled(restaurant.id).catch(() => false),
+    listQuoteDrafts(restaurant.id).catch(() => [])
   ]);
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
@@ -1613,8 +1668,10 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dashboardRestaurant = restaurant;
   root.dashboardQuotes = quotes;
   root.quoteCatalogItems = catalogItemsForQuotes(dashboardMenu);
+  root.quotePieceSaleEnabled = pieceSaleEnabled;
+  root.quoteDrafts = quoteDrafts;
   root.quoteClients = (Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || []).map(normalizeCustomerAccount);
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes, quoteDrafts);
   applyClientTools(root);
 }
 
@@ -2272,7 +2329,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = [], quotes = []) {
+function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = [], quotes = [], quoteDrafts = []) {
   const canEditProfile = ["owner", "admin"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -2296,7 +2353,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       <section class="dashboard-panel ${activeTab === "menu" ? "is-active" : ""}" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations, role)}</section>
-      <section class="dashboard-panel ${activeTab === "quotes" ? "is-active" : ""}" data-dashboard-panel="quotes">${quotesHtml(quotes, customers, menu, role)}</section>
+      <section class="dashboard-panel ${activeTab === "quotes" ? "is-active" : ""}" data-dashboard-panel="quotes">${quotesHtml(quotes, customers, menu, role, quoteDrafts)}</section>
       <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam, accessRequests)}</section>
       <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -3891,6 +3948,39 @@ function quoteSortTime(quote = {}) {
   return dateFromFirestoreValue(quote.createdAt || quote.issuedAt)?.getTime() || 0;
 }
 
+// Brouillons de devis : collection separee (restaurants/{id}/quote_drafts), invisible pour
+// l'application (elle ne lit que quotes) et le compteur partage restaurants/{id}/counters/quotes
+// n'est consomme qu'a la creation reelle du devis (voir createQuote), jamais pour un brouillon.
+async function listQuoteDrafts(restaurantId) {
+  const services = await getServices();
+  const { collection, getDocs } = services.firestoreModule;
+  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "quote_drafts"));
+  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() })).sort((a, b) => quoteSortTime(b) - quoteSortTime(a));
+}
+
+async function saveQuoteDraft(restaurantId, draftId, payload, user) {
+  const services = await getServices();
+  const { doc, collection, serverTimestamp, setDoc } = services.firestoreModule;
+  const isNew = !draftId;
+  const draftRef = isNew
+    ? doc(collection(services.db, "restaurants", restaurantId, "quote_drafts"))
+    : doc(services.db, "restaurants", restaurantId, "quote_drafts", draftId);
+  await setDoc(draftRef, {
+    ...payload,
+    ...(isNew ? { createdAt: serverTimestamp() } : {}),
+    updatedAt: serverTimestamp(),
+    updatedBy: user?.uid || ""
+  }, { merge: true });
+  return draftRef.id;
+}
+
+async function deleteQuoteDraft(restaurantId, draftId) {
+  if (!draftId) return;
+  const services = await getServices();
+  const { doc, deleteDoc } = services.firestoreModule;
+  await deleteDoc(doc(services.db, "restaurants", restaurantId, "quote_drafts", draftId));
+}
+
 // Le code client du numero de devis : les 4 derniers chiffres du telephone, sinon 4 lettres
 // du nom (completees par des X) ; identique au calcul fait par l'application.
 function quoteClientCode(customer = {}) {
@@ -4020,15 +4110,25 @@ function catalogItemsForQuotes(catalogMenu) {
   const categories = catalogMenu?.categories || [];
   const items = [];
   categories.forEach((category) => {
+    // Vente a la piece : reglage de categorie (comme dans l'app POS), pas de l'article.
+    // Categorie divisible en N parts egales, prix piece = prix entier / N.
+    const divisibilityQuantity = Number(category.divisibilityQuantity) || 0;
+    const pieceSaleEligible = category.isDivisibleInSupplements === true && category.pieceSaleEnabled === true && divisibilityQuantity > 0;
+    const pieceSalePrefix = String(category.pieceSalePrefix || "").trim();
     (category.items || []).forEach((item) => {
       if (!item.name) return;
+      const price = Number(item.price) || 0;
       items.push({
         name: item.name,
-        price: Number(item.price) || 0,
+        price,
         vat: firstNumber(item.vatOnSite) ?? 10,
         itemId: item.id || "",
         categoryId: item.categoryId || category.id || "",
-        categoryName: category.displayName || category.name || ""
+        categoryName: category.displayName || category.name || "",
+        pieceSaleEligible,
+        divisibilityQuantity,
+        piecePrice: pieceSaleEligible ? roundMoney(price / divisibilityQuantity) : 0,
+        pieceSalePrefix
       });
     });
   });
@@ -4058,10 +4158,20 @@ function groupCatalogItemsByCategory(items) {
 
 // Widget de selection multiple (comme le catalogue de prise de commande de l'application) :
 // permet d'ajouter plusieurs lignes de devis en une seule fois, avec une quantite par article.
-function quoteCatalogPickerHtml(items = []) {
+// Le mode "Par piece" reprend le fonctionnement de l'app : categories divisibles en N parts,
+// prix = prix entier / N, nom prefixe (voir catalogItemsForQuotes).
+function quoteCatalogPickerHtml(items = [], pieceSaleEnabled = false) {
   const groups = groupCatalogItemsByCategory(items);
+  const hasPieceEligibleItem = items.some((item) => item.pieceSaleEligible);
+  const showPieceToggle = pieceSaleEnabled && hasPieceEligibleItem;
   return `
-    <div class="quote-catalog-picker" data-quote-catalog-picker>
+    <div class="quote-catalog-picker" data-quote-catalog-picker data-catalog-picker-mode="normal">
+      ${showPieceToggle ? `
+        <div class="quote-catalog-mode-toggle" data-catalog-picker-mode-toggle role="group" aria-label="Mode de vente">
+          <button class="button-reset is-active" type="button" data-catalog-picker-mode-btn="normal">Normal</button>
+          <button class="button-reset" type="button" data-catalog-picker-mode-btn="piece">Par piece</button>
+        </div>
+      ` : ""}
       <input type="search" class="quote-catalog-search" placeholder="Rechercher un article..." data-catalog-picker-search />
       <div class="quote-catalog-picker-groups" data-catalog-picker-groups>
         ${groups.length ? groups.map((group) => `
@@ -4072,9 +4182,14 @@ function quoteCatalogPickerHtml(items = []) {
                 <div class="quote-catalog-picker-item" data-catalog-picker-item
                   data-catalog-picker-name="${escapeAttr(item.name.toLowerCase())}"
                   data-item-name="${escapeAttr(item.name)}" data-item-price="${item.price}" data-item-vat="${item.vat}"
-                  data-item-id="${escapeAttr(item.itemId)}" data-item-category-id="${escapeAttr(item.categoryId)}" data-item-category-name="${escapeAttr(item.categoryName)}">
-                  <span class="quote-catalog-picker-name">${escapeHtml(item.name)}</span>
-                  <span class="quote-catalog-picker-price">${escapeHtml(formatMoney(item.price))}</span>
+                  data-item-id="${escapeAttr(item.itemId)}" data-item-category-id="${escapeAttr(item.categoryId)}" data-item-category-name="${escapeAttr(item.categoryName)}"
+                  data-item-piece-eligible="${item.pieceSaleEligible ? "1" : ""}" data-item-piece-price="${item.piecePrice || 0}"
+                  data-item-piece-qty="${item.divisibilityQuantity || 0}" data-item-piece-prefix="${escapeAttr(item.pieceSalePrefix || "")}">
+                  <span class="quote-catalog-picker-name">
+                    ${escapeHtml(item.name)}
+                    ${item.pieceSaleEligible ? `<small class="quote-catalog-piece-tag">Vente a la piece (${item.divisibilityQuantity})</small>` : ""}
+                  </span>
+                  <span class="quote-catalog-picker-price" data-catalog-picker-item-price>${escapeHtml(formatMoney(item.price))}</span>
                   <div class="quote-catalog-picker-qty">
                     <button class="button-reset" type="button" data-catalog-picker-decrement aria-label="Diminuer la quantite">&minus;</button>
                     <input type="number" min="0" step="1" value="0" data-catalog-picker-qty />
@@ -4096,7 +4211,7 @@ function quoteCatalogPickerHtml(items = []) {
 
 function openQuoteCatalogPicker(root, form, triggerRow) {
   if (!form) return;
-  const overlay = showDashboardModal("Choisir dans le catalogue", quoteCatalogPickerHtml(root.quoteCatalogItems || []), { wide: true });
+  const overlay = showDashboardModal("Choisir dans le catalogue", quoteCatalogPickerHtml(root.quoteCatalogItems || [], root.quotePieceSaleEnabled === true), { wide: true });
   const picker = overlay.querySelector("[data-quote-catalog-picker]");
   const summary = picker.querySelector("[data-catalog-picker-summary]");
   const qtyInputs = [...picker.querySelectorAll("[data-catalog-picker-qty]")];
@@ -4119,6 +4234,23 @@ function openQuoteCatalogPicker(root, form, triggerRow) {
     qtyInput.addEventListener("input", updateSummary);
   });
 
+  picker.querySelectorAll("[data-catalog-picker-mode-btn]").forEach((modeBtn) => {
+    modeBtn.addEventListener("click", () => {
+      const mode = modeBtn.dataset.catalogPickerModeBtn;
+      picker.dataset.catalogPickerMode = mode;
+      picker.querySelectorAll("[data-catalog-picker-mode-btn]").forEach((btn) => btn.classList.toggle("is-active", btn === modeBtn));
+      picker.querySelectorAll("[data-catalog-picker-item]").forEach((itemEl) => {
+        const priceEl = itemEl.querySelector("[data-catalog-picker-item-price]");
+        const isEligible = itemEl.dataset.itemPieceEligible === "1";
+        if (mode === "piece" && isEligible) {
+          priceEl.textContent = `${formatMoney(Number(itemEl.dataset.itemPiecePrice) || 0)} / piece`;
+        } else {
+          priceEl.textContent = formatMoney(Number(itemEl.dataset.itemPrice) || 0);
+        }
+      });
+    });
+  });
+
   picker.querySelector("[data-catalog-picker-search]").addEventListener("input", (event) => {
     const term = event.target.value.trim().toLowerCase();
     picker.querySelectorAll("[data-catalog-picker-group]").forEach((group) => {
@@ -4133,18 +4265,23 @@ function openQuoteCatalogPicker(root, form, triggerRow) {
   });
 
   picker.querySelector("[data-catalog-picker-confirm]").addEventListener("click", () => {
+    const pieceMode = picker.dataset.catalogPickerMode === "piece";
     const selections = [...picker.querySelectorAll("[data-catalog-picker-item]")]
-      .map((itemEl) => ({
-        item: {
-          name: itemEl.dataset.itemName,
-          price: Number(itemEl.dataset.itemPrice) || 0,
-          vat: Number(itemEl.dataset.itemVat) || 0,
-          itemId: itemEl.dataset.itemId,
-          categoryId: itemEl.dataset.itemCategoryId,
-          categoryName: itemEl.dataset.itemCategoryName
-        },
-        qty: Number(itemEl.querySelector("[data-catalog-picker-qty]").value) || 0
-      }))
+      .map((itemEl) => {
+        const isPieceLine = pieceMode && itemEl.dataset.itemPieceEligible === "1";
+        const prefix = itemEl.dataset.itemPiecePrefix || "";
+        return {
+          item: {
+            name: isPieceLine && prefix ? `${prefix} ${itemEl.dataset.itemName}` : itemEl.dataset.itemName,
+            price: isPieceLine ? Number(itemEl.dataset.itemPiecePrice) || 0 : Number(itemEl.dataset.itemPrice) || 0,
+            vat: Number(itemEl.dataset.itemVat) || 0,
+            itemId: itemEl.dataset.itemId,
+            categoryId: itemEl.dataset.itemCategoryId,
+            categoryName: itemEl.dataset.itemCategoryName
+          },
+          qty: Number(itemEl.querySelector("[data-catalog-picker-qty]").value) || 0
+        };
+      })
       .filter((entry) => entry.qty > 0);
     if (!selections.length) {
       closeDashboardModal();
@@ -4167,11 +4304,12 @@ function openQuoteCatalogPicker(root, form, triggerRow) {
 // ===========================================================================
 // Affichage
 // ===========================================================================
-function quotesHtml(quotes = [], customerAccounts = {}, catalogMenu = null, role = "") {
+function quotesHtml(quotes = [], customerAccounts = {}, catalogMenu = null, role = "", drafts = []) {
   const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
   const clients = customers.map(normalizeCustomerAccount);
   const canManage = QUOTE_MANAGER_ROLES.includes(role);
   const sorted = [...quotes].sort((a, b) => quoteSortTime(b) - quoteSortTime(a));
+  const sortedDrafts = [...drafts].sort((a, b) => quoteSortTime(b) - quoteSortTime(a));
   return `
     <div class="quotes-section" data-quotes-section>
       <div class="quotes-list-view" data-quotes-list-view>
@@ -4187,6 +4325,14 @@ function quotesHtml(quotes = [], customerAccounts = {}, catalogMenu = null, role
             </button>
           ` : ""}
         </div>
+        ${canManage && sortedDrafts.length ? `
+          <section class="quote-drafts" aria-labelledby="quote-drafts-title">
+            <h3 id="quote-drafts-title">Brouillons <span class="quote-drafts-count">${sortedDrafts.length}</span></h3>
+            <div class="quote-drafts-list">
+              ${sortedDrafts.map((draft) => quoteDraftRowHtml(draft, clients)).join("")}
+            </div>
+          </section>
+        ` : ""}
         ${sorted.length ? `
           <div class="client-ledger-table quotes-table">
             <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emis le</span><span>Valable jusqu'au</span><span>Total TTC</span><span>Statut</span></div>
@@ -4195,6 +4341,24 @@ function quotesHtml(quotes = [], customerAccounts = {}, catalogMenu = null, role
         ` : `<div class="client-account-empty">Aucun devis pour le moment.</div>`}
       </div>
       ${canManage ? quoteCreatePageHtml(clients) : ""}
+    </div>
+  `;
+}
+
+function quoteDraftRowHtml(draft = {}, clients = []) {
+  const client = clients.find((item) => item.id === draft.customerId);
+  const clientName = client?.displayName || client?.companyName || "Client non choisi";
+  const totalTtc = quoteLinesTotals(draft.lines || []).totalTtc;
+  return `
+    <div class="quote-draft-row" data-quote-draft-id="${escapeAttr(draft.id)}">
+      <div class="quote-draft-info">
+        <strong>${escapeHtml(draft.eventLabel || clientName)}</strong>
+        <small>${escapeHtml([clientName, clientDateLabel(draft.updatedAt) ? `modifie le ${clientDateLabel(draft.updatedAt)}` : "", formatMoney(totalTtc)].filter(Boolean).join(" · "))}</small>
+      </div>
+      <div class="quote-draft-actions">
+        <button class="outline-dark-btn button-reset" type="button" data-quote-draft-resume>Reprendre</button>
+        <button class="button-reset quote-line-remove" type="button" data-quote-draft-delete aria-label="Supprimer le brouillon">&times;</button>
+      </div>
     </div>
   `;
 }
@@ -4270,7 +4434,11 @@ function quoteCreatePageHtml(clients = []) {
         </div>
 
         <label class="wide-field">Conditions<textarea name="conditions" rows="3">Devis valable jusqu'a la date indiquee. Prix TTC.</textarea></label>
-        <button class="primary-btn button-reset" type="submit">Creer le devis</button>
+        <div class="quote-form-actions">
+          <button class="outline-dark-btn button-reset" type="button" data-quote-preview>Previsualiser</button>
+          <button class="outline-dark-btn button-reset" type="button" data-quote-save-draft>Enregistrer comme brouillon</button>
+          <button class="primary-btn button-reset" type="submit">Creer le devis</button>
+        </div>
         <small data-form-status></small>
       </form>
     </section>
@@ -4399,9 +4567,8 @@ function updateQuoteFormTotals(form) {
   if (ttc) ttc.textContent = formatMoney(totalTtc);
 }
 
-async function submitQuoteForm(root, form, restaurantId) {
-  const rows = [...form.querySelectorAll("[data-quote-line]")];
-  const lines = rows.map((row) => ({
+function quoteFormLines(form) {
+  return [...form.querySelectorAll("[data-quote-line]")].map((row) => ({
     name: row.querySelector("[data-quote-line-name]").value.trim(),
     quantity: Number(row.querySelector("[data-quote-line-qty]").value) || 0,
     unitPrice: Number(row.querySelector("[data-quote-line-price]").value) || 0,
@@ -4410,13 +4577,18 @@ async function submitQuoteForm(root, form, restaurantId) {
     categoryId: row.dataset.catalogCategoryId || "",
     categoryName: row.dataset.catalogCategoryName || ""
   })).filter((line) => line.name && line.quantity > 0);
-  if (!lines.length) throw new Error("Ajoutez au moins une ligne avec un libelle et une quantite.");
+}
+
+// Reunit ce que le formulaire "Nouveau devis" contient, sous une forme partagee par la
+// creation reelle (submitQuoteForm), l'apercu PDF (previewQuoteFromForm) et l'enregistrement
+// en brouillon (saveQuoteFormAsDraft) : evite de retaper trois fois la meme extraction du DOM.
+function quotePayloadFromForm(root, form) {
+  const lines = quoteFormLines(form);
   const { totalTtc } = quoteLinesTotals(lines);
   const data = new FormData(form);
   const customerId = form.querySelector("[data-quote-customer-select]")?.value || "";
-  const selectedClient = (root.quoteClients || []).find((item) => item.id === customerId);
-  if (!selectedClient) throw new Error("Choisissez un client (ou ajoutez-en un avec le bouton « Ajouter un client »).");
-  const customer = {
+  const selectedClient = (root.quoteClients || []).find((item) => item.id === customerId) || null;
+  const customer = selectedClient ? {
     customerId: selectedClient.id,
     name: selectedClient.displayName || selectedClient.companyName || "",
     phone: selectedClient.phone || "",
@@ -4424,7 +4596,7 @@ async function submitQuoteForm(root, form, restaurantId) {
     address: selectedClient.address || "",
     taxId: selectedClient.taxId || "",
     vatNumber: selectedClient.vatNumber || ""
-  };
+  } : null;
   const eventDateValue = data.get("eventDate");
   const validUntilValue = data.get("validUntil");
   const now = new Date();
@@ -4442,20 +4614,151 @@ async function submitQuoteForm(root, form, restaurantId) {
     isClosed: false,
     revision: 0,
     tableNote: String(data.get("notes") || "").trim() || null,
-    customerName: customer.name || null,
-    customerPhone: customer.phone || null,
+    customerName: customer?.name || null,
+    customerPhone: customer?.phone || null,
     quotedAt: now.toISOString()
   };
-  await createQuote(restaurantId, {
+  return {
+    lines,
+    totalTtc,
+    customerId,
     customer,
     sourceTable,
-    totalTtc,
     validUntil: validUntilValue ? new Date(`${validUntilValue}T12:00:00`).toISOString() : new Date(now.getTime() + 30 * 86400000).toISOString(),
     eventLabel: String(data.get("eventLabel") || "").trim(),
     eventDate: eventDateValue ? new Date(`${eventDateValue}T12:00:00`).toISOString() : null,
+    covers: Number(data.get("covers")) || 0,
     depositAmount: Number(data.get("depositAmount")) || 0,
+    notes: String(data.get("notes") || "").trim(),
     conditions: String(data.get("conditions") || "").trim()
+  };
+}
+
+async function submitQuoteForm(root, form, restaurantId) {
+  const payload = quotePayloadFromForm(root, form);
+  if (!payload.lines.length) throw new Error("Ajoutez au moins une ligne avec un libelle et une quantite.");
+  if (!payload.customer) throw new Error("Choisissez un client (ou ajoutez-en un avec le bouton « Ajouter un client »).");
+  await createQuote(restaurantId, {
+    customer: payload.customer,
+    sourceTable: payload.sourceTable,
+    totalTtc: payload.totalTtc,
+    validUntil: payload.validUntil,
+    eventLabel: payload.eventLabel,
+    eventDate: payload.eventDate,
+    depositAmount: payload.depositAmount,
+    conditions: payload.conditions
   }, currentUser);
+  if (form.dataset.draftId) await deleteQuoteDraft(restaurantId, form.dataset.draftId).catch(() => {});
+}
+
+async function previewQuoteFromForm(root, form) {
+  const payload = quotePayloadFromForm(root, form);
+  if (!payload.lines.length) throw new Error("Ajoutez au moins une ligne avec un libelle et une quantite.");
+  const restaurant = root.dashboardRestaurant || {};
+  const previewQuote = {
+    quoteNumber: "APERCU",
+    status: "issued",
+    issuedAt: new Date().toISOString(),
+    customer: payload.customer || { name: "Client non renseigne" },
+    sourceTable: payload.sourceTable,
+    totalTtc: payload.totalTtc,
+    validUntil: payload.validUntil,
+    eventLabel: payload.eventLabel,
+    eventDate: payload.eventDate,
+    depositAmount: payload.depositAmount,
+    conditions: payload.conditions
+  };
+  const overlay = showDashboardModal("Apercu du devis", `<p class="client-modal-wait">Generation du PDF...</p>`, { wide: true });
+  const blob = await buildQuotePdf(previewQuote, restaurant);
+  if (!document.body.contains(overlay)) return;
+  const objectUrl = URL.createObjectURL(blob);
+  overlay.dataset.quoteObjectUrl = objectUrl;
+  overlay.querySelector(".client-modal-body").innerHTML = `<div class="quote-preview"><iframe src="${escapeAttr(objectUrl)}" title="Apercu du devis"></iframe></div>`;
+  const cleanupUrl = () => URL.revokeObjectURL(objectUrl);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest("[data-client-modal-close]")) cleanupUrl();
+  });
+  const footer = document.createElement("footer");
+  footer.innerHTML = `
+    <p class="quote-preview-note">Apercu uniquement : le devis n'est pas encore enregistre, le vrai numero sera attribue a la creation.</p>
+    <button class="outline-dark-btn button-reset" type="button" data-client-modal-close>Fermer l'apercu</button>
+  `;
+  overlay.querySelector(".client-modal").appendChild(footer);
+}
+
+async function saveQuoteFormAsDraft(root, form) {
+  const status = form.querySelector("[data-form-status]");
+  const payload = quotePayloadFromForm(root, form);
+  if (!payload.lines.length && !payload.customer && !payload.eventLabel) {
+    if (status) status.textContent = "Rien a enregistrer pour l'instant.";
+    return;
+  }
+  const restaurantId = root.dataset.restaurantId;
+  if (status) status.textContent = "Enregistrement du brouillon...";
+  const draftId = await saveQuoteDraft(restaurantId, form.dataset.draftId || "", {
+    customerId: payload.customerId,
+    eventLabel: payload.eventLabel,
+    eventDate: payload.eventDate,
+    covers: payload.covers,
+    validUntil: payload.validUntil,
+    depositAmount: payload.depositAmount,
+    notes: payload.notes,
+    conditions: payload.conditions,
+    lines: payload.lines
+  }, currentUser);
+  form.dataset.draftId = draftId;
+  if (status) status.textContent = "Brouillon enregistre. Vous pouvez continuer a modifier ce devis.";
+}
+
+// Reouvre la page de creation et pre-remplit tout depuis un brouillon (restaurants/{id}/quote_drafts).
+// "Nouveau devis" repart toujours d'une page vierge, meme si un brouillon etait en cours
+// d'edition juste avant (sinon on risquerait d'ecraser ce brouillon en cliquant "Creer").
+function resetQuoteCreateForm(root, form) {
+  if (!form) return;
+  delete form.dataset.draftId;
+  form.reset();
+  applyQuoteClientSelection(root, form);
+  const linesContainer = form.querySelector("[data-quote-lines]");
+  linesContainer.querySelectorAll("[data-quote-line]").forEach((row) => row.remove());
+  linesContainer.insertAdjacentHTML("beforeend", quoteLineRowHtml());
+  updateQuoteFormTotals(form);
+  const status = form.querySelector("[data-form-status]");
+  if (status) status.textContent = "";
+}
+
+function resumeQuoteDraft(root, draftId) {
+  const draft = (root.quoteDrafts || []).find((item) => item.id === draftId);
+  if (!draft) return;
+  const section = document.querySelector("[data-quotes-section]");
+  const form = section?.querySelector("[data-dashboard-quote-form]");
+  if (!form) return;
+  form.dataset.draftId = draft.id;
+  form.querySelector("[data-quote-customer-select]").value = draft.customerId || "";
+  applyQuoteClientSelection(root, form);
+  form.elements.eventLabel.value = draft.eventLabel || "";
+  form.elements.eventDate.value = draft.eventDate ? String(draft.eventDate).slice(0, 10) : "";
+  form.elements.covers.value = draft.covers || "";
+  form.elements.validUntil.value = draft.validUntil ? String(draft.validUntil).slice(0, 10) : "";
+  form.elements.depositAmount.value = draft.depositAmount || "";
+  form.elements.notes.value = draft.notes || "";
+  form.elements.conditions.value = draft.conditions || "";
+  const linesContainer = form.querySelector("[data-quote-lines]");
+  linesContainer.querySelectorAll("[data-quote-line]").forEach((row) => row.remove());
+  const lines = Array.isArray(draft.lines) && draft.lines.length ? draft.lines : [null];
+  lines.forEach((line) => {
+    linesContainer.insertAdjacentHTML("beforeend", quoteLineRowHtml(line ? {
+      name: line.name,
+      price: Number(line.unitPrice) || 0,
+      vat: Number(line.vat) || 0,
+      itemId: line.itemId || "",
+      categoryId: line.categoryId || "",
+      categoryName: line.categoryName || ""
+    } : null, line ? Number(line.quantity) || 1 : 1));
+  });
+  linesContainer.querySelectorAll("[data-quote-line]").forEach(updateQuoteLineRow);
+  updateQuoteFormTotals(form);
+  section.querySelector("[data-quotes-list-view]")?.classList.add("is-hidden");
+  section.querySelector("[data-quote-create-page]")?.classList.remove("is-hidden");
 }
 
 // ===========================================================================
@@ -4471,9 +4774,8 @@ function quoteDefaultConditions(restaurant = {}) {
 // PDF du devis : mise en page proche de celle de l'application (Helvetica
 // proportionnelle, encadres Client/Prestation/Conditions, tableau borde avec
 // en-tete grise), plutot que le rendu "ticket" en police a chasse fixe.
-// Le logo du restaurant n'est pas incorpore : Firebase Storage n'envoie pas
-// d'en-tete CORS sur ces fichiers, le navigateur ne peut donc pas en lire les
-// pixels depuis le site (le nom du restaurant en gras le remplace).
+// Le logo du restaurant (documentLogoUrl en priorite) est incorpore en pixels ;
+// si aucun logo n'est disponible, le nom du restaurant en gras le remplace.
 // ===========================================================================
 
 // Largeurs Helvetica standard (unites pour 1000, table Adobe AFM), codes 32-126.
