@@ -531,8 +531,10 @@ async function saveRestaurantProfile(restaurantId, form) {
   const existing = await getRestaurant(restaurantId);
   const logoFile = form.querySelector('[name="logoFile"]')?.files?.[0];
   const coverFile = form.querySelector('[name="coverFile"]')?.files?.[0];
+  const documentLogoFile = form.querySelector('[name="documentLogoFile"]')?.files?.[0];
   const logoUrl = logoFile ? await uploadRestaurantImage(restaurantId, logoFile, "logo") : text(data, "logoUrl") || existing?.logoUrl || "";
   const coverUrl = coverFile ? await uploadRestaurantImage(restaurantId, coverFile, "cover") : text(data, "coverUrl") || existing?.coverUrl || "";
+  const documentLogoUrl = documentLogoFile ? await uploadRestaurantImage(restaurantId, documentLogoFile, "logo-document") : text(data, "documentLogoUrl") || existing?.documentLogoUrl || "";
   const addressLine1 = text(data, "address");
   const postalCode = text(data, "postalCode");
   const city = text(data, "city");
@@ -543,6 +545,7 @@ async function saveRestaurantProfile(restaurantId, form) {
     tradeName: text(data, "name"),
     logoUrl,
     coverUrl,
+    documentLogoUrl,
     description: text(data, "description"),
     cuisineType: text(data, "cuisineType"),
     address,
@@ -2417,7 +2420,9 @@ function profileFormHtml(restaurant, canEdit) {
         <label>Google Maps URL<input name="googleMapsUrl" value="${escapeAttr(restaurant.googleMapsUrl)}" ${disabled(canEdit)} /></label>
         <input type="hidden" name="logoUrl" value="${escapeAttr(restaurant.logoUrl)}" />
         <input type="hidden" name="coverUrl" value="${escapeAttr(restaurant.coverUrl)}" />
+        <input type="hidden" name="documentLogoUrl" value="${escapeAttr(restaurant.documentLogoUrl)}" />
         ${profileImageFieldHtml("Logo", "logoFile", restaurant.logoUrl, canEdit, "Logo restaurant")}
+        ${profileImageFieldHtml("Logo pour documents (fond blanc)", "documentLogoFile", restaurant.documentLogoUrl, canEdit, "Logo pour documents")}
         ${profileImageFieldHtml("Image couverture", "coverFile", restaurant.coverUrl, canEdit, "Image couverture")}
         <label class="wide-field">Description<textarea name="description" rows="4" ${disabled(canEdit)}>${escapeHtml(restaurant.description)}</textarea></label>
       </div>
@@ -4521,10 +4526,13 @@ async function buildQuotePdf(quote = {}, restaurant = {}) {
   const lineItems = Array.isArray(table.lines) ? table.lines.filter((line) => Number(line.quantity) !== 0) : [];
 
   // -- en-tete : logo (ou nom en gras a defaut) a gauche, "DEVIS" + reperes a droite --
+  // Le logo "documentLogoUrl" (variante pour fond blanc) est prioritaire sur le logo
+  // general du restaurant, souvent clair/blanc et pense pour un fond fonce.
   let logo = null;
-  if (restaurant.logoUrl) {
+  const logoUrl = firstText(restaurant.documentLogoUrl, restaurant.logoUrl);
+  if (logoUrl) {
     try {
-      const pixels = await loadLogoPixels(restaurant.logoUrl);
+      const pixels = await loadLogoPixels(logoUrl);
       logo = { name: await doc.addImageAsset(pixels), width: pixels.width, height: pixels.height };
     } catch (error) {
       logo = null; // logo inaccessible (reseau, image invalide...) : repli sur le nom en gras
@@ -5788,6 +5796,7 @@ function normalizeRestaurant(id, data) {
     name: data.name || profile.name || profile.tradeName || id,
     slug: data.slug || profile.slug || id,
     logoUrl: data.logoUrl || profile.logoUrl || "",
+    documentLogoUrl: data.documentLogoUrl || profile.documentLogoUrl || "",
     description: data.description || profile.description || "",
     cuisineType: data.cuisineType || profile.cuisineType || data.businessType || profile.businessType || "",
     address,
