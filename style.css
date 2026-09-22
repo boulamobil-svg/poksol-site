@@ -5908,7 +5908,8 @@ button.client-ledger-row:focus-visible {
 /* ------------------------------------------------------------------
    Devis : liste, formulaire de creation avec autocompletion, apercu PDF
    ------------------------------------------------------------------ */
-.quotes-head {
+.quotes-head,
+.reservations-head {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -5917,11 +5918,13 @@ button.client-ledger-row:focus-visible {
   margin-bottom: 18px;
 }
 
-.quotes-head h2 {
+.quotes-head h2,
+.reservations-head h2 {
   margin: 0 0 4px;
 }
 
-.quotes-head p {
+.quotes-head p,
+.reservations-head p {
   margin: 0;
   color: var(--text-muted);
 }

@@ -1273,6 +1273,12 @@ function initDashboardPage() {
       return;
     }
     if (!event.target.closest(".client-col-head")) closeClientColumnMenus(root);
+    const reservationAddOpen = event.target.closest("[data-reservation-add-open]");
+    if (reservationAddOpen) {
+      event.preventDefault();
+      openDashboardReservationAdd(root);
+      return;
+    }
     const quoteRow = event.target.closest("[data-quote-row]");
     if (quoteRow) {
       event.preventDefault();
@@ -5912,6 +5918,18 @@ function zipStore(files) {
 function reservationsHtml(reservations, role) {
   const canUpdate = ["owner", "admin", "manager"].includes(role);
   return `
+    <div class="reservations-head">
+      <div>
+        <h2>Reservations</h2>
+        <p>${reservations.length} reservation${reservations.length > 1 ? "s" : ""}.</p>
+      </div>
+      ${canUpdate ? `
+        <button class="client-create-btn button-reset" type="button" data-reservation-add-open>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <strong>Nouvelle reservation</strong>
+        </button>
+      ` : ""}
+    </div>
     <div class="responsive-table reservations-table">
       <div class="table-row table-head reservation-summary"><span>Date</span><span>Client</span><span>Contact</span><span>Couverts</span><span>Statut</span><span>Infos</span></div>
       ${reservations.length ? reservations.map((reservation) => {
@@ -5946,6 +5964,92 @@ function reservationsHtml(reservations, role) {
       }).join("") : `<div class="empty-state">Aucune reservation pour le moment.</div>`}
     </div>
   `;
+}
+
+function dashboardReservationFormHtml() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `
+    <form class="platform-form" data-dashboard-reservation-form>
+      <div class="form-grid">
+        <label>Nom du client<input name="name" required /></label>
+        <label>Telephone<input name="phone" type="tel" required /></label>
+        <label>Email<input name="email" type="email" /></label>
+        <label>Couverts<input name="guests" type="number" min="1" step="1" value="2" required /></label>
+        <label>Date<input name="date" type="date" value="${today}" required /></label>
+        <label>Heure<input name="time" type="time" required /></label>
+      </div>
+      <label class="wide-field">Notes<textarea name="message" rows="3" placeholder="Table pres de la fenetre, allergie..."></textarea></label>
+      <button class="primary-btn button-reset" type="submit">Ajouter la reservation</button>
+      <small data-form-status></small>
+    </form>
+  `;
+}
+
+// Reservation ajoutee manuellement par l'equipe depuis le dashboard : memes regles que le
+// formulaire public (horaires d'ouverture, champs obligatoires), source distincte pour
+// que "Reservations > Details > Source" indique clairement qui l'a creee.
+async function submitDashboardReservation(root, form) {
+  const services = await getServices();
+  const { addDoc, collection, serverTimestamp, Timestamp } = services.firestoreModule;
+  const restaurant = root.dashboardRestaurant || {};
+  const restaurantId = root.dataset.restaurantId;
+  const data = new FormData(form);
+  const date = text(data, "date");
+  const time = text(data, "time");
+  const customerName = text(data, "name");
+  const customerPhone = text(data, "phone");
+  const customerEmail = text(data, "email");
+  if (!customerName || !customerPhone || !date || !time) {
+    throw new Error("Nom, telephone, date et heure sont obligatoires.");
+  }
+  const reservedAt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(reservedAt.getTime())) throw new Error("Date ou heure invalide.");
+  if (!isReservationWithinOpeningHours(restaurant.openingHours, date, time)) {
+    throw new Error("Ce creneau est en dehors des horaires d'ouverture.");
+  }
+  await addDoc(collection(services.db, "restaurants", restaurantId, "reservations"), {
+    restaurantId,
+    customerName,
+    customerPhone,
+    customerEmail,
+    customer: { name: customerName, phone: customerPhone, email: customerEmail },
+    date,
+    time,
+    phone: customerPhone,
+    email: customerEmail,
+    guests: Number(text(data, "guests")) || 1,
+    notes: text(data, "message"),
+    status: "planned",
+    reservedAt: Timestamp.fromDate(reservedAt),
+    source: "dashboard_admin",
+    sourceLabel: "Ajoutee depuis le dashboard",
+    reservationSource: "dashboard_admin",
+    channel: "dashboard",
+    createdBy: currentUser?.uid || "",
+    createdByName: currentUser?.displayName || currentUser?.email || "Equipe restaurant",
+    createdByType: "staff",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+function openDashboardReservationAdd(root) {
+  const overlay = showDashboardModal("Nouvelle reservation", dashboardReservationFormHtml());
+  const form = overlay.querySelector("[data-dashboard-reservation-form]");
+  const status = form.querySelector("[data-form-status]");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      status.textContent = "Enregistrement...";
+      await submitDashboardReservation(root, form);
+      closeDashboardModal();
+      await renderDashboard(root, currentUser, root.dataset.restaurantId, "reservations");
+    } catch (error) {
+      status.textContent = error?.code === "permission-denied"
+        ? "Action refusee par Firestore : votre role ne permet pas cette operation."
+        : (error.message || String(error));
+    }
+  });
 }
 
 function reservationDetailItemHtml(label, value, wide = false) {
