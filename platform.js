@@ -773,7 +773,7 @@ async function createCustomerAccount(restaurantId, form, user) {
   if (!hasCustomerIdentity(data)) {
     throw new Error("Renseignez au moins un nom, une societe, un telephone ou un email.");
   }
-  await addDoc(collection(services.db, "restaurants", restaurantId, "customers"), {
+  const docRef = await addDoc(collection(services.db, "restaurants", restaurantId, "customers"), {
     ...data,
     active: true,
     createdBy: user?.uid || "",
@@ -781,6 +781,7 @@ async function createCustomerAccount(restaurantId, form, user) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+  return docRef.id;
 }
 
 async function updateCustomerAccount(restaurantId, form) {
@@ -1263,6 +1264,28 @@ function initDashboardPage() {
       openQuoteDetail(root, quoteRow.dataset.quoteRow);
       return;
     }
+    const quoteCreateOpen = event.target.closest("[data-quote-create-open]");
+    if (quoteCreateOpen) {
+      event.preventDefault();
+      const section = quoteCreateOpen.closest("[data-quotes-section]");
+      section?.querySelector("[data-quotes-list-view]")?.classList.add("is-hidden");
+      section?.querySelector("[data-quote-create-page]")?.classList.remove("is-hidden");
+      return;
+    }
+    const quoteCreateClose = event.target.closest("[data-quote-create-close]");
+    if (quoteCreateClose) {
+      event.preventDefault();
+      const section = quoteCreateClose.closest("[data-quotes-section]");
+      section?.querySelector("[data-quote-create-page]")?.classList.add("is-hidden");
+      section?.querySelector("[data-quotes-list-view]")?.classList.remove("is-hidden");
+      return;
+    }
+    const quoteAddClient = event.target.closest("[data-quote-add-client]");
+    if (quoteAddClient) {
+      event.preventDefault();
+      openQuoteAddClient(root, quoteAddClient.closest("form"));
+      return;
+    }
     const quoteAddLine = event.target.closest("[data-quote-add-line]");
     if (quoteAddLine) {
       event.preventDefault();
@@ -1430,15 +1453,7 @@ function initDashboardPage() {
       return;
     }
     if (event.target.matches("[data-quote-customer-select]")) {
-      const option = event.target.selectedOptions[0];
-      const quoteForm = event.target.closest("form");
-      quoteForm.querySelector("[data-quote-customer-id]").value = option?.value || "";
-      quoteForm.querySelector("[data-quote-customer-name]").value = option?.dataset.name || "";
-      quoteForm.querySelector("[data-quote-customer-phone]").value = option?.dataset.phone || "";
-      quoteForm.querySelector("[data-quote-customer-email]").value = option?.dataset.email || "";
-      quoteForm.querySelector("[data-quote-customer-address]").value = option?.dataset.address || "";
-      quoteForm.querySelector("[data-quote-customer-tax]").value = option?.dataset.tax || "";
-      quoteForm.querySelector("[data-quote-customer-vat]").value = option?.dataset.vat || "";
+      applyQuoteClientSelection(root, event.target.closest("form"));
       return;
     }
     if (event.target.matches("[data-quote-line-qty], [data-quote-line-price], [data-quote-line-vat]")) {
@@ -1574,6 +1589,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dashboardRestaurant = restaurant;
   root.dashboardQuotes = quotes;
   root.quoteCatalogItems = catalogItemsForQuotes(dashboardMenu);
+  root.quoteClients = (Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || []).map(normalizeCustomerAccount);
   root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes);
   applyClientTools(root);
 }
@@ -2723,7 +2739,7 @@ function clientsHtml(customerAccounts = {}, reservations = [], role = "") {
           <details class="client-add-panel">
             <summary class="client-create-btn">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M19 8v6M16 11h6"/></svg>
-              <strong>Create contact</strong>
+              <strong>Creer client</strong>
             </summary>
             <form class="platform-form customer-account-form" data-dashboard-customer-form data-customer-type-scope data-customer-type="individual">
               ${customerFieldsHtml()}
@@ -3942,28 +3958,28 @@ function quotesHtml(quotes = [], customerAccounts = {}, catalogMenu = null, role
   const canManage = QUOTE_MANAGER_ROLES.includes(role);
   const sorted = [...quotes].sort((a, b) => quoteSortTime(b) - quoteSortTime(a));
   return `
-    <div class="quotes-section">
-      <div class="quotes-head">
-        <div>
-          <h2>Devis</h2>
-          <p>${sorted.length} devis emis.</p>
-        </div>
-        ${canManage ? `
-          <details class="client-add-panel quote-add-panel">
-            <summary class="client-create-btn">
+    <div class="quotes-section" data-quotes-section>
+      <div class="quotes-list-view" data-quotes-list-view>
+        <div class="quotes-head">
+          <div>
+            <h2>Devis</h2>
+            <p>${sorted.length} devis emis.</p>
+          </div>
+          ${canManage ? `
+            <button class="client-create-btn button-reset" type="button" data-quote-create-open>
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15h6"/></svg>
               <strong>Nouveau devis</strong>
-            </summary>
-            ${quoteFormHtml(clients, catalogMenu)}
-          </details>
-        ` : ""}
-      </div>
-      ${sorted.length ? `
-        <div class="client-ledger-table quotes-table">
-          <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emis le</span><span>Valable jusqu'au</span><span>Total TTC</span><span>Statut</span></div>
-          ${sorted.map((quote) => quoteRowHtml(quote)).join("")}
+            </button>
+          ` : ""}
         </div>
-      ` : `<div class="client-account-empty">Aucun devis pour le moment.</div>`}
+        ${sorted.length ? `
+          <div class="client-ledger-table quotes-table">
+            <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emis le</span><span>Valable jusqu'au</span><span>Total TTC</span><span>Statut</span></div>
+            ${sorted.map((quote) => quoteRowHtml(quote)).join("")}
+          </div>
+        ` : `<div class="client-account-empty">Aucun devis pour le moment.</div>`}
+      </div>
+      ${canManage ? quoteCreatePageHtml(clients, catalogMenu) : ""}
     </div>
   `;
 }
@@ -3983,57 +3999,135 @@ function quoteRowHtml(quote = {}) {
   `;
 }
 
-function quoteFormHtml(clients = [], catalogMenu = null) {
+// Un client choisi (ou cree a la volee) porte deja son nom/telephone/email/adresse/SIRET/TVA :
+// pas besoin de les retaper, la fiche client fait foi. « Ajouter un client » ouvre le meme
+// formulaire que l'onglet Comptes clients (customerFieldsHtml), dans une fenetre.
+function quoteCreatePageHtml(clients = [], catalogMenu = null) {
   const items = catalogItemsForQuotes(catalogMenu);
   const validUntil = new Date(Date.now() + 30 * 86400000);
   return `
-    <form class="platform-form quote-form" data-dashboard-quote-form>
-      <datalist id="quote-catalog-items">
-        ${items.map((item) => `<option value="${escapeAttr(item.name)}"></option>`).join("")}
-      </datalist>
-      <div class="form-grid">
-        <label>Client existant
-          <select data-quote-customer-select>
-            <option value="">&mdash; Saisie libre &mdash;</option>
-            ${clients.map((client) => `<option value="${escapeAttr(client.id)}" data-name="${escapeAttr(client.displayName || client.companyName || "")}" data-phone="${escapeAttr(client.phone || "")}" data-email="${escapeAttr(client.email || "")}" data-address="${escapeAttr(client.address || "")}" data-tax="${escapeAttr(client.taxId || "")}" data-vat="${escapeAttr(client.vatNumber || "")}">${escapeHtml(client.displayName || client.companyName || "Client")}</option>`).join("")}
-          </select>
-        </label>
-      </div>
-      <input type="hidden" name="customerId" data-quote-customer-id />
-      <div class="form-grid">
-        <label>Nom du client<input name="customerName" data-quote-customer-name required /></label>
-        <label>Telephone<input name="customerPhone" data-quote-customer-phone /></label>
-        <label>Email<input name="customerEmail" type="email" data-quote-customer-email /></label>
-        <label>Adresse<input name="customerAddress" data-quote-customer-address /></label>
-        <label>SIRET / fiscal<input name="customerTaxId" data-quote-customer-tax /></label>
-        <label>N&deg; TVA<input name="customerVatNumber" data-quote-customer-vat /></label>
-      </div>
-      <div class="form-grid">
-        <label>Intitule de la prestation<input name="eventLabel" placeholder="Anniversaire, mariage, buffet d'entreprise..." /></label>
-        <label>Date de l'evenement<input name="eventDate" type="date" /></label>
-        <label>Couverts<input name="covers" type="number" min="0" step="1" /></label>
-        <label>Valable jusqu'au<input name="validUntil" type="date" value="${validUntil.toISOString().slice(0, 10)}" required /></label>
-        <label>Acompte demande (EUR)<input name="depositAmount" type="number" min="0" step="0.01" /></label>
-      </div>
-      <label class="wide-field">Notes<textarea name="notes" rows="2"></textarea></label>
+    <section class="quote-create-page is-hidden" data-quote-create-page>
+      <header class="client-detail-header">
+        <button class="button-reset client-back-btn" type="button" data-quote-create-close aria-label="Retour aux devis">&larr;</button>
+        <div>
+          <span>Devis</span>
+          <h2>Nouveau devis</h2>
+        </div>
+      </header>
+      <form class="platform-form quote-form" data-dashboard-quote-form>
+        <datalist id="quote-catalog-items">
+          ${items.map((item) => `<option value="${escapeAttr(item.name)}"></option>`).join("")}
+        </datalist>
 
-      <div class="quote-lines" data-quote-lines>
-        <div class="quote-line-row quote-line-head"><span>Libelle</span><span>Qte</span><span>PU TTC</span><span>TVA</span><span>Total TTC</span><span></span></div>
-        ${quoteLineRowHtml()}
-      </div>
-      <button class="outline-dark-btn button-reset" type="button" data-quote-add-line>+ Ajouter une ligne</button>
+        <div class="quote-client-picker">
+          <label class="quote-client-select">Client
+            <select data-quote-customer-select>
+              ${quoteClientOptionsHtml(clients)}
+            </select>
+          </label>
+          <button class="outline-dark-btn button-reset" type="button" data-quote-add-client>+ Ajouter un client</button>
+        </div>
+        <div class="quote-client-summary" data-quote-client-summary>${quoteClientSummaryHtml(null)}</div>
 
-      <div class="quote-totals" data-quote-totals>
-        <span>Total HT <strong data-quote-total-ht>0,00 &euro;</strong></span>
-        <span>TVA <strong data-quote-total-vat>0,00 &euro;</strong></span>
-        <span>Total TTC <strong data-quote-total-ttc>0,00 &euro;</strong></span>
-      </div>
+        <div class="form-grid">
+          <label>Intitule de la prestation<input name="eventLabel" placeholder="Anniversaire, mariage, buffet d'entreprise..." /></label>
+          <label>Date de l'evenement<input name="eventDate" type="date" /></label>
+          <label>Couverts<input name="covers" type="number" min="0" step="1" /></label>
+          <label>Valable jusqu'au<input name="validUntil" type="date" value="${validUntil.toISOString().slice(0, 10)}" required /></label>
+          <label>Acompte demande (EUR)<input name="depositAmount" type="number" min="0" step="0.01" /></label>
+        </div>
+        <label class="wide-field">Notes<textarea name="notes" rows="2"></textarea></label>
 
-      <label class="wide-field">Conditions<textarea name="conditions" rows="3">Devis valable jusqu'a la date indiquee. Prix TTC.</textarea></label>
-      <button class="primary-btn button-reset" type="submit">Creer le devis</button>
+        <div class="quote-lines" data-quote-lines>
+          <div class="quote-line-row quote-line-head"><span>Libelle</span><span>Qte</span><span>PU TTC</span><span>TVA</span><span>Total TTC</span><span></span></div>
+          ${quoteLineRowHtml()}
+        </div>
+        <button class="outline-dark-btn button-reset" type="button" data-quote-add-line>+ Ajouter une ligne</button>
+
+        <div class="quote-totals" data-quote-totals>
+          <span>Total HT <strong data-quote-total-ht>0,00 &euro;</strong></span>
+          <span>TVA <strong data-quote-total-vat>0,00 &euro;</strong></span>
+          <span>Total TTC <strong data-quote-total-ttc>0,00 &euro;</strong></span>
+        </div>
+
+        <label class="wide-field">Conditions<textarea name="conditions" rows="3">Devis valable jusqu'a la date indiquee. Prix TTC.</textarea></label>
+        <button class="primary-btn button-reset" type="submit">Creer le devis</button>
+        <small data-form-status></small>
+      </form>
+    </section>
+  `;
+}
+
+function quoteClientOptionsHtml(clients = [], selectedId = "") {
+  return `
+    <option value="">${clients.length ? "Choisir un client..." : "Aucun client enregistre"}</option>
+    ${clients.map((client) => `<option value="${escapeAttr(client.id)}" ${client.id === selectedId ? "selected" : ""}>${escapeHtml(client.displayName || client.companyName || "Client")}</option>`).join("")}
+  `;
+}
+
+function quoteClientSummaryHtml(client) {
+  if (!client) {
+    return `<p class="quote-client-empty">Choisissez un client existant, ou ajoutez-en un avec le bouton ci-dessus.</p>`;
+  }
+  const rows = [
+    client.phone ? escapeHtml(client.phone) : "",
+    client.email ? escapeHtml(client.email) : "",
+    client.address ? escapeHtml(client.address) : "",
+    client.taxId ? `SIRET / fiscal : ${escapeHtml(client.taxId)}` : "",
+    client.vatNumber ? `TVA : ${escapeHtml(client.vatNumber)}` : ""
+  ].filter(Boolean);
+  return `
+    <strong>${escapeHtml(client.displayName || client.companyName || "Client")}</strong>
+    ${rows.map((row) => `<span>${row}</span>`).join("")}
+  `;
+}
+
+// Repercute le client choisi dans le formulaire (resume en lecture seule).
+function applyQuoteClientSelection(root, form) {
+  const select = form.querySelector("[data-quote-customer-select]");
+  const summary = form.querySelector("[data-quote-client-summary]");
+  if (!select || !summary) return;
+  const client = (root.quoteClients || []).find((item) => item.id === select.value) || null;
+  summary.innerHTML = quoteClientSummaryHtml(client);
+}
+
+// « Ajouter un client » : le meme formulaire que Comptes clients, dans une fenetre. La fenetre
+// est ajoutee hors de #dashboard-root (voir showDashboardModal), donc son propre gestionnaire
+// de soumission est cable ici plutot que de compter sur la delegation du formulaire principal.
+function openQuoteAddClient(root, form) {
+  const overlay = showDashboardModal("Ajouter un client", `
+    <form class="platform-form customer-account-form" data-dashboard-customer-form data-customer-type-scope data-customer-type="individual">
+      ${customerFieldsHtml()}
+      <button class="primary-btn button-reset" type="submit">Ajouter le client</button>
       <small data-form-status></small>
     </form>
-  `;
+  `);
+  const inlineForm = overlay.querySelector("[data-dashboard-customer-form]");
+  const status = inlineForm.querySelector("[data-form-status]");
+  inlineForm.addEventListener("change", (event) => {
+    if (event.target.matches("[data-customer-type-select]")) updateCustomerTypeScope(event.target);
+  });
+  inlineForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      requireClientPermission(root, "manage");
+      status.textContent = "Enregistrement...";
+      const restaurantId = root.dataset.restaurantId;
+      const newId = await createCustomerAccount(restaurantId, inlineForm, currentUser);
+      const newClient = normalizeCustomerAccount({ id: newId, customerCollection: "customers", ...customerAccountPayload(inlineForm), active: true });
+      root.quoteClients = [...(root.quoteClients || []), newClient];
+      closeDashboardModal();
+      const select = form.querySelector("[data-quote-customer-select]");
+      if (select) {
+        select.innerHTML = quoteClientOptionsHtml(root.quoteClients, newClient.id);
+        applyQuoteClientSelection(root, form);
+      }
+    } catch (error) {
+      status.textContent = error?.code === "permission-denied"
+        ? "Action refusee par Firestore : votre role ne permet pas cette operation."
+        : (error.message || String(error));
+    }
+  });
 }
 
 function quoteLineRowHtml() {
@@ -4092,16 +4186,18 @@ async function submitQuoteForm(root, form, restaurantId) {
   if (!lines.length) throw new Error("Ajoutez au moins une ligne avec un libelle et une quantite.");
   const { totalTtc } = quoteLinesTotals(lines);
   const data = new FormData(form);
+  const customerId = form.querySelector("[data-quote-customer-select]")?.value || "";
+  const selectedClient = (root.quoteClients || []).find((item) => item.id === customerId);
+  if (!selectedClient) throw new Error("Choisissez un client (ou ajoutez-en un avec le bouton « Ajouter un client »).");
   const customer = {
-    customerId: data.get("customerId") || "",
-    name: String(data.get("customerName") || "").trim(),
-    phone: String(data.get("customerPhone") || "").trim(),
-    email: String(data.get("customerEmail") || "").trim(),
-    address: String(data.get("customerAddress") || "").trim(),
-    taxId: String(data.get("customerTaxId") || "").trim(),
-    vatNumber: String(data.get("customerVatNumber") || "").trim()
+    customerId: selectedClient.id,
+    name: selectedClient.displayName || selectedClient.companyName || "",
+    phone: selectedClient.phone || "",
+    email: selectedClient.email || "",
+    address: selectedClient.address || "",
+    taxId: selectedClient.taxId || "",
+    vatNumber: selectedClient.vatNumber || ""
   };
-  if (!customer.name) throw new Error("Renseignez le nom du client.");
   const eventDateValue = data.get("eventDate");
   const validUntilValue = data.get("validUntil");
   const now = new Date();

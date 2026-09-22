@@ -2065,8 +2065,26 @@ select:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-height: 48px;
+  padding: 0 22px 0 16px;
+  border: 0;
+  border-radius: 14px;
   color: white;
-  background: #202327;
+  background: linear-gradient(180deg, #2f8bff, #1968e0);
+  box-shadow: 0 8px 20px rgba(25, 118, 243, 0.28);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+.client-create-btn:hover,
+.client-create-btn:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(25, 118, 243, 0.34);
+}
+
+.client-create-btn svg {
+  flex: none;
 }
 
 .client-create-btn span {
@@ -2083,6 +2101,8 @@ select:focus-visible {
 .client-create-btn strong {
   color: inherit;
   font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .client-add-panel > summary.client-create-btn strong::after,
@@ -4523,6 +4543,14 @@ body.menu-page-body.translated-rtl {
     grid-column: auto;
   }
 
+  .quote-client-picker {
+    align-items: stretch;
+  }
+
+  .quote-client-select {
+    min-width: 0;
+  }
+
   button.quote-row {
     text-align: left;
   }
@@ -5386,39 +5414,10 @@ body.menu-page-body.translated-rtl {
 }
 
 /* ------------------------------------------------------------------
-   Bouton « Create contact » / « Nouveau devis » : le meme partout, pas
-   seulement dans l'onglet Clients (la regle generique .client-create-btn
-   plus haut reste noire, pour d'autres boutons qui n'ont pas cette icone).
+   Bouton « Creer client » / « Nouveau devis » : bleu partout (voir la regle
+   generique .client-create-btn plus haut) ; assombri une fois le panneau
+   ouvert quand c'est un <details> (l'onglet Clients, pas la page Devis).
    ------------------------------------------------------------------ */
-.client-add-panel > summary.client-create-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 0 22px 0 16px;
-  border-radius: 14px;
-  color: white;
-  background: linear-gradient(180deg, #2f8bff, #1968e0);
-  box-shadow: 0 8px 20px rgba(25, 118, 243, 0.28);
-  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
-}
-
-.client-add-panel > summary.client-create-btn strong {
-  color: white;
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
-.client-add-panel > summary.client-create-btn svg {
-  flex: none;
-}
-
-.client-add-panel > summary.client-create-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 26px rgba(25, 118, 243, 0.34);
-}
-
 .client-add-panel[open] > summary.client-create-btn {
   background: linear-gradient(180deg, #1d78f0, #1456b8);
 }
@@ -5699,8 +5698,47 @@ button.client-ledger-row:focus-visible {
   color: var(--text-muted);
 }
 
-.quote-add-panel {
-  min-width: 280px;
+.quote-create-page {
+  width: 100%;
+}
+
+.quote-client-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.quote-client-select {
+  flex: 1;
+  min-width: 240px;
+}
+
+.quote-client-summary {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  border: 1px solid #d3e5ff;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.quote-client-summary strong {
+  color: var(--poksol-navy);
+  font-size: 15px;
+}
+
+.quote-client-summary span {
+  color: #4a525d;
+  font-weight: 700;
+}
+
+.quote-client-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-weight: 700;
 }
 
 .quotes-table .quote-row {
