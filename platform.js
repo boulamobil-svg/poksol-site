@@ -597,16 +597,23 @@ async function savePublicSettings(restaurantId, form) {
   const data = new FormData(form);
   const primaryColor = normalizeHexColor(text(data, "primaryColor"), "#0A2540");
   const accentColor = normalizeHexColor(text(data, "accentColor"), "#1976F3");
+  const publicPageEnabled = data.get("publicPageEnabled") === "on";
+  const reservationEnabled = data.get("reservationEnabled") === "on";
   await setDoc(doc(services.db, "restaurants", restaurantId), {
-    publicPageEnabled: data.get("publicPageEnabled") === "on",
-    qrMenuEnabled: data.get("qrMenuEnabled") === "on",
-    reservationEnabled: data.get("reservationEnabled") === "on",
+    publicPageEnabled,
+    // QR menu and reservations are disabled/greyed in the UI whenever the public page
+    // is off, so their fields aren't submitted then: only write them while the page is
+    // on, otherwise this merge would silently erase their last saved state.
+    ...(publicPageEnabled ? {
+      qrMenuEnabled: data.get("qrMenuEnabled") === "on",
+      reservationEnabled
+    } : {}),
     publicPageSettings: {
       visibleSections: {
         hero: true,
         hours: true,
         menu: true,
-        reservations: data.get("reservationEnabled") === "on",
+        reservations: publicPageEnabled && reservationEnabled,
         gallery: true,
         contact: true
       },
@@ -666,10 +673,6 @@ async function saveQrMenu(restaurantId, form, menu = null) {
     })
   ]);
 
-  await setDoc(doc(services.db, "restaurants", restaurantId), {
-    qrMenuEnabled: data.get("isActive") === "on",
-    updatedAt: serverTimestamp()
-  }, { merge: true });
   await setDoc(doc(services.db, "restaurants", restaurantId, "menus", "main"), {
     title: text(data, "title") || "Menu principal",
     type: text(data, "type") || "catalog",
@@ -1425,6 +1428,10 @@ function initDashboardPage() {
   root.addEventListener("change", async (event) => {
     if (event.target.matches("[data-profile-image-file]")) {
       previewProfileImageFile(event.target);
+      return;
+    }
+    if (event.target.matches("[data-master-toggle]")) {
+      applyMasterToggleCascade(event.target);
       return;
     }
     if (event.target.matches("[data-catalog-image-file]")) {
@@ -2468,18 +2475,33 @@ function hoursFormHtml(restaurant, canEdit) {
   `;
 }
 
+function switchFieldHtml(label, inputName, checked, canEdit, extraAttrs = "") {
+  return `
+    <label class="switch-field">
+      <span class="switch-field-label">${escapeHtml(label)}</span>
+      <span class="switch">
+        <input type="checkbox" name="${escapeAttr(inputName)}" ${checked ? "checked" : ""} ${disabled(canEdit)} ${extraAttrs} />
+        <span class="switch-track"></span>
+      </span>
+    </label>
+  `;
+}
+
 function publicSettingsHtml(restaurant, publicUrl, canEdit) {
   const settings = restaurant.publicPageSettings || {};
   const theme = settings.theme || {};
   const primaryColor = normalizeHexColor(theme.primaryColor, "#0A2540");
   const accentColor = normalizeHexColor(theme.accentColor, "#1976F3");
   const previewUrl = `${publicUrl}${publicUrl.includes("?") ? "&" : "?"}preview=${Date.now()}`;
+  const publicPageOn = restaurant.publicPageEnabled !== false;
+  const qrMenuOn = restaurant.qrMenuEnabled === true;
+  const reservationOn = restaurant.reservationEnabled !== false;
   return `
     <form class="platform-form" data-dashboard-public-form>
       <div class="toggle-grid">
-        <label><input type="checkbox" name="publicPageEnabled" ${restaurant.publicPageEnabled !== false ? "checked" : ""} ${disabled(canEdit)} /> Page publique active</label>
-        <label><input type="checkbox" name="reservationEnabled" ${restaurant.reservationEnabled !== false ? "checked" : ""} ${disabled(canEdit)} /> Reservations actives</label>
-        <label><input type="checkbox" name="qrMenuEnabled" ${restaurant.qrMenuEnabled ? "checked" : ""} ${disabled(canEdit)} /> QR menu actif</label>
+        ${switchFieldHtml("Page publique active", "publicPageEnabled", publicPageOn, canEdit, "data-master-toggle")}
+        ${switchFieldHtml("QR menu actif", "qrMenuEnabled", publicPageOn && qrMenuOn, canEdit && publicPageOn, `data-dependent-toggle data-last-checked="${qrMenuOn}"`)}
+        ${switchFieldHtml("Reservations actives", "reservationEnabled", publicPageOn && reservationOn, canEdit && publicPageOn, `data-dependent-toggle data-last-checked="${reservationOn}"`)}
       </div>
       <div class="form-grid">
         ${colorPickerFieldHtml("Couleur principale", "primaryColor", primaryColor, canEdit, ["#0A2540", "#123C63", "#17324D", "#2D3748", "#1F2937", "#0F766E"])}
@@ -2575,6 +2597,24 @@ function previewProfileImageFile(input) {
   preview.querySelector("img")?.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
   const button = field?.querySelector("[data-file-upload-button]");
   if (button) button.textContent = "Modifier le fichier";
+}
+
+function applyMasterToggleCascade(masterInput) {
+  const grid = masterInput.closest(".toggle-grid");
+  if (!grid) return;
+  const dependents = grid.querySelectorAll("[data-dependent-toggle]");
+  if (masterInput.checked) {
+    dependents.forEach((input) => {
+      input.disabled = false;
+      input.checked = input.dataset.lastChecked === "true";
+    });
+  } else {
+    dependents.forEach((input) => {
+      input.dataset.lastChecked = String(input.checked);
+      input.checked = false;
+      input.disabled = true;
+    });
+  }
 }
 
 function colorPickerFieldHtml(label, name, value, canEdit, palette) {
