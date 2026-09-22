@@ -3356,7 +3356,10 @@ const NL = String.fromCharCode(10);
 const BACKSLASH = String.fromCharCode(92);
 const EURO = String.fromCharCode(8364);
 // Caracteres hors Latin-1 encodables en WinAnsi (police standard du PDF).
-const PDF_WINANSI_EXTRA = new Map([[8364, 128], [8230, 133], [8216, 145], [8217, 146], [8220, 147], [8221, 148], [8226, 149], [8211, 150], [8212, 151]]);
+// 8239/8201 : espace fine insecable et espace fine, utilisees par Intl.NumberFormat("fr-FR", ...)
+// entre les groupes de milliers (« 1 500,00 ») ; on les rend par l'espace insecable (160), deja geree
+// correctement plus bas (>= 127, echappee en octal), WinAnsi n'ayant pas ce glyphe fin.
+const PDF_WINANSI_EXTRA = new Map([[8364, 128], [8230, 133], [8216, 145], [8217, 146], [8220, 147], [8221, 148], [8226, 149], [8211, 150], [8212, 151], [8239, 160], [8201, 160]]);
 
 function ticketMoney(value) {
   return `${roundMoney(value).toFixed(2).replace(".", ",")} ${EURO}`;
@@ -3669,13 +3672,13 @@ function closeDashboardModalOnEscape(event) {
   if (event.key === "Escape") closeDashboardModal();
 }
 
-function showDashboardModal(title, bodyHtml) {
+function showDashboardModal(title, bodyHtml, { wide = false } = {}) {
   closeDashboardModal();
   const overlay = document.createElement("div");
   overlay.className = "client-modal-overlay";
   overlay.dataset.clientModal = "";
   overlay.innerHTML = `
-    <div class="client-modal" role="dialog" aria-modal="true" aria-label="${escapeAttr(title)}">
+    <div class="client-modal${wide ? " is-wide" : ""}" role="dialog" aria-modal="true" aria-label="${escapeAttr(title)}">
       <header>
         <h3>${escapeHtml(title)}</h3>
         <button class="button-reset client-modal-close" type="button" data-client-modal-close aria-label="Fermer">&times;</button>
@@ -3751,8 +3754,6 @@ async function openClientMovement(root, key) {
 // d'un logiciel de facturation).
 // ===========================================================================
 const QUOTE_MANAGER_ROLES = CLIENT_MANAGER_ROLES;
-const QUOTE_WIDTH = 74;
-const QUOTE_COLUMN_WIDTHS = [30, 5, 12, 6, 13];
 const QUOTE_STATUS_LABELS = {
   issued: "Emis",
   accepted: "Accepte",
@@ -4143,74 +4144,287 @@ function quoteDefaultConditions(restaurant = {}) {
   return ["Devis valable jusqu'a la date indiquee. Prix TTC.", terms, notice].filter(Boolean).join(NL);
 }
 
-function padQuoteCell(text, width, align = "left") {
-  const value = String(text).length > width ? String(text).slice(0, width) : String(text);
-  return align === "right" ? value.padStart(width, " ") : value.padEnd(width, " ");
+// ===========================================================================
+// PDF du devis : mise en page proche de celle de l'application (Helvetica
+// proportionnelle, encadres Client/Prestation/Conditions, tableau borde avec
+// en-tete grise), plutot que le rendu "ticket" en police a chasse fixe.
+// Le logo du restaurant n'est pas incorpore : Firebase Storage n'envoie pas
+// d'en-tete CORS sur ces fichiers, le navigateur ne peut donc pas en lire les
+// pixels depuis le site (le nom du restaurant en gras le remplace).
+// ===========================================================================
+
+// Largeurs Helvetica standard (unites pour 1000, table Adobe AFM), codes 32-126.
+const HELVETICA_WIDTHS = {
+  32: 278, 33: 278, 34: 355, 35: 556, 36: 556, 37: 889, 38: 667, 39: 191, 40: 333, 41: 333,
+  42: 389, 43: 584, 44: 278, 45: 333, 46: 278, 47: 278, 48: 556, 49: 556, 50: 556, 51: 556,
+  52: 556, 53: 556, 54: 556, 55: 556, 56: 556, 57: 556, 58: 278, 59: 278, 60: 584, 61: 584,
+  62: 584, 63: 556, 64: 1015, 65: 667, 66: 667, 67: 722, 68: 722, 69: 667, 70: 611, 71: 778,
+  72: 722, 73: 278, 74: 500, 75: 667, 76: 556, 77: 833, 78: 722, 79: 778, 80: 667, 81: 778,
+  82: 722, 83: 667, 84: 611, 85: 722, 86: 667, 87: 944, 88: 667, 89: 667, 90: 611, 91: 278,
+  92: 278, 93: 278, 94: 469, 95: 556, 96: 333, 97: 556, 98: 556, 99: 500, 100: 556, 101: 556,
+  102: 278, 103: 556, 104: 556, 105: 222, 106: 222, 107: 500, 108: 222, 109: 833, 110: 556,
+  111: 556, 112: 556, 113: 556, 114: 333, 115: 500, 116: 278, 117: 556, 118: 500, 119: 722,
+  120: 500, 121: 500, 122: 500, 123: 334, 124: 260, 125: 334, 126: 584
+};
+const HELVETICA_BOLD_WIDTHS = {
+  32: 278, 33: 333, 34: 474, 35: 556, 36: 556, 37: 889, 38: 722, 39: 238, 40: 333, 41: 333,
+  42: 389, 43: 584, 44: 278, 45: 333, 46: 278, 47: 278, 48: 556, 49: 556, 50: 556, 51: 556,
+  52: 556, 53: 556, 54: 556, 55: 556, 56: 556, 57: 556, 58: 333, 59: 333, 60: 584, 61: 584,
+  62: 584, 63: 611, 64: 975, 65: 722, 66: 722, 67: 722, 68: 722, 69: 667, 70: 611, 71: 778,
+  72: 722, 73: 278, 74: 556, 75: 722, 76: 611, 77: 833, 78: 722, 79: 778, 80: 667, 81: 778,
+  82: 722, 83: 667, 84: 611, 85: 722, 86: 667, 87: 944, 88: 667, 89: 667, 90: 611, 91: 333,
+  92: 278, 93: 333, 94: 584, 95: 556, 96: 333, 97: 556, 98: 611, 99: 556, 100: 611, 101: 556,
+  102: 333, 103: 611, 104: 611, 105: 278, 106: 278, 107: 556, 108: 278, 109: 889, 110: 611,
+  111: 611, 112: 611, 113: 611, 114: 389, 115: 556, 116: 333, 117: 611, 118: 556, 119: 778,
+  120: 556, 121: 556, 122: 500, 123: 389, 124: 280, 125: 389, 126: 584
+};
+
+// Un caractere accentue reprend la chasse de sa lettre de base (tres proche en Helvetica) ;
+// l'Euro a une chasse fixe connue.
+function glyphWidth(char, bold) {
+  const table = bold ? HELVETICA_BOLD_WIDTHS : HELVETICA_WIDTHS;
+  const code = char.charCodeAt(0);
+  if (table[code] != null) return table[code];
+  if (code === 8364) return 556;
+  const base = char.normalize("NFD").charCodeAt(0);
+  if (table[base] != null) return table[base];
+  return bold ? 611 : 556;
 }
 
-function quoteTableRow(cells, aligns) {
-  return cells.map((cell, index) => padQuoteCell(cell, QUOTE_COLUMN_WIDTHS[index], aligns[index])).join(" ");
+function pdfTextWidth(text, bold = false, size = 10) {
+  return [...String(text)].reduce((sum, char) => sum + glyphWidth(char, bold), 0) * size / 1000;
 }
 
-function quoteItemLines(name, qtyLabel, priceLabel, vatLabel, totalLabel) {
-  const parts = ticketWrap(name, QUOTE_COLUMN_WIDTHS[0]);
-  const last = parts.length - 1;
-  return parts.map((part, index) => index === last
-    ? quoteTableRow([part, qtyLabel, priceLabel, vatLabel, totalLabel], ["left", "right", "right", "right", "right"])
-    : quoteTableRow([part, "", "", "", ""], ["left", "right", "right", "right", "right"]));
-}
-
-// Le devis reutilise les aides de mise en forme du ticket (ticketWrap/ticketRow/ticketAmount...),
-// avec une largeur de page plus grande (document A4, pas un ticket de caisse).
-function buildQuoteDocument({ quote = {}, restaurant = {} }) {
-  const width = QUOTE_WIDTH;
+// Retour a la ligne par largeur reelle (et non plus par nombre de caracteres).
+function wrapProportional(text, maxWidth, bold = false, size = 10) {
+  const words = String(text || "").split(" ").filter(Boolean);
   const lines = [];
-  const add = (text = "", bold = false) => lines.push({ text: String(text), bold });
-  const rule = (char = "-") => add(char.repeat(width));
-  const center = (text, bold = false) => ticketWrap(text, width).forEach((part) => add(" ".repeat(Math.floor((width - part.length) / 2)) + part, bold));
-  const row = (left, right, bold = false) => ticketRow(left, right, width, 0).forEach((text) => add(text, bold));
+  let current = "";
+  words.forEach((word) => {
+    const attempt = current ? `${current} ${word}` : word;
+    if (!current || pdfTextWidth(attempt, bold, size) <= maxWidth) current = attempt;
+    else {
+      lines.push(current);
+      current = word;
+    }
+  });
+  if (current || !lines.length) lines.push(current);
+  return lines;
+}
 
+// ---------------------------------------------------------------------------
+// Un petit « canvas » PDF multi-pages : texte Helvetica positionne au point pres,
+// rectangles/lignes vectoriels. Les blocs (voir buildQuotePdf) sont dessines dans
+// l'ordre ; un bloc qui ne tient plus sur la page en cours passe sur une nouvelle page.
+// ---------------------------------------------------------------------------
+class PdfDocument {
+  constructor({ pageWidth = 595.28, pageHeight = 841.89, margin = 40 } = {}) {
+    this.pageWidth = pageWidth;
+    this.pageHeight = pageHeight;
+    this.margin = margin;
+    this.pages = [];
+    this.newPage();
+  }
+
+  newPage() {
+    this.stream = "";
+    this.pages.push(this);
+    this.y = this.pageHeight - this.margin;
+    if (!this._pages) this._pages = [];
+    this._pages.push({ stream: "" });
+    this._current = this._pages[this._pages.length - 1];
+  }
+
+  get contentWidth() {
+    return this.pageWidth - this.margin * 2;
+  }
+
+  // Fait passer a une nouvelle page si la hauteur demandee ne tient plus au-dessus de la marge.
+  ensureSpace(height) {
+    if (this.y - height < this.margin) this.newPage();
+  }
+
+  emit(op) {
+    this._current.stream += `${op}${NL}`;
+  }
+
+  text(x, yTop, value, { bold = false, size = 10, color = "0 0 0" } = {}) {
+    const y = this.pageHeight - yTop - size * 0.8;
+    this.emit(`q ${color} rg BT /${bold ? "FB" : "FR"} ${pdfNumber(size)} Tf ${pdfNumber(x)} ${pdfNumber(y)} Td (${pdfText(value)}) Tj ET Q`);
+  }
+
+  textRight(xRight, yTop, value, options = {}) {
+    this.text(xRight - pdfTextWidth(value, options.bold, options.size ?? 10), yTop, value, options);
+  }
+
+  // Ecrit un paragraphe (retour a la ligne automatique) et renvoie la hauteur utilisee.
+  paragraph(x, yTop, maxWidth, value, { bold = false, size = 10, leading = size * 1.32 } = {}) {
+    const lines = wrapProportional(value, maxWidth, bold, size);
+    lines.forEach((line, index) => this.text(x, yTop + index * leading, line, { bold, size }));
+    return lines.length * leading;
+  }
+
+  rect(x, yTop, width, height, { stroke = "0.6 0.6 0.6", fill = null, lineWidth = 0.6 } = {}) {
+    const y = this.pageHeight - yTop - height;
+    let op = "q ";
+    if (fill) op += `${fill} rg `;
+    if (stroke) op += `${stroke} RG ${pdfNumber(lineWidth)} w `;
+    op += `${pdfNumber(x)} ${pdfNumber(y)} ${pdfNumber(width)} ${pdfNumber(height)} re `;
+    op += fill && stroke ? "B" : fill ? "f" : "S";
+    this.emit(`${op} Q`);
+  }
+
+  line(x1, yTop1, x2, yTop2, { color = "0.6 0.6 0.6", lineWidth = 0.6 } = {}) {
+    const y1 = this.pageHeight - yTop1;
+    const y2 = this.pageHeight - yTop2;
+    this.emit(`q ${color} RG ${pdfNumber(lineWidth)} w ${pdfNumber(x1)} ${pdfNumber(y1)} m ${pdfNumber(x2)} ${pdfNumber(y2)} l S Q`);
+  }
+
+  // ---- assemblage final ----
+  build() {
+    const objects = [];
+    const addObject = (body) => {
+      objects.push(body);
+      return objects.length;
+    };
+    const catalogId = addObject("");
+    const pagesId = addObject("");
+    const fontRegular = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+    const fontBold = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+    const pageIds = this._pages.map((page) => {
+      const contentId = addObject(`<< /Length ${page.stream.length} >>${NL}stream${NL}${page.stream}endstream`);
+      return addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${this.pageWidth} ${this.pageHeight}] /Resources << /Font << /FR ${fontRegular} 0 R /FB ${fontBold} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    });
+    objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+    objects[pagesId - 1] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
+
+    let pdf = `%PDF-1.4${NL}`;
+    const offsets = [];
+    objects.forEach((body, index) => {
+      offsets.push(pdf.length);
+      pdf += `${index + 1} 0 obj${NL}${body}${NL}endobj${NL}`;
+    });
+    const xrefAt = pdf.length;
+    pdf += `xref${NL}0 ${objects.length + 1}${NL}0000000000 65535 f ${NL}`;
+    offsets.forEach((offset) => {
+      pdf += `${String(offset).padStart(10, "0")} 00000 n ${NL}`;
+    });
+    pdf += `trailer${NL}<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>${NL}startxref${NL}${xrefAt}${NL}%%EOF${NL}`;
+    const bytes = new Uint8Array(pdf.length);
+    for (let index = 0; index < pdf.length; index += 1) bytes[index] = pdf.charCodeAt(index) & 255;
+    return new Blob([bytes], { type: "application/pdf" });
+  }
+}
+
+// Encadre avec titre en gras : renvoie la hauteur reellement utilisee.
+function pdfBox(doc, x, yTop, width, title, bodyLines, { minHeight = 60, pad = 10 } = {}) {
+  const size = 9.5;
+  const leading = size * 1.35;
+  const innerWidth = width - pad * 2;
+  const wrapped = bodyLines.flatMap((line) => wrapProportional(line, innerWidth, false, size));
+  const height = Math.max(minHeight, pad * 2 + leading * (1.3 + wrapped.length));
+  doc.rect(x, yTop, width, height, { stroke: "0.6 0.6 0.6" });
+  doc.text(x + pad, yTop + pad, title, { bold: true, size: 10.5 });
+  wrapped.forEach((line, index) => doc.text(x + pad, yTop + pad + leading * (1.3 + index), line, { size }));
+  return height;
+}
+
+function quoteHeaderLegalLine(restaurant) {
+  const { siret, siren } = legalIdentifiers(restaurant);
+  const identifier = siret ? `SIRET : ${formatSiret(siret)}` : siren ? `SIREN : ${formatSiret(siren)}` : "";
+  return [identifier, restaurant.vatNumber ? `TVA : ${restaurant.vatNumber}` : ""].filter(Boolean).join("   -   ");
+}
+
+// ---------------------------------------------------------------------------
+// Construit le PDF complet du devis (une page, plus si le contenu deborde).
+// ---------------------------------------------------------------------------
+function buildQuotePdf(quote = {}, restaurant = {}) {
+  const doc = new PdfDocument();
+  const margin = doc.margin;
+  const width = doc.contentWidth;
   const customer = quote.customer || {};
   const table = quote.sourceTable || {};
   const lineItems = Array.isArray(table.lines) ? table.lines.filter((line) => Number(line.quantity) !== 0) : [];
 
-  center(String(firstText(restaurant.name, restaurant.tradeName, "Restaurant")).toUpperCase(), true);
+  // -- en-tete : identite du restaurant a gauche, "DEVIS" + reperes a droite --
+  const restaurantName = String(firstText(restaurant.name, restaurant.tradeName, "Restaurant"));
+  doc.text(margin, doc.pageHeight - doc.y, restaurantName, { bold: true, size: 16 });
+  let leftY = doc.pageHeight - doc.y + 22;
   const street = cleanStreetLine(firstText(restaurant.addressLine1, restaurant.address), restaurant.postalCode);
-  if (street) center(street);
-  const cityLine = [restaurant.postalCode, restaurant.city].filter(Boolean).join(" ");
-  if (cityLine) center(cityLine);
-  if (restaurant.phone) center(`Tel : ${formatClientPhone(restaurant.phone)}`);
-  const { siret, siren } = legalIdentifiers(restaurant);
-  if (siret) center(`SIRET : ${formatSiret(siret)}`);
-  else if (siren) center(`SIREN : ${formatSiret(siren)}`);
-  if (restaurant.vatNumber) center(`TVA : ${restaurant.vatNumber}`);
-  add("");
-  row("DEVIS", quote.quoteNumber || "", true);
-  row("Date", clientDateLabel(quote.issuedAt) || "-");
-  row("Valable jusqu'au", clientDateLabel(quote.validUntil) || "-");
-  rule("=");
+  const addressLines = [
+    street,
+    [restaurant.postalCode, restaurant.city].filter(Boolean).join(" "),
+    restaurant.phone ? `Tel : ${formatClientPhone(restaurant.phone)}` : "",
+    restaurant.email || "",
+    quoteHeaderLegalLine(restaurant)
+  ].filter(Boolean);
+  addressLines.forEach((line) => {
+    doc.text(margin, leftY, line, { size: 9.5 });
+    leftY += 13.5;
+  });
 
-  add("CLIENT", true);
+  const rightX = doc.pageWidth - margin;
+  doc.textRight(rightX, doc.pageHeight - doc.y, "DEVIS", { bold: true, size: 22 });
+  let rightY = doc.pageHeight - doc.y + 26;
   [
+    quote.quoteNumber || "",
+    `Date : ${clientDateLabel(quote.issuedAt) || "-"}`,
+    `Valable jusqu'au : ${clientDateLabel(quote.validUntil) || "-"}`
+  ].forEach((line) => {
+    doc.textRight(rightX, rightY, line, { size: 10 });
+    rightY += 14;
+  });
+
+  doc.y -= Math.max(leftY, rightY) - (doc.pageHeight - doc.y) + 6;
+  doc.line(margin, doc.pageHeight - doc.y, doc.pageWidth - margin, doc.pageHeight - doc.y);
+  doc.y -= 16;
+
+  // -- client / prestation, cote a cote --
+  const boxWidth = (width - 16) / 2;
+  const clientLines = [
     customer.name || "Client non renseigne",
     customer.phone ? `Tel. : ${formatClientPhone(customer.phone)}` : "",
     customer.email ? `Email : ${customer.email}` : "",
     customer.address || "",
     customer.taxId ? `SIRET/Fiscal : ${customer.taxId}` : "",
     customer.vatNumber ? `TVA : ${customer.vatNumber}` : ""
-  ].filter(Boolean).forEach((line) => ticketWrap(line, width).forEach((part) => add(part)));
-  add("");
-  add("PRESTATION", true);
-  [
+  ].filter(Boolean);
+  const prestationLines = [
     quote.eventLabel || (table.sessionKind === "takeaway" ? "A emporter" : "Sur place"),
     quote.eventDate ? `Date evenement : ${clientDateLabel(quote.eventDate)}` : "",
     table.covers ? `${table.covers} couverts` : "",
     table.tableNote ? `Note : ${table.tableNote}` : ""
-  ].filter(Boolean).forEach((line) => ticketWrap(line, width).forEach((part) => add(part)));
-  rule();
+  ].filter(Boolean);
+  doc.ensureSpace(100);
+  const topY = doc.pageHeight - doc.y;
+  const clientHeight = pdfBox(doc, margin, topY, boxWidth, "Client", clientLines);
+  const prestationHeight = pdfBox(doc, margin + boxWidth + 16, topY, boxWidth, "Prestation", prestationLines);
+  doc.y -= Math.max(clientHeight, prestationHeight) + 20;
 
-  add(quoteTableRow(["Designation", "Qte", "PU TTC", "TVA", "Total TTC"], ["left", "right", "right", "right", "right"]), true);
-  rule();
+  // -- tableau des articles --
+  const columns = [
+    { label: "Designation", width: width * 0.46, align: "left" },
+    { label: "Qte", width: width * 0.09, align: "right" },
+    { label: "PU TTC", width: width * 0.15, align: "right" },
+    { label: "TVA", width: width * 0.10, align: "right" },
+    { label: "Total TTC", width: width * 0.20, align: "right" }
+  ];
+  const colX = [margin];
+  columns.forEach((column, index) => colX.push(colX[index] + column.width));
+
+  const drawTableHeader = () => {
+    doc.ensureSpace(30);
+    const rowTop = doc.pageHeight - doc.y;
+    doc.rect(margin, rowTop, width, 22, { stroke: "0.6 0.6 0.6", fill: "0.91 0.91 0.91" });
+    columns.forEach((column, index) => {
+      const cellX = colX[index];
+      if (column.align === "right") doc.textRight(cellX + column.width - 6, rowTop + 6, column.label, { bold: true, size: 9.5 });
+      else doc.text(cellX + 6, rowTop + 6, column.label, { bold: true, size: 9.5 });
+    });
+    doc.y -= 22;
+  };
+  drawTableHeader();
+
   let total = 0;
   const vatBuckets = new Map();
   lineItems.forEach((line) => {
@@ -4223,47 +4437,83 @@ function buildQuoteDocument({ quote = {}, restaurant = {} }) {
       const vatAmount = lineTotal - lineTotal / (1 + rate / 100);
       vatBuckets.set(rate, roundMoney((vatBuckets.get(rate) || 0) + vatAmount));
     }
-    quoteItemLines(
-      line.name || "Article",
-      ticketQuantity(quantity),
-      ticketAmount(unitPrice),
-      `${String(rate).replace(".", ",")}%`,
-      ticketAmount(lineTotal)
-    ).forEach((part) => add(part));
+    const cells = [line.name || "Article", ticketQuantity(quantity), ticketAmount(unitPrice), `${String(rate).replace(".", ",")}%`, ticketAmount(lineTotal)];
+    const wrapped = wrapProportional(cells[0], columns[0].width - 12, false, 9.5);
+    const rowHeight = Math.max(20, wrapped.length * 13 + 6);
+    doc.ensureSpace(rowHeight);
+    if (doc.pageHeight - doc.y === doc.margin) drawTableHeader();
+    const rowTop = doc.pageHeight - doc.y;
+    doc.rect(margin, rowTop, width, rowHeight, { stroke: "0.75 0.75 0.75", lineWidth: 0.4 });
+    wrapped.forEach((part, index) => doc.text(colX[0] + 6, rowTop + 6 + index * 13, part, { size: 9.5 }));
+    cells.slice(1).forEach((value, index) => {
+      const column = columns[index + 1];
+      doc.textRight(colX[index + 1] + column.width - 6, rowTop + 6, value, { size: 9.5 });
+    });
+    doc.y -= rowHeight;
   });
-  if (!lineItems.length) center("Aucune ligne");
-  rule();
+  if (!lineItems.length) {
+    doc.ensureSpace(24);
+    const rowTop = doc.pageHeight - doc.y;
+    doc.rect(margin, rowTop, width, 22, { stroke: "0.75 0.75 0.75", lineWidth: 0.4 });
+    doc.text(margin + 6, rowTop + 6, "Aucune ligne", { size: 9.5 });
+    doc.y -= 22;
+  }
+  doc.y -= 16;
 
+  // -- totaux, alignes a droite comme le tableau --
   total = roundMoney(total);
   const totalVat = roundMoney([...vatBuckets.values()].reduce((sum, value) => sum + value, 0));
   const totalHt = roundMoney(total - totalVat);
-  [...vatBuckets.entries()].sort((a, b) => a[0] - b[0]).forEach(([rate, amount]) => row(`TVA ${String(rate).replace(".", ",")} %`, ticketMoney(amount)));
-  row("Total HT", ticketMoney(totalHt));
-  row("Total TTC", ticketMoney(total), true);
   const deposit = roundMoney(Number(quote.depositAmount) || 0);
+  const totalsRows = [
+    ...[...vatBuckets.entries()].sort((a, b) => a[0] - b[0]).map(([rate, amount]) => [`TVA ${String(rate).replace(".", ",")} %`, formatMoney(amount), false]),
+    ["Total HT", formatMoney(totalHt), false],
+    ["Total TTC", formatMoney(total), true]
+  ];
   if (deposit > 0) {
-    row("Acompte demande", ticketMoney(deposit));
-    row("Reste a regler", ticketMoney(roundMoney(Math.max(total - deposit, 0))), true);
+    totalsRows.push(["Acompte demande", formatMoney(deposit), false]);
+    totalsRows.push(["Reste a regler", formatMoney(roundMoney(Math.max(total - deposit, 0))), true]);
   }
-  rule();
+  const totalsWidth = 230;
+  const totalsX = doc.pageWidth - margin - totalsWidth;
+  doc.ensureSpace(totalsRows.length * 15 + 6);
+  totalsRows.forEach(([label, value, bold]) => {
+    const rowTop = doc.pageHeight - doc.y;
+    doc.text(totalsX, rowTop, label, { bold, size: 10 });
+    doc.textRight(doc.pageWidth - margin, rowTop, value, { bold, size: 10 });
+    doc.y -= 15;
+  });
+  doc.y -= 12;
 
-  add("CONDITIONS", true);
+  // -- conditions --
   const conditions = String(quote.conditions || "").trim() || quoteDefaultConditions(restaurant);
-  conditions.split(NL).forEach((paragraph) => ticketWrap(paragraph, width).forEach((part) => add(part)));
+  doc.ensureSpace(60);
+  let boxTop = doc.pageHeight - doc.y;
+  let boxHeight = pdfBox(doc, margin, boxTop, width, "Conditions", conditions.split(NL));
+  doc.y -= boxHeight + 16;
 
+  // -- coordonnees bancaires --
   if (restaurant.iban || restaurant.bic) {
-    rule();
-    add("COORDONNEES BANCAIRES", true);
     const holder = firstText(restaurant.legalName, restaurant.tradeName, restaurant.name);
-    if (holder) add(`Titulaire : ${holder}`);
-    if (restaurant.iban) add(`IBAN : ${restaurant.iban}`);
-    if (restaurant.bic) add(`BIC : ${restaurant.bic}`);
-    add(`Reference a indiquer : ${quote.quoteNumber || ""}`);
+    const bankLines = [
+      holder ? `Titulaire : ${holder}` : "",
+      restaurant.iban ? `IBAN : ${restaurant.iban}` : "",
+      restaurant.bic ? `BIC : ${restaurant.bic}` : "",
+      `Reference a indiquer : ${quote.quoteNumber || ""}`
+    ].filter(Boolean);
+    doc.ensureSpace(60);
+    boxTop = doc.pageHeight - doc.y;
+    boxHeight = pdfBox(doc, margin, boxTop, width, "Coordonnees bancaires", bankLines);
+    doc.y -= boxHeight + 16;
   }
-  rule();
-  add("");
-  row("Bon pour accord", "Signature client");
-  return lines;
+
+  // -- signature --
+  doc.ensureSpace(40);
+  const signTop = doc.pageHeight - doc.y;
+  doc.text(margin, signTop, "Bon pour accord", { size: 10 });
+  doc.textRight(doc.pageWidth - margin, signTop, "Signature client", { size: 10 });
+
+  return doc.build();
 }
 
 function openQuoteDetail(root, quoteId) {
@@ -4271,11 +4521,18 @@ function openQuoteDetail(root, quoteId) {
   if (!quote) return;
   const restaurant = root.dashboardRestaurant || {};
   const canManage = QUOTE_MANAGER_ROLES.includes(root.dataset.restaurantRole || "");
-  const receipt = buildQuoteDocument({ quote, restaurant });
+  const blob = buildQuotePdf(quote, restaurant);
+  const objectUrl = URL.createObjectURL(blob);
   const overlay = showDashboardModal(
     `Devis ${quote.quoteNumber || ""}`,
-    `<div class="ticket-sheet"><pre class="ticket-paper quote-paper">${receipt.map((line) => (line.bold ? `<b>${escapeHtml(line.text)}</b>` : escapeHtml(line.text))).join(NL)}</pre></div>`
+    `<div class="quote-preview"><iframe src="${escapeAttr(objectUrl)}" title="Apercu du devis"></iframe></div>`,
+    { wide: true }
   );
+  overlay.dataset.quoteObjectUrl = objectUrl;
+  const cleanupUrl = () => URL.revokeObjectURL(objectUrl);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest("[data-client-modal-close]")) cleanupUrl();
+  });
   const footer = document.createElement("footer");
   footer.innerHTML = `
     ${canManage ? `
@@ -4291,10 +4548,11 @@ function openQuoteDetail(root, quoteId) {
   overlay.querySelector(".client-modal").appendChild(footer);
   footer.querySelector("[data-quote-download]").addEventListener("click", () => {
     const stamp = String(quote.quoteNumber || quote.id).replace(/[^a-zA-Z0-9_-]/g, "_");
-    downloadClientFile(buildDocumentPdf(receipt, { width: QUOTE_WIDTH, fontSize: 8.3 }), `${stamp}.pdf`, "application/pdf");
+    downloadClientFile(blob, `${stamp}.pdf`, "application/pdf");
   });
   footer.querySelector("[data-quote-status-select]")?.addEventListener("change", async (event) => {
     await updateQuoteStatus(root.dataset.restaurantId, quote.id, event.target.value);
+    cleanupUrl();
     closeDashboardModal();
     await renderDashboard(root, currentUser, root.dataset.restaurantId, "quotes");
   });

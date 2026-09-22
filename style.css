@@ -2085,9 +2085,9 @@ select:focus-visible {
   font-size: 15px;
 }
 
-.client-ledger .client-add-panel > summary strong::after,
-.client-ledger .client-add-panel[open] > summary strong::before,
-.client-ledger .client-add-panel[open] > summary strong::after {
+.client-add-panel > summary.client-create-btn strong::after,
+.client-add-panel[open] > summary.client-create-btn strong::before,
+.client-add-panel[open] > summary.client-create-btn strong::after {
   content: none;
 }
 
@@ -5386,9 +5386,11 @@ body.menu-page-body.translated-rtl {
 }
 
 /* ------------------------------------------------------------------
-   Clients : bouton « Create contact », solde credits - debits, journal en tableau
+   Bouton « Create contact » / « Nouveau devis » : le meme partout, pas
+   seulement dans l'onglet Clients (la regle generique .client-create-btn
+   plus haut reste noire, pour d'autres boutons qui n'ont pas cette icone).
    ------------------------------------------------------------------ */
-.client-ledger .client-add-panel > summary.client-create-btn {
+.client-add-panel > summary.client-create-btn {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -5401,23 +5403,23 @@ body.menu-page-body.translated-rtl {
   transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
 }
 
-.client-ledger .client-add-panel > summary.client-create-btn strong {
+.client-add-panel > summary.client-create-btn strong {
   color: white;
   font-size: 15px;
   font-weight: 900;
   letter-spacing: 0;
 }
 
-.client-ledger .client-add-panel > summary.client-create-btn svg {
+.client-add-panel > summary.client-create-btn svg {
   flex: none;
 }
 
-.client-ledger .client-add-panel > summary.client-create-btn:hover {
+.client-add-panel > summary.client-create-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 12px 26px rgba(25, 118, 243, 0.34);
 }
 
-.client-ledger .client-add-panel[open] > summary.client-create-btn {
+.client-add-panel[open] > summary.client-create-btn {
   background: linear-gradient(180deg, #1d78f0, #1456b8);
 }
 
@@ -5816,6 +5818,14 @@ button.quote-row:focus-visible {
   color: var(--poksol-navy);
 }
 
-.quote-paper {
-  font-size: 11.5px;
+.quote-preview {
+  height: min(72vh, 760px);
+}
+
+.quote-preview iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: #eef1f4;
 }
