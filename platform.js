@@ -2536,13 +2536,27 @@ function menuFormHtml(restaurant, menu, canEdit) {
 
 function profileImageFieldHtml(label, inputName, imageUrl, canEdit, alt) {
   return `
-    <label class="profile-image-field">${escapeHtml(label)}
+    <div class="profile-image-field">
+      <span class="field-label">${escapeHtml(label)}</span>
       <span class="profile-image-preview${imageUrl ? "" : " is-empty"}" data-profile-image-preview>
         ${imageUrl
           ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(alt)}" loading="lazy" /><a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener noreferrer">Ouvrir</a>`
           : "Aucune image enregistree"}
       </span>
-      <input name="${escapeAttr(inputName)}" type="file" accept="image/png,image/jpeg,image/webp${inputName === "logoFile" ? ",image/svg+xml" : ""}" data-profile-image-file ${disabled(canEdit)} />
+      ${fileUploadButtonHtml(inputName, `image/png,image/jpeg,image/webp${inputName === "logoFile" ? ",image/svg+xml" : ""}`, !!imageUrl, canEdit, "data-profile-image-file")}
+    </div>
+  `;
+}
+
+// Bouton de televersement stylise : le texte natif du navigateur (« Choisir un fichier »)
+// ne peut pas etre modifie, on cache donc l'input (toujours accessible au clavier, le
+// <label> le porte) derriere un bouton dont le texte dit ce qu'il fait, et change des
+// qu'un fichier existe deja ou vient d'etre choisi.
+function fileUploadButtonHtml(inputName, accept, hasExisting, canEdit, extraAttrs = "") {
+  return `
+    <label class="file-upload-control${canEdit ? "" : " is-disabled"}">
+      <input name="${escapeAttr(inputName)}" type="file" accept="${escapeAttr(accept)}" class="file-upload-input" ${extraAttrs} ${disabled(canEdit)} />
+      <span class="file-upload-button" data-file-upload-button>${hasExisting ? "Modifier le fichier" : "Ajouter un fichier"}</span>
     </label>
   `;
 }
@@ -2552,12 +2566,15 @@ function profileImageFieldHtml(label, inputName, imageUrl, canEdit, alt) {
 function previewProfileImageFile(input) {
   const file = input.files?.[0];
   if (!file) return;
-  const preview = input.closest(".profile-image-field")?.querySelector("[data-profile-image-preview]");
+  const field = input.closest(".profile-image-field");
+  const preview = field?.querySelector("[data-profile-image-preview]");
   if (!preview) return;
   preview.classList.remove("is-empty");
   const url = URL.createObjectURL(file);
   preview.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(file.name || "Apercu")}" />`;
   preview.querySelector("img")?.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+  const button = field?.querySelector("[data-file-upload-button]");
+  if (button) button.textContent = "Modifier le fichier";
 }
 
 function colorPickerFieldHtml(label, name, value, canEdit, palette) {
@@ -2700,7 +2717,7 @@ function catalogItemEditorHtml(item, canEdit) {
           <label>Nom d'affichage<input name="${escapeAttr(fieldPrefix)}.publicDisplayName" value="${escapeAttr(item.displayName !== item.name ? item.displayName : "")}" placeholder="${escapeAttr(item.name || "Nom catalogue")}" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
           ${needsMenuPrice ? `<label>Prix menu<input name="${escapeAttr(fieldPrefix)}.publicPrice" value="${escapeAttr(item.publicPrice || "")}" placeholder="Ex: 12,50" inputmode="decimal" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>` : ""}
           <label>URL image<input name="${escapeAttr(fieldPrefix)}.imageUrl" value="${escapeAttr(item.imageUrl || "")}" placeholder="https://..." data-catalog-image-url data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
-          <label>Image<input name="${escapeAttr(fieldPrefix)}.imageFile" type="file" accept="image/png,image/jpeg,image/webp" data-catalog-image-file data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)} /></label>
+          <div class="field-label-group">Image${fileUploadButtonHtml(`${fieldPrefix}.imageFile`, "image/png,image/jpeg,image/webp", !!item.imageUrl, canEdit, `data-catalog-image-file data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}"`)}</div>
           <label class="wide-field">Description article<textarea name="${escapeAttr(fieldPrefix)}.publicDescription" rows="2" data-catalog-autosave data-catalog-type="item" data-category-id="${escapeAttr(item.categoryId)}" data-item-id="${escapeAttr(item.id)}" ${disabled(canEdit)}>${escapeHtml(item.description || "")}</textarea></label>
         </div>
       </div>
@@ -2711,10 +2728,13 @@ function catalogItemEditorHtml(item, canEdit) {
 function previewCatalogImageFile(input) {
   const file = input.files?.[0];
   if (!file) return;
-  const preview = input.closest(".catalog-item-editor")?.querySelector("[data-catalog-image-preview]");
+  const editor = input.closest(".catalog-item-editor");
+  const preview = editor?.querySelector("[data-catalog-image-preview]");
   if (!preview) return;
   const url = URL.createObjectURL(file);
   setCatalogImagePreview(preview, url, file.name || "Image article", () => URL.revokeObjectURL(url));
+  const button = input.closest(".file-upload-control")?.querySelector("[data-file-upload-button]");
+  if (button) button.textContent = "Modifier le fichier";
 }
 
 function previewCatalogImageUrl(input) {

@@ -2857,8 +2857,11 @@ select:focus-visible {
 }
 
 .profile-image-field {
+  display: grid;
   align-content: start;
   gap: 10px;
+  color: var(--poksol-navy);
+  font-weight: 900;
 }
 
 .profile-image-preview {
@@ -2892,6 +2895,52 @@ select:focus-visible {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 900;
+}
+
+/* Bouton de televersement : le texte natif du navigateur ne peut pas etre traduit ni
+   adapte, on cache donc le vrai <input type="file"> (reste au clavier, le <label> le porte)
+   derriere ce bouton. */
+.file-upload-control {
+  display: inline-flex;
+  width: fit-content;
+}
+
+.file-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.file-upload-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid #9bb9dc;
+  border-radius: 12px;
+  color: var(--poksol-navy);
+  background: white;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.file-upload-control:hover .file-upload-button {
+  border-color: var(--poksol-blue);
+  background: #f8fbff;
+}
+
+.file-upload-control:focus-within .file-upload-button {
+  outline: 2px solid var(--poksol-blue);
+  outline-offset: 2px;
+}
+
+.file-upload-control.is-disabled .file-upload-button {
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
 .catalog-items-editor {
@@ -4170,6 +4219,7 @@ body.menu-page-body.translated-rtl {
 }
 
 .form-grid label,
+.form-grid .field-label-group,
 .hours-row label {
   display: grid;
   gap: 8px;
