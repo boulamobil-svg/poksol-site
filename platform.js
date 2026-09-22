@@ -1306,6 +1306,12 @@ function initDashboardPage() {
       updateQuoteFormTotals(quoteForm);
       return;
     }
+    const quoteLineCatalog = event.target.closest("[data-quote-line-catalog]");
+    if (quoteLineCatalog) {
+      event.preventDefault();
+      openQuoteCatalogPicker(root, quoteLineCatalog.closest("form"), quoteLineCatalog.closest("[data-quote-line]"));
+      return;
+    }
     const clientMovement = event.target.closest("[data-client-movement]");
     if (clientMovement) {
       event.preventDefault();
@@ -1468,6 +1474,10 @@ function initDashboardPage() {
     }
     if (event.target.matches("[data-quote-customer-select]")) {
       applyQuoteClientSelection(root, event.target.closest("form"));
+      return;
+    }
+    if (event.target.matches("[data-quote-covers-label]")) {
+      localStorage.setItem("poksolQuoteCoversLabel", event.target.value);
       return;
     }
     if (event.target.matches("[data-quote-line-qty], [data-quote-line-price], [data-quote-line-vat]")) {
@@ -4004,7 +4014,8 @@ function quoteLineToRoomOrderLine(line, index) {
   };
 }
 
-// ---- catalogue : la liste servant a l'autocompletion, aplatie depuis le menu du restaurant.
+// ---- catalogue : liste aplatie depuis le menu du restaurant, utilisee pour l'autocompletion
+// d'une ligne et pour le widget de selection multiple (openQuoteCatalogPicker).
 function catalogItemsForQuotes(catalogMenu) {
   const categories = catalogMenu?.categories || [];
   const items = [];
@@ -4028,6 +4039,129 @@ function findCatalogItemByName(items, name) {
   const target = String(name || "").trim().toLowerCase();
   if (!target) return null;
   return items.find((item) => item.name.trim().toLowerCase() === target) || null;
+}
+
+function groupCatalogItemsByCategory(items) {
+  const groups = [];
+  const byCategory = new Map();
+  items.forEach((item) => {
+    const key = item.categoryId || item.categoryName || "";
+    if (!byCategory.has(key)) {
+      const group = { categoryName: item.categoryName || "Autres", items: [] };
+      byCategory.set(key, group);
+      groups.push(group);
+    }
+    byCategory.get(key).items.push(item);
+  });
+  return groups;
+}
+
+// Widget de selection multiple (comme le catalogue de prise de commande de l'application) :
+// permet d'ajouter plusieurs lignes de devis en une seule fois, avec une quantite par article.
+function quoteCatalogPickerHtml(items = []) {
+  const groups = groupCatalogItemsByCategory(items);
+  return `
+    <div class="quote-catalog-picker" data-quote-catalog-picker>
+      <input type="search" class="quote-catalog-search" placeholder="Rechercher un article..." data-catalog-picker-search />
+      <div class="quote-catalog-picker-groups" data-catalog-picker-groups>
+        ${groups.length ? groups.map((group) => `
+          <section class="quote-catalog-picker-group" data-catalog-picker-group>
+            <h4>${escapeHtml(group.categoryName)}</h4>
+            <div class="quote-catalog-picker-items">
+              ${group.items.map((item) => `
+                <div class="quote-catalog-picker-item" data-catalog-picker-item
+                  data-catalog-picker-name="${escapeAttr(item.name.toLowerCase())}"
+                  data-item-name="${escapeAttr(item.name)}" data-item-price="${item.price}" data-item-vat="${item.vat}"
+                  data-item-id="${escapeAttr(item.itemId)}" data-item-category-id="${escapeAttr(item.categoryId)}" data-item-category-name="${escapeAttr(item.categoryName)}">
+                  <span class="quote-catalog-picker-name">${escapeHtml(item.name)}</span>
+                  <span class="quote-catalog-picker-price">${escapeHtml(formatMoney(item.price))}</span>
+                  <div class="quote-catalog-picker-qty">
+                    <button class="button-reset" type="button" data-catalog-picker-decrement aria-label="Diminuer la quantite">&minus;</button>
+                    <input type="number" min="0" step="1" value="0" data-catalog-picker-qty />
+                    <button class="button-reset" type="button" data-catalog-picker-increment aria-label="Augmenter la quantite">+</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </section>
+        `).join("") : `<p class="empty-state">Aucun article dans le catalogue.</p>`}
+      </div>
+      <div class="quote-catalog-picker-footer">
+        <span data-catalog-picker-summary>Aucun article selectionne</span>
+        <button class="primary-btn button-reset" type="button" data-catalog-picker-confirm>Ajouter au devis</button>
+      </div>
+    </div>
+  `;
+}
+
+function openQuoteCatalogPicker(root, form, triggerRow) {
+  if (!form) return;
+  const overlay = showDashboardModal("Choisir dans le catalogue", quoteCatalogPickerHtml(root.quoteCatalogItems || []), { wide: true });
+  const picker = overlay.querySelector("[data-quote-catalog-picker]");
+  const summary = picker.querySelector("[data-catalog-picker-summary]");
+  const qtyInputs = [...picker.querySelectorAll("[data-catalog-picker-qty]")];
+
+  const updateSummary = () => {
+    const total = qtyInputs.reduce((sum, input) => sum + (Number(input.value) || 0), 0);
+    summary.textContent = total > 0 ? `${total} article${total > 1 ? "s" : ""} selectionne${total > 1 ? "s" : ""}` : "Aucun article selectionne";
+  };
+
+  picker.querySelectorAll("[data-catalog-picker-item]").forEach((itemEl) => {
+    const qtyInput = itemEl.querySelector("[data-catalog-picker-qty]");
+    itemEl.querySelector("[data-catalog-picker-decrement]").addEventListener("click", () => {
+      qtyInput.value = Math.max(0, (Number(qtyInput.value) || 0) - 1);
+      updateSummary();
+    });
+    itemEl.querySelector("[data-catalog-picker-increment]").addEventListener("click", () => {
+      qtyInput.value = (Number(qtyInput.value) || 0) + 1;
+      updateSummary();
+    });
+    qtyInput.addEventListener("input", updateSummary);
+  });
+
+  picker.querySelector("[data-catalog-picker-search]").addEventListener("input", (event) => {
+    const term = event.target.value.trim().toLowerCase();
+    picker.querySelectorAll("[data-catalog-picker-group]").forEach((group) => {
+      let visibleCount = 0;
+      group.querySelectorAll("[data-catalog-picker-item]").forEach((itemEl) => {
+        const match = !term || itemEl.dataset.catalogPickerName.includes(term);
+        itemEl.classList.toggle("is-hidden", !match);
+        if (match) visibleCount++;
+      });
+      group.classList.toggle("is-hidden", visibleCount === 0);
+    });
+  });
+
+  picker.querySelector("[data-catalog-picker-confirm]").addEventListener("click", () => {
+    const selections = [...picker.querySelectorAll("[data-catalog-picker-item]")]
+      .map((itemEl) => ({
+        item: {
+          name: itemEl.dataset.itemName,
+          price: Number(itemEl.dataset.itemPrice) || 0,
+          vat: Number(itemEl.dataset.itemVat) || 0,
+          itemId: itemEl.dataset.itemId,
+          categoryId: itemEl.dataset.itemCategoryId,
+          categoryName: itemEl.dataset.itemCategoryName
+        },
+        qty: Number(itemEl.querySelector("[data-catalog-picker-qty]").value) || 0
+      }))
+      .filter((entry) => entry.qty > 0);
+    if (!selections.length) {
+      closeDashboardModal();
+      return;
+    }
+    const linesContainer = form.querySelector("[data-quote-lines]");
+    const triggerIsEmpty = !!triggerRow && !triggerRow.querySelector("[data-quote-line-name]")?.value.trim();
+    selections.forEach(({ item, qty }) => {
+      linesContainer.insertAdjacentHTML("beforeend", quoteLineRowHtml(item, qty));
+    });
+    if (triggerIsEmpty) triggerRow.remove();
+    linesContainer.querySelectorAll("[data-quote-line]").forEach(updateQuoteLineRow);
+    updateQuoteFormTotals(form);
+    closeDashboardModal();
+  });
+
+  updateSummary();
 }
 
 // ===========================================================================
@@ -4060,7 +4194,7 @@ function quotesHtml(quotes = [], customerAccounts = {}, catalogMenu = null, role
           </div>
         ` : `<div class="client-account-empty">Aucun devis pour le moment.</div>`}
       </div>
-      ${canManage ? quoteCreatePageHtml(clients, catalogMenu) : ""}
+      ${canManage ? quoteCreatePageHtml(clients) : ""}
     </div>
   `;
 }
@@ -4083,8 +4217,11 @@ function quoteRowHtml(quote = {}) {
 // Un client choisi (ou cree a la volee) porte deja son nom/telephone/email/adresse/SIRET/TVA :
 // pas besoin de les retaper, la fiche client fait foi. « Ajouter un client » ouvre le meme
 // formulaire que l'onglet Comptes clients (customerFieldsHtml), dans une fenetre.
-function quoteCreatePageHtml(clients = [], catalogMenu = null) {
-  const items = catalogItemsForQuotes(catalogMenu);
+function quoteCoversLabelPreference() {
+  return localStorage.getItem("poksolQuoteCoversLabel") === "Convives" ? "Convives" : "Couverts";
+}
+
+function quoteCreatePageHtml(clients = []) {
   const validUntil = new Date(Date.now() + 30 * 86400000);
   return `
     <section class="quote-create-page is-hidden" data-quote-create-page>
@@ -4096,10 +4233,6 @@ function quoteCreatePageHtml(clients = [], catalogMenu = null) {
         </div>
       </header>
       <form class="platform-form quote-form" data-dashboard-quote-form>
-        <datalist id="quote-catalog-items">
-          ${items.map((item) => `<option value="${escapeAttr(item.name)}"></option>`).join("")}
-        </datalist>
-
         <div class="quote-client-picker">
           <label class="quote-client-select">Client
             <select data-quote-customer-select>
@@ -4113,7 +4246,12 @@ function quoteCreatePageHtml(clients = [], catalogMenu = null) {
         <div class="form-grid">
           <label>Intitule de la prestation<input name="eventLabel" placeholder="Anniversaire, mariage, buffet d'entreprise..." /></label>
           <label>Date de l'evenement<input name="eventDate" type="date" /></label>
-          <label>Couverts<input name="covers" type="number" min="0" step="1" /></label>
+          <label>
+            <select class="label-select" data-quote-covers-label>
+              ${["Couverts", "Convives"].map((word) => `<option value="${word}" ${word === quoteCoversLabelPreference() ? "selected" : ""}>${word}</option>`).join("")}
+            </select>
+            <input name="covers" type="number" min="0" step="1" />
+          </label>
           <label>Valable jusqu'au<input name="validUntil" type="date" value="${validUntil.toISOString().slice(0, 10)}" required /></label>
           <label>Acompte demande (EUR)<input name="depositAmount" type="number" min="0" step="0.01" /></label>
         </div>
@@ -4211,14 +4349,22 @@ function openQuoteAddClient(root, form) {
   });
 }
 
-function quoteLineRowHtml() {
+function quoteLineRowHtml(item = null, qty = 1) {
+  const price = item ? item.price : 0;
+  const vat = item && [0, 5.5, 10, 20].includes(Number(item.vat)) ? Number(item.vat) : 10;
+  const catalogAttrs = item
+    ? ` data-catalog-item-id="${escapeAttr(item.itemId)}" data-catalog-category-id="${escapeAttr(item.categoryId)}" data-catalog-category-name="${escapeAttr(item.categoryName)}"`
+    : "";
   return `
-    <div class="quote-line-row" data-quote-line>
-      <input type="text" list="quote-catalog-items" placeholder="Nom de l'article ou texte libre" data-quote-line-name required />
-      <input type="number" min="0" step="1" value="1" data-quote-line-qty />
-      <input type="number" min="0" step="0.01" value="0" data-quote-line-price />
+    <div class="quote-line-row" data-quote-line${catalogAttrs}>
+      <div class="quote-line-name-field">
+        <input type="text" placeholder="Nom de l'article ou texte libre" data-quote-line-name required value="${escapeAttr(item?.name || "")}" />
+        <button class="button-reset quote-line-catalog-btn" type="button" data-quote-line-catalog aria-label="Choisir dans le catalogue">&#9662;</button>
+      </div>
+      <input type="number" min="0" step="1" value="${qty}" data-quote-line-qty />
+      <input type="number" min="0" step="0.01" value="${price.toFixed(2)}" data-quote-line-price />
       <select data-quote-line-vat>
-        ${[0, 5.5, 10, 20].map((rate) => `<option value="${rate}" ${rate === 10 ? "selected" : ""}>${String(rate).replace(".", ",")} %</option>`).join("")}
+        ${[0, 5.5, 10, 20].map((rate) => `<option value="${rate}" ${rate === vat ? "selected" : ""}>${String(rate).replace(".", ",")} %</option>`).join("")}
       </select>
       <span data-quote-line-total>0,00 &euro;</span>
       <button class="button-reset quote-line-remove" type="button" data-quote-line-remove aria-label="Supprimer la ligne">&times;</button>
@@ -5672,19 +5818,42 @@ function accessRequestsHtml(requests = []) {
   `;
 }
 
+function sortedTeamMembers(members) {
+  return [...members].sort((a, b) => {
+    const activeA = (a.status || "active") === "active" ? 0 : 1;
+    const activeB = (b.status || "active") === "active" ? 0 : 1;
+    if (activeA !== activeB) return activeA - activeB;
+    const nameA = (a.displayName || a.email || "").toLowerCase();
+    const nameB = (b.displayName || b.email || "").toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+}
+
+function teamStatusBadgeHtml(status) {
+  const isActive = (status || "active") === "active";
+  return `<span class="team-status-badge ${isActive ? "is-active" : "is-inactive"}">${isActive ? "Actif" : "Inactif"}</span>`;
+}
+
 function teamHtml(members, canManageTeam, accessRequests = []) {
+  const sorted = sortedTeamMembers(members);
   return `
     ${canManageTeam ? accessRequestsHtml(accessRequests) : ""}
-    <div class="responsive-table">
+    <div class="responsive-table team-table">
       <div class="table-row table-head"><span>Nom</span><span>Email</span><span>Role</span><span>Statut</span></div>
-      ${members.length ? members.map((member) => `
-        <div class="table-row">
-          <span>${escapeHtml(member.displayName || member.uid)}</span>
-          <span>${escapeHtml(member.email || "")}</span>
+      ${sorted.length ? sorted.map((member) => {
+        const hasProfile = !!(member.displayName || member.email);
+        return `
+        <div class="table-row ${(member.status || "active") === "active" ? "" : "is-inactive-row"}">
+          <span class="team-member-name">
+            <span class="team-avatar" aria-hidden="true">${escapeHtml(userInitials(member.displayName, member.email))}</span>
+            ${hasProfile ? escapeHtml(member.displayName || member.email) : `<em class="team-member-incomplete">Profil incomplet</em>`}
+          </span>
+          <span>${escapeHtml(member.email || "—")}</span>
           <span>${escapeHtml(ROLE_LABELS[member.role] || member.role || "staff")}</span>
-          <span>${escapeHtml(member.status || "active")}</span>
+          <span>${teamStatusBadgeHtml(member.status)}</span>
         </div>
-      `).join("") : `<div class="empty-state">Aucun membre trouve.</div>`}
+      `;
+      }).join("") : `<div class="empty-state">Aucun membre trouve.</div>`}
     </div>
     ${canManageTeam ? `
       <form class="platform-form invite-form" data-dashboard-invite-form>

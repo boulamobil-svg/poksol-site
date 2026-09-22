@@ -1693,6 +1693,63 @@ select:focus-visible {
   grid-template-columns: 1fr 1fr 1.1fr 0.6fr 0.8fr 82px;
 }
 
+.team-table .table-row {
+  grid-template-columns: 1.5fr 1.6fr 0.9fr 0.8fr;
+}
+
+.team-table .table-row.is-inactive-row {
+  background: #eef1f5;
+  opacity: 0.75;
+}
+
+.team-member-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  color: var(--poksol-navy);
+}
+
+.team-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: white;
+  background: var(--poksol-blue);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.team-member-incomplete {
+  color: var(--text-muted);
+  font-style: italic;
+  font-weight: 700;
+}
+
+.team-status-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.team-status-badge.is-active {
+  color: #0f5132;
+  background: #d1f5df;
+}
+
+.team-status-badge.is-inactive {
+  color: #4b5563;
+  background: #e5e9ef;
+}
+
 .clients-table .client-row {
   grid-template-columns: 1.1fr 1fr 1.15fr 0.65fr 0.75fr 1fr;
 }
@@ -4300,6 +4357,24 @@ body.menu-page-body.translated-rtl {
   font-weight: 900;
 }
 
+.form-grid select.label-select {
+  width: fit-content;
+  border: none;
+  background: transparent;
+  padding: 0 16px 0 0;
+  border-radius: 0;
+  font: inherit;
+  font-weight: 900;
+  color: var(--poksol-navy);
+  cursor: pointer;
+}
+
+.form-grid select.label-select:focus {
+  box-shadow: none;
+  outline: 2px solid #1976f3;
+  outline-offset: 2px;
+}
+
 .form-grid input,
 .form-grid select,
 .form-grid textarea,
@@ -4671,6 +4746,12 @@ body.menu-page-body.translated-rtl {
 
   .quote-client-select {
     min-width: 0;
+  }
+
+  .quote-catalog-picker-item {
+    grid-template-columns: 1fr;
+    justify-items: start;
+    gap: 6px;
   }
 
   button.quote-row {
@@ -5934,6 +6015,35 @@ button.quote-row:focus-visible {
   gap: 8px;
 }
 
+.quote-line-name-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.quote-line-name-field input {
+  flex: 1;
+  min-width: 0;
+}
+
+.quote-line-catalog-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #d3e5ff;
+  background: #f2f7ff;
+  color: var(--poksol-blue);
+  font-size: 12px;
+}
+
+.quote-line-catalog-btn:hover {
+  background: #e3edff;
+}
+
 .quote-line-row input,
 .quote-line-row select {
   min-width: 0;
@@ -5976,6 +6086,109 @@ button.quote-row:focus-visible {
 .quote-totals strong {
   margin-left: 6px;
   color: var(--poksol-navy);
+}
+
+.quote-catalog-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: min(70vh, 640px);
+}
+
+.quote-catalog-search {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #d3e5ff;
+  font-size: 14px;
+}
+
+.quote-catalog-picker-groups {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 18px;
+  padding-right: 4px;
+}
+
+.quote-catalog-picker-group h4 {
+  margin: 0 0 8px;
+  color: var(--poksol-navy);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.quote-catalog-picker-group.is-hidden {
+  display: none;
+}
+
+.quote-catalog-picker-items {
+  display: grid;
+  gap: 6px;
+}
+
+.quote-catalog-picker-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fbff;
+  border: 1px solid #eaf0fb;
+}
+
+.quote-catalog-picker-item.is-hidden {
+  display: none;
+}
+
+.quote-catalog-picker-name {
+  font-weight: 800;
+  color: var(--poksol-navy);
+}
+
+.quote-catalog-picker-price {
+  color: var(--text-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.quote-catalog-picker-qty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quote-catalog-picker-qty button {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #eaf0fb;
+  color: var(--poksol-navy);
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+.quote-catalog-picker-qty input {
+  width: 42px;
+  text-align: center;
+  border-radius: 8px;
+  border: 1px solid #d3e5ff;
+  padding: 4px;
+}
+
+.quote-catalog-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #eaf0fb;
+  font-weight: 800;
+  color: var(--text-muted);
 }
 
 .quote-preview {
