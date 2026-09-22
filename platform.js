@@ -4212,6 +4212,55 @@ function wrapProportional(text, maxWidth, bold = false, size = 10) {
   return lines;
 }
 
+// Compresse des octets bruts en deflate/zlib (compatible /Filter /FlateDecode d'un PDF),
+// via l'API native du navigateur : pas de librairie de compression a embarquer.
+async function deflateBytes(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+// Un octet == un caractere (code 0-255) : c'est ainsi que build() assemble le PDF final
+// avant de le reconvertir en octets. Par blocs pour eviter la limite d'arguments de
+// String.fromCharCode sur un tableau de plusieurs dizaines de milliers d'octets.
+function bytesToBinaryString(bytes) {
+  let out = "";
+  const chunkSize = 8192;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    out += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return out;
+}
+
+// Logo du restaurant : recupere l'image, la redimensionne (canvas) a la taille d'affichage
+// pour garder le PDF leger, et renvoie ses pixels RGB (+ alpha si l'image en a un). Echoue
+// silencieusement (repli sur le nom du restaurant en gras) si le fichier est inaccessible.
+async function loadLogoPixels(url, maxWidth = 170, maxHeight = 64) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`logo HTTP ${response.status}`);
+  const blob = await response.blob();
+  const bitmap = await createImageBitmap(blob);
+  const scale = Math.min(maxWidth / bitmap.width, maxHeight / bitmap.height, 1);
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.drawImage(bitmap, 0, 0, width, height);
+  const { data } = context.getImageData(0, 0, width, height);
+  const rgb = new Uint8Array(width * height * 3);
+  const alpha = new Uint8Array(width * height);
+  let hasAlpha = false;
+  for (let pixel = 0, offset = 0; pixel < width * height; pixel += 1, offset += 4) {
+    rgb[pixel * 3] = data[offset];
+    rgb[pixel * 3 + 1] = data[offset + 1];
+    rgb[pixel * 3 + 2] = data[offset + 2];
+    alpha[pixel] = data[offset + 3];
+    if (data[offset + 3] !== 255) hasAlpha = true;
+  }
+  return { width, height, rgb, alpha: hasAlpha ? alpha : null };
+}
+
 // ---------------------------------------------------------------------------
 // Un petit « canvas » PDF multi-pages : texte Helvetica positionne au point pres,
 // rectangles/lignes vectoriels. Les blocs (voir buildQuotePdf) sont dessines dans
@@ -4223,6 +4272,7 @@ class PdfDocument {
     this.pageHeight = pageHeight;
     this.margin = margin;
     this.pages = [];
+    this._images = [];
     this.newPage();
   }
 
@@ -4280,6 +4330,25 @@ class PdfDocument {
     this.emit(`q ${color} RG ${pdfNumber(lineWidth)} w ${pdfNumber(x1)} ${pdfNumber(y1)} m ${pdfNumber(x2)} ${pdfNumber(y2)} l S Q`);
   }
 
+  // Enregistre une image (pixels RGB deja extraits, canal alpha optionnel) et renvoie le
+  // nom de ressource a passer a image(). La compression (FlateDecode) se fait ici, une
+  // seule fois, plutot qu'a chaque usage.
+  async addImageAsset({ width, height, rgb, alpha }) {
+    const name = `Im${this._images.length + 1}`;
+    let smaskName = null;
+    if (alpha) {
+      smaskName = `${name}Mask`;
+      this._images.push({ name: smaskName, width, height, colorSpace: "DeviceGray", data: await deflateBytes(alpha), isMask: true });
+    }
+    this._images.push({ name, width, height, colorSpace: "DeviceRGB", data: await deflateBytes(rgb), smaskName });
+    return name;
+  }
+
+  image(x, yTop, width, height, name) {
+    const y = this.pageHeight - yTop - height;
+    this.emit(`q ${pdfNumber(width)} 0 0 ${pdfNumber(height)} ${pdfNumber(x)} ${pdfNumber(y)} cm /${name} Do Q`);
+  }
+
   // ---- assemblage final ----
   build() {
     const objects = [];
@@ -4291,9 +4360,18 @@ class PdfDocument {
     const pagesId = addObject("");
     const fontRegular = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
     const fontBold = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+    const imageObjIds = {};
+    this._images.forEach((image) => {
+      const smaskRef = !image.isMask && image.smaskName ? ` /SMask ${imageObjIds[image.smaskName]} 0 R` : "";
+      const id = addObject(`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /${image.colorSpace} /BitsPerComponent 8 /Filter /FlateDecode${smaskRef} /Length ${image.data.length} >>${NL}stream${NL}${bytesToBinaryString(image.data)}${NL}endstream`);
+      imageObjIds[image.name] = id;
+    });
+    const xObjectDict = Object.keys(imageObjIds).length
+      ? ` /XObject << ${Object.entries(imageObjIds).map(([name, id]) => `/${name} ${id} 0 R`).join(" ")} >>`
+      : "";
     const pageIds = this._pages.map((page) => {
       const contentId = addObject(`<< /Length ${page.stream.length} >>${NL}stream${NL}${page.stream}endstream`);
-      return addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${this.pageWidth} ${this.pageHeight}] /Resources << /Font << /FR ${fontRegular} 0 R /FB ${fontBold} 0 R >> >> /Contents ${contentId} 0 R >>`);
+      return addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${this.pageWidth} ${this.pageHeight}] /Resources << /Font << /FR ${fontRegular} 0 R /FB ${fontBold} 0 R >>${xObjectDict} >> /Contents ${contentId} 0 R >>`);
     });
     objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
     objects[pagesId - 1] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
@@ -4338,7 +4416,7 @@ function quoteHeaderLegalLine(restaurant) {
 // ---------------------------------------------------------------------------
 // Construit le PDF complet du devis (une page, plus si le contenu deborde).
 // ---------------------------------------------------------------------------
-function buildQuotePdf(quote = {}, restaurant = {}) {
+async function buildQuotePdf(quote = {}, restaurant = {}) {
   const doc = new PdfDocument();
   const margin = doc.margin;
   const width = doc.contentWidth;
@@ -4346,10 +4424,26 @@ function buildQuotePdf(quote = {}, restaurant = {}) {
   const table = quote.sourceTable || {};
   const lineItems = Array.isArray(table.lines) ? table.lines.filter((line) => Number(line.quantity) !== 0) : [];
 
-  // -- en-tete : identite du restaurant a gauche, "DEVIS" + reperes a droite --
+  // -- en-tete : logo (ou nom en gras a defaut) a gauche, "DEVIS" + reperes a droite --
+  let logo = null;
+  if (restaurant.logoUrl) {
+    try {
+      const pixels = await loadLogoPixels(restaurant.logoUrl);
+      logo = { name: await doc.addImageAsset(pixels), width: pixels.width, height: pixels.height };
+    } catch (error) {
+      logo = null; // logo inaccessible (reseau, image invalide...) : repli sur le nom en gras
+    }
+  }
   const restaurantName = String(firstText(restaurant.name, restaurant.tradeName, "Restaurant"));
-  doc.text(margin, doc.pageHeight - doc.y, restaurantName, { bold: true, size: 16 });
-  let leftY = doc.pageHeight - doc.y + 22;
+  const headerTop = doc.pageHeight - doc.y;
+  let leftY;
+  if (logo) {
+    doc.image(margin, headerTop, logo.width, logo.height, logo.name);
+    leftY = headerTop + logo.height + 8;
+  } else {
+    doc.text(margin, headerTop, restaurantName, { bold: true, size: 16 });
+    leftY = headerTop + 22;
+  }
   const street = cleanStreetLine(firstText(restaurant.addressLine1, restaurant.address), restaurant.postalCode);
   const addressLines = [
     street,
@@ -4516,19 +4610,21 @@ function buildQuotePdf(quote = {}, restaurant = {}) {
   return doc.build();
 }
 
-function openQuoteDetail(root, quoteId) {
+async function openQuoteDetail(root, quoteId) {
   const quote = (root.dashboardQuotes || []).find((item) => item.id === quoteId);
   if (!quote) return;
   const restaurant = root.dashboardRestaurant || {};
   const canManage = QUOTE_MANAGER_ROLES.includes(root.dataset.restaurantRole || "");
-  const blob = buildQuotePdf(quote, restaurant);
-  const objectUrl = URL.createObjectURL(blob);
   const overlay = showDashboardModal(
     `Devis ${quote.quoteNumber || ""}`,
-    `<div class="quote-preview"><iframe src="${escapeAttr(objectUrl)}" title="Apercu du devis"></iframe></div>`,
+    `<p class="client-modal-wait">Generation du PDF...</p>`,
     { wide: true }
   );
+  const blob = await buildQuotePdf(quote, restaurant);
+  if (!document.body.contains(overlay)) return;
+  const objectUrl = URL.createObjectURL(blob);
   overlay.dataset.quoteObjectUrl = objectUrl;
+  overlay.querySelector(".client-modal-body").innerHTML = `<div class="quote-preview"><iframe src="${escapeAttr(objectUrl)}" title="Apercu du devis"></iframe></div>`;
   const cleanupUrl = () => URL.revokeObjectURL(objectUrl);
   overlay.addEventListener("click", (event) => {
     if (event.target === overlay || event.target.closest("[data-client-modal-close]")) cleanupUrl();
