@@ -1257,6 +1257,26 @@ function initDashboardPage() {
       return;
     }
     if (!event.target.closest(".client-col-head")) closeClientColumnMenus(root);
+    const quoteRow = event.target.closest("[data-quote-row]");
+    if (quoteRow) {
+      event.preventDefault();
+      openQuoteDetail(root, quoteRow.dataset.quoteRow);
+      return;
+    }
+    const quoteAddLine = event.target.closest("[data-quote-add-line]");
+    if (quoteAddLine) {
+      event.preventDefault();
+      quoteAddLine.closest("form")?.querySelector("[data-quote-lines]")?.insertAdjacentHTML("beforeend", quoteLineRowHtml());
+      return;
+    }
+    const quoteRemoveLine = event.target.closest("[data-quote-line-remove]");
+    if (quoteRemoveLine) {
+      event.preventDefault();
+      const quoteForm = quoteRemoveLine.closest("form");
+      quoteRemoveLine.closest("[data-quote-line]")?.remove();
+      updateQuoteFormTotals(quoteForm);
+      return;
+    }
     const clientMovement = event.target.closest("[data-client-movement]");
     if (clientMovement) {
       event.preventDefault();
@@ -1348,6 +1368,10 @@ function initDashboardPage() {
       if (form.matches("[data-dashboard-customer-delete-form]")) {
         await deleteCustomerAccount(restaurantId, form.dataset.customerId, form.dataset.customerCollection);
       }
+      if (form.matches("[data-dashboard-quote-form]")) {
+        requireQuotePermission(root);
+        await submitQuoteForm(root, form, restaurantId);
+      }
       if (form.matches("[data-dashboard-jobtitle-form]")) await saveUserJobTitle(restaurantId, form, currentUser);
       if (form.matches("[data-dashboard-access-form]")) await reviewAccessRequest(restaurantId, form, event.submitter?.value, currentUser);
       if (form.matches("[data-dashboard-invite-form]")) {
@@ -1405,6 +1429,40 @@ function initDashboardPage() {
       updateCustomerTypeScope(event.target);
       return;
     }
+    if (event.target.matches("[data-quote-customer-select]")) {
+      const option = event.target.selectedOptions[0];
+      const quoteForm = event.target.closest("form");
+      quoteForm.querySelector("[data-quote-customer-id]").value = option?.value || "";
+      quoteForm.querySelector("[data-quote-customer-name]").value = option?.dataset.name || "";
+      quoteForm.querySelector("[data-quote-customer-phone]").value = option?.dataset.phone || "";
+      quoteForm.querySelector("[data-quote-customer-email]").value = option?.dataset.email || "";
+      quoteForm.querySelector("[data-quote-customer-address]").value = option?.dataset.address || "";
+      quoteForm.querySelector("[data-quote-customer-tax]").value = option?.dataset.tax || "";
+      quoteForm.querySelector("[data-quote-customer-vat]").value = option?.dataset.vat || "";
+      return;
+    }
+    if (event.target.matches("[data-quote-line-qty], [data-quote-line-price], [data-quote-line-vat]")) {
+      const quoteRowEl = event.target.closest("[data-quote-line]");
+      updateQuoteLineRow(quoteRowEl);
+      updateQuoteFormTotals(quoteRowEl?.closest("form"));
+      return;
+    }
+    if (event.target.matches("[data-quote-line-name]")) {
+      const quoteRowEl = event.target.closest("[data-quote-line]");
+      const match = findCatalogItemByName(root.quoteCatalogItems || [], event.target.value);
+      if (match) {
+        quoteRowEl.querySelector("[data-quote-line-price]").value = match.price.toFixed(2);
+        const vatSelect = quoteRowEl.querySelector("[data-quote-line-vat]");
+        const vatValue = String(match.vat);
+        if ([...vatSelect.options].some((option) => option.value === vatValue)) vatSelect.value = vatValue;
+        quoteRowEl.dataset.catalogItemId = match.itemId;
+        quoteRowEl.dataset.catalogCategoryId = match.categoryId;
+        quoteRowEl.dataset.catalogCategoryName = match.categoryName;
+        updateQuoteLineRow(quoteRowEl);
+        updateQuoteFormTotals(quoteRowEl.closest("form"));
+      }
+      return;
+    }
     if (!event.target.matches("[data-reservation-status]")) return;
     const restaurantId = root.dataset.restaurantId;
     await updateReservationStatus(restaurantId, event.target.dataset.reservationStatus, event.target.value);
@@ -1421,6 +1479,11 @@ function initDashboardPage() {
     }
     if (event.target.matches("[data-client-col-filter]")) {
       setClientColumnFilter(root, event.target.dataset.clientColFilter, event.target.value);
+    }
+    if (event.target.matches("[data-quote-line-qty], [data-quote-line-price]")) {
+      const quoteRowEl = event.target.closest("[data-quote-line]");
+      updateQuoteLineRow(quoteRowEl);
+      updateQuoteFormTotals(quoteRowEl?.closest("form"));
     }
   });
   root.addEventListener("keydown", (event) => {
@@ -1493,14 +1556,15 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
   root.dataset.restaurantRole = role;
-  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests, quotes] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
     getActiveMenu(restaurant.id).catch(() => null),
     listCatalogMenu(restaurant.id).catch(() => null),
     getUserDoc(user.uid).catch(() => null),
-    ["owner", "admin"].includes(role) ? listAccessRequests(restaurant.id).catch(() => []) : Promise.resolve([])
+    ["owner", "admin"].includes(role) ? listAccessRequests(restaurant.id).catch(() => []) : Promise.resolve([]),
+    listQuotes(restaurant.id).catch(() => [])
   ]);
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
@@ -1508,7 +1572,9 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   const account = currentUserSummary(user, userProfile, members, role, restaurant.id);
   root.clientExportSource = { customers: customerAccounts, reservations };
   root.dashboardRestaurant = restaurant;
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests);
+  root.dashboardQuotes = quotes;
+  root.quoteCatalogItems = catalogItemsForQuotes(dashboardMenu);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes);
   applyClientTools(root);
 }
 
@@ -2166,7 +2232,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = []) {
+function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = [], quotes = []) {
   const canEditProfile = ["owner", "admin"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -2179,7 +2245,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       </button>
       <button class="dashboard-nav-backdrop button-reset" type="button" aria-label="Fermer les sections" data-dashboard-nav-backdrop></button>
       <nav class="dashboard-tabs" aria-label="Sections dashboard">
-        ${["overview", "profile", "hours", "public", "menu", "reservations", "clients", "team", "downloads"].map((tab, index) => `
+        ${["overview", "profile", "hours", "public", "menu", "reservations", "clients", "quotes", "team", "downloads"].map((tab, index) => `
           <button class="${tab === activeTab ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>
         `).join("")}
       </nav>
@@ -2190,6 +2256,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       <section class="dashboard-panel ${activeTab === "menu" ? "is-active" : ""}" data-dashboard-panel="menu">${menuFormHtml(restaurant, menu, canEditProfile)}</section>
       <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations, role)}</section>
+      <section class="dashboard-panel ${activeTab === "quotes" ? "is-active" : ""}" data-dashboard-panel="quotes">${quotesHtml(quotes, customers, menu, role)}</section>
       <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam, accessRequests)}</section>
       <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -3502,27 +3569,31 @@ function pdfNumber(value) {
   return (Math.round(value * 100) / 100).toString();
 }
 
-function buildTicketPdf(lines) {
+// PDF A4 ecrit ligne par ligne (police a chasse fixe), avec filigrane diagonal optionnel :
+// commun au ticket de caisse (filigrane « COPIE ») et au devis (sans filigrane, plus large).
+function buildDocumentPdf(lines, { width = TICKET_WIDTH, fontSize = 9, watermarkText = "" } = {}) {
   const pageWidth = 595.28;
   const pageHeight = 841.89;
-  const fontSize = 9;
-  const leading = 11.5;
-  const blockWidth = TICKET_WIDTH * fontSize * 0.6;
+  const leading = fontSize * 1.28;
+  const blockWidth = width * fontSize * 0.6;
   const padding = 18;
-  const perPage = 62;
+  const perPage = Math.max(20, Math.floor((pageHeight - 140) / leading));
   const chunks = [];
   for (let index = 0; index < lines.length; index += perPage) chunks.push(lines.slice(index, index + perPage));
   if (!chunks.length) chunks.push([]);
 
-  // Filigrane « COPIE » en diagonale au centre de la page (Helvetica-Bold, gris clair).
-  const markSize = 130;
-  const markWidth = 3.112 * markSize;
-  const markHeight = markSize * 0.36;
-  const cos = Math.cos(Math.PI / 4);
-  const sin = Math.sin(Math.PI / 4);
-  const markX = pageWidth / 2 - (cos * markWidth / 2 - sin * markHeight);
-  const markY = pageHeight / 2 - (sin * markWidth / 2 + cos * markHeight);
-  const watermark = `q 0.9 g BT /F3 ${markSize} Tf ${pdfNumber(cos)} ${pdfNumber(sin)} ${pdfNumber(-sin)} ${pdfNumber(cos)} ${pdfNumber(markX)} ${pdfNumber(markY)} Tm (COPIE) Tj ET Q`;
+  // Filigrane en diagonale au centre de la page (Helvetica-Bold, gris clair).
+  let watermark = "";
+  if (watermarkText) {
+    const markSize = 130;
+    const markWidth = 3.112 * markSize;
+    const markHeight = markSize * 0.36;
+    const cos = Math.cos(Math.PI / 4);
+    const sin = Math.sin(Math.PI / 4);
+    const markX = pageWidth / 2 - (cos * markWidth / 2 - sin * markHeight);
+    const markY = pageHeight / 2 - (sin * markWidth / 2 + cos * markHeight);
+    watermark = `q 0.9 g BT /F3 ${markSize} Tf ${pdfNumber(cos)} ${pdfNumber(sin)} ${pdfNumber(-sin)} ${pdfNumber(cos)} ${pdfNumber(markX)} ${pdfNumber(markY)} Tm (${pdfText(watermarkText)}) Tj ET Q${NL}`;
+  }
 
   const objects = [];
   const addObject = (body) => {
@@ -3538,9 +3609,9 @@ function buildTicketPdf(lines) {
   chunks.forEach((chunk) => {
     const blockHeight = chunk.length * leading;
     const left = (pageWidth - blockWidth) / 2;
-    const top = chunks.length === 1 ? (pageHeight + blockHeight) / 2 : pageHeight - 90;
-    let stream = `${watermark}${NL}`;
-    stream += `q 0.75 G 0.6 w ${pdfNumber(left - padding)} ${pdfNumber(top - blockHeight - padding + leading * 0.3)} ${pdfNumber(blockWidth + padding * 2)} ${pdfNumber(blockHeight + padding * 2)} re S Q${NL}`;
+    const top = chunks.length === 1 && watermarkText ? (pageHeight + blockHeight) / 2 : pageHeight - 60;
+    let stream = watermark;
+    if (watermarkText) stream += `q 0.75 G 0.6 w ${pdfNumber(left - padding)} ${pdfNumber(top - blockHeight - padding + leading * 0.3)} ${pdfNumber(blockWidth + padding * 2)} ${pdfNumber(blockHeight + padding * 2)} re S Q${NL}`;
     chunk.forEach((line, index) => {
       const y = top - (index + 1) * leading + leading * 0.3;
       stream += `BT /${line.bold ? "F2" : "F1"} ${fontSize} Tf ${pdfNumber(left)} ${pdfNumber(y)} Td (${pdfText(line.text)}) Tj ET${NL}`;
@@ -3568,6 +3639,10 @@ function buildTicketPdf(lines) {
   return new Blob([bytes], { type: "application/pdf" });
 }
 
+function buildTicketPdf(lines) {
+  return buildDocumentPdf(lines, { width: TICKET_WIDTH, fontSize: 9, watermarkText: "COPIE" });
+}
+
 function findClientMovement(root, key) {
   const [collectionName, clientId, movementId] = String(key || "").split("/");
   const source = root.clientExportSource?.customers;
@@ -3585,17 +3660,17 @@ async function readRoomOrder(restaurantId, ticketId) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
-function closeClientMovementModal() {
+function closeDashboardModal() {
   document.querySelector("[data-client-modal]")?.remove();
-  document.removeEventListener("keydown", closeClientMovementOnEscape);
+  document.removeEventListener("keydown", closeDashboardModalOnEscape);
 }
 
-function closeClientMovementOnEscape(event) {
-  if (event.key === "Escape") closeClientMovementModal();
+function closeDashboardModalOnEscape(event) {
+  if (event.key === "Escape") closeDashboardModal();
 }
 
-function showClientMovementModal(title, bodyHtml) {
-  closeClientMovementModal();
+function showDashboardModal(title, bodyHtml) {
+  closeDashboardModal();
   const overlay = document.createElement("div");
   overlay.className = "client-modal-overlay";
   overlay.dataset.clientModal = "";
@@ -3609,10 +3684,10 @@ function showClientMovementModal(title, bodyHtml) {
     </div>
   `;
   overlay.addEventListener("click", (event) => {
-    if (event.target === overlay || event.target.closest("[data-client-modal-close]")) closeClientMovementModal();
+    if (event.target === overlay || event.target.closest("[data-client-modal-close]")) closeDashboardModal();
   });
   document.body.appendChild(overlay);
-  document.addEventListener("keydown", closeClientMovementOnEscape);
+  document.addEventListener("keydown", closeDashboardModalOnEscape);
   overlay.querySelector("[data-client-modal-close]")?.focus();
   return overlay;
 }
@@ -3637,10 +3712,10 @@ async function openClientMovement(root, key) {
   const clientName = client.displayName || client.companyName || "";
   const flat = { ...movement, amount };
   if (direction === "credit") {
-    showClientMovementModal("Encaissement compte client", paymentDetailHtml(client, flat));
+    showDashboardModal("Encaissement compte client", paymentDetailHtml(client, flat));
     return;
   }
-  const overlay = showClientMovementModal(movement.ticketLabel ? `Ticket ${movement.ticketLabel}` : "Ticket", `<p class="client-modal-wait">Chargement du ticket...</p>`);
+  const overlay = showDashboardModal(movement.ticketLabel ? `Ticket ${movement.ticketLabel}` : "Ticket", `<p class="client-modal-wait">Chargement du ticket...</p>`);
   let ticket = null;
   let failure = "";
   try {
@@ -3665,6 +3740,563 @@ async function openClientMovement(root, key) {
   footer.querySelector("[data-ticket-download]").addEventListener("click", () => {
     const stamp = String(ticket?.continuousNumber || ticket?.dailyNumber || movement.ticketId || "ticket").replace(/[^a-zA-Z0-9_-]/g, "_");
     downloadClientFile(buildTicketPdf(receipt), `ticket-${stamp}-copie.pdf`, "application/pdf");
+  });
+}
+
+
+// ===========================================================================
+// Devis : liste des devis emis (lecture partagee avec l'application, meme
+// numerotation DEV-AAAAMMJJ-CODE-NNNN), telechargement PDF, et creation avec
+// autocompletion des libelles du catalogue (comme le champ « Select or type »
+// d'un logiciel de facturation).
+// ===========================================================================
+const QUOTE_MANAGER_ROLES = CLIENT_MANAGER_ROLES;
+const QUOTE_WIDTH = 74;
+const QUOTE_COLUMN_WIDTHS = [30, 5, 12, 6, 13];
+const QUOTE_STATUS_LABELS = {
+  issued: "Emis",
+  accepted: "Accepte",
+  refused: "Refuse",
+  expired: "Expire",
+  transformed_to_order: "Transforme en commande"
+};
+const QUOTE_STATUS_TONES = {
+  issued: "even",
+  accepted: "credit",
+  refused: "owed",
+  expired: "owed",
+  transformed_to_order: "credit"
+};
+
+function quoteStatusLabel(status) {
+  return QUOTE_STATUS_LABELS[status] || "Emis";
+}
+
+async function listQuotes(restaurantId) {
+  const services = await getServices();
+  const { collection, getDocs } = services.firestoreModule;
+  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "quotes"));
+  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() })).sort((a, b) => quoteSortTime(b) - quoteSortTime(a));
+}
+
+function quoteSortTime(quote = {}) {
+  return dateFromFirestoreValue(quote.createdAt || quote.issuedAt)?.getTime() || 0;
+}
+
+// Le code client du numero de devis : les 4 derniers chiffres du telephone, sinon 4 lettres
+// du nom (completees par des X) ; identique au calcul fait par l'application.
+function quoteClientCode(customer = {}) {
+  const digits = String(customer.phone || "").replace(/[^0-9]/g, "");
+  if (digits.length >= 4) return digits.slice(-4);
+  const letters = String(customer.name || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (letters.length >= 4) return letters.slice(0, 4);
+  if (letters) return letters.padEnd(4, "X");
+  return "CLNT";
+}
+
+function buildQuoteNumber(issuedAt, clientCode, sequence) {
+  const year = issuedAt.getFullYear();
+  const month = String(issuedAt.getMonth() + 1).padStart(2, "0");
+  const day = String(issuedAt.getDate()).padStart(2, "0");
+  return `DEV-${year}${month}${day}-${clientCode}-${String(sequence).padStart(4, "0")}`;
+}
+
+// Meme numerotation que l'application (compteur partage restaurants/{id}/counters/quotes) :
+// un devis cree sur le site et un devis cree dans l'application ne se percutent jamais.
+async function createQuote(restaurantId, payload, user) {
+  const services = await getServices();
+  const { doc, collection, runTransaction, serverTimestamp } = services.firestoreModule;
+  const quoteRef = doc(collection(services.db, "restaurants", restaurantId, "quotes"));
+  const counterRef = doc(services.db, "restaurants", restaurantId, "counters", "quotes");
+  const now = new Date();
+  const clientCode = quoteClientCode(payload.customer);
+  await runTransaction(services.db, async (transaction) => {
+    const counterSnap = await transaction.get(counterRef);
+    const current = Number(counterSnap.data()?.next) || 1;
+    const quoteNumber = buildQuoteNumber(now, clientCode, current);
+    transaction.set(quoteRef, {
+      quoteNumber,
+      status: "issued",
+      sourceTableId: quoteRef.id,
+      sourceTable: payload.sourceTable,
+      customer: payload.customer,
+      issuedAt: now.toISOString(),
+      validUntil: payload.validUntil,
+      totalTtc: payload.totalTtc,
+      eventLabel: payload.eventLabel || "",
+      eventDate: payload.eventDate || null,
+      depositAmount: payload.depositAmount || 0,
+      conditions: payload.conditions || "",
+      sourceQuoteId: "",
+      orderHistory: [],
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      restaurantId,
+      quoteId: quoteRef.id,
+      createdBy: user?.uid || "",
+      createdByEmail: user?.email || "",
+      createdAtServer: serverTimestamp(),
+      updatedAtServer: serverTimestamp()
+    });
+    transaction.set(counterRef, { next: current + 1, updatedAt: now.toISOString(), updatedAtServer: serverTimestamp() }, { merge: true });
+  });
+  return quoteRef.id;
+}
+
+async function updateQuoteStatus(restaurantId, quoteId, status) {
+  const services = await getServices();
+  const { doc, setDoc, serverTimestamp } = services.firestoreModule;
+  await setDoc(doc(services.db, "restaurants", restaurantId, "quotes", quoteId), {
+    status,
+    updatedAt: new Date().toISOString(),
+    updatedAtServer: serverTimestamp()
+  }, { merge: true });
+}
+
+function requireQuotePermission(root) {
+  const role = root.dataset.restaurantRole || "";
+  if (!QUOTE_MANAGER_ROLES.includes(role)) throw new Error("La creation de devis est reservee aux managers, admins et owners.");
+}
+
+// ---- lignes d'un devis : forme compatible avec les lignes de commande de l'application,
+// pour qu'un devis cree sur le site reste lisible dans l'application (et inversement).
+function quoteLineTotal(line = {}) {
+  return roundMoney((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0));
+}
+
+function quoteLinesTotals(lines) {
+  let totalTtc = 0;
+  const vatBuckets = new Map();
+  lines.forEach((line) => {
+    const lineTotal = quoteLineTotal(line);
+    totalTtc += lineTotal;
+    const rate = Number(line.vat) || 0;
+    if (rate > 0 && lineTotal > 0) {
+      const vatAmount = lineTotal - lineTotal / (1 + rate / 100);
+      vatBuckets.set(rate, roundMoney((vatBuckets.get(rate) || 0) + vatAmount));
+    }
+  });
+  return { totalTtc: roundMoney(totalTtc), vatBuckets };
+}
+
+function quoteLineToRoomOrderLine(line, index) {
+  return {
+    id: `site-${index}`,
+    itemId: line.itemId || "",
+    categoryId: line.categoryId || "",
+    name: line.name,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    printerRoles: [],
+    sendStatus: "pending",
+    vatOnSite: line.vat,
+    vatTakeaway: line.vat,
+    constituents: [],
+    selectedSupplements: [],
+    removedConstituents: [],
+    ingredientAdjustments: [],
+    isPieceMode: false,
+    categoryName: line.categoryName || "Devis",
+    categoryPrefix: "",
+    pieceSalePrefix: null,
+    saleMode: "on_site",
+    course: "suite",
+    lineType: "product",
+    note: null
+  };
+}
+
+// ---- catalogue : la liste servant a l'autocompletion, aplatie depuis le menu du restaurant.
+function catalogItemsForQuotes(catalogMenu) {
+  const categories = catalogMenu?.categories || [];
+  const items = [];
+  categories.forEach((category) => {
+    (category.items || []).forEach((item) => {
+      if (!item.name) return;
+      items.push({
+        name: item.name,
+        price: Number(item.price) || 0,
+        vat: firstNumber(item.vatOnSite) ?? 10,
+        itemId: item.id || "",
+        categoryId: item.categoryId || category.id || "",
+        categoryName: category.displayName || category.name || ""
+      });
+    });
+  });
+  return items;
+}
+
+function findCatalogItemByName(items, name) {
+  const target = String(name || "").trim().toLowerCase();
+  if (!target) return null;
+  return items.find((item) => item.name.trim().toLowerCase() === target) || null;
+}
+
+// ===========================================================================
+// Affichage
+// ===========================================================================
+function quotesHtml(quotes = [], customerAccounts = {}, catalogMenu = null, role = "") {
+  const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
+  const clients = customers.map(normalizeCustomerAccount);
+  const canManage = QUOTE_MANAGER_ROLES.includes(role);
+  const sorted = [...quotes].sort((a, b) => quoteSortTime(b) - quoteSortTime(a));
+  return `
+    <div class="quotes-section">
+      <div class="quotes-head">
+        <div>
+          <h2>Devis</h2>
+          <p>${sorted.length} devis emis.</p>
+        </div>
+        ${canManage ? `
+          <details class="client-add-panel quote-add-panel">
+            <summary class="client-create-btn">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15h6"/></svg>
+              <strong>Nouveau devis</strong>
+            </summary>
+            ${quoteFormHtml(clients, catalogMenu)}
+          </details>
+        ` : ""}
+      </div>
+      ${sorted.length ? `
+        <div class="client-ledger-table quotes-table">
+          <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emis le</span><span>Valable jusqu'au</span><span>Total TTC</span><span>Statut</span></div>
+          ${sorted.map((quote) => quoteRowHtml(quote)).join("")}
+        </div>
+      ` : `<div class="client-account-empty">Aucun devis pour le moment.</div>`}
+    </div>
+  `;
+}
+
+function quoteRowHtml(quote = {}) {
+  const customer = quote.customer || {};
+  const tone = QUOTE_STATUS_TONES[quote.status] || "even";
+  return `
+    <button type="button" class="client-ledger-row quote-row is-clickable" data-quote-row="${escapeAttr(quote.id)}">
+      <span><strong>${escapeHtml(quote.quoteNumber || quote.id)}</strong></span>
+      <span>${escapeHtml(customer.name || "Client non renseigne")}</span>
+      <span>${escapeHtml(clientDateLabel(quote.issuedAt) || "-")}</span>
+      <span>${escapeHtml(clientDateLabel(quote.validUntil) || "-")}</span>
+      <span>${escapeHtml(formatMoney(quote.totalTtc))}</span>
+      <span><span class="quote-status-badge is-${tone}">${escapeHtml(quoteStatusLabel(quote.status))}</span></span>
+    </button>
+  `;
+}
+
+function quoteFormHtml(clients = [], catalogMenu = null) {
+  const items = catalogItemsForQuotes(catalogMenu);
+  const validUntil = new Date(Date.now() + 30 * 86400000);
+  return `
+    <form class="platform-form quote-form" data-dashboard-quote-form>
+      <datalist id="quote-catalog-items">
+        ${items.map((item) => `<option value="${escapeAttr(item.name)}"></option>`).join("")}
+      </datalist>
+      <div class="form-grid">
+        <label>Client existant
+          <select data-quote-customer-select>
+            <option value="">&mdash; Saisie libre &mdash;</option>
+            ${clients.map((client) => `<option value="${escapeAttr(client.id)}" data-name="${escapeAttr(client.displayName || client.companyName || "")}" data-phone="${escapeAttr(client.phone || "")}" data-email="${escapeAttr(client.email || "")}" data-address="${escapeAttr(client.address || "")}" data-tax="${escapeAttr(client.taxId || "")}" data-vat="${escapeAttr(client.vatNumber || "")}">${escapeHtml(client.displayName || client.companyName || "Client")}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <input type="hidden" name="customerId" data-quote-customer-id />
+      <div class="form-grid">
+        <label>Nom du client<input name="customerName" data-quote-customer-name required /></label>
+        <label>Telephone<input name="customerPhone" data-quote-customer-phone /></label>
+        <label>Email<input name="customerEmail" type="email" data-quote-customer-email /></label>
+        <label>Adresse<input name="customerAddress" data-quote-customer-address /></label>
+        <label>SIRET / fiscal<input name="customerTaxId" data-quote-customer-tax /></label>
+        <label>N&deg; TVA<input name="customerVatNumber" data-quote-customer-vat /></label>
+      </div>
+      <div class="form-grid">
+        <label>Intitule de la prestation<input name="eventLabel" placeholder="Anniversaire, mariage, buffet d'entreprise..." /></label>
+        <label>Date de l'evenement<input name="eventDate" type="date" /></label>
+        <label>Couverts<input name="covers" type="number" min="0" step="1" /></label>
+        <label>Valable jusqu'au<input name="validUntil" type="date" value="${validUntil.toISOString().slice(0, 10)}" required /></label>
+        <label>Acompte demande (EUR)<input name="depositAmount" type="number" min="0" step="0.01" /></label>
+      </div>
+      <label class="wide-field">Notes<textarea name="notes" rows="2"></textarea></label>
+
+      <div class="quote-lines" data-quote-lines>
+        <div class="quote-line-row quote-line-head"><span>Libelle</span><span>Qte</span><span>PU TTC</span><span>TVA</span><span>Total TTC</span><span></span></div>
+        ${quoteLineRowHtml()}
+      </div>
+      <button class="outline-dark-btn button-reset" type="button" data-quote-add-line>+ Ajouter une ligne</button>
+
+      <div class="quote-totals" data-quote-totals>
+        <span>Total HT <strong data-quote-total-ht>0,00 &euro;</strong></span>
+        <span>TVA <strong data-quote-total-vat>0,00 &euro;</strong></span>
+        <span>Total TTC <strong data-quote-total-ttc>0,00 &euro;</strong></span>
+      </div>
+
+      <label class="wide-field">Conditions<textarea name="conditions" rows="3">Devis valable jusqu'a la date indiquee. Prix TTC.</textarea></label>
+      <button class="primary-btn button-reset" type="submit">Creer le devis</button>
+      <small data-form-status></small>
+    </form>
+  `;
+}
+
+function quoteLineRowHtml() {
+  return `
+    <div class="quote-line-row" data-quote-line>
+      <input type="text" list="quote-catalog-items" placeholder="Nom de l'article ou texte libre" data-quote-line-name required />
+      <input type="number" min="0" step="1" value="1" data-quote-line-qty />
+      <input type="number" min="0" step="0.01" value="0" data-quote-line-price />
+      <select data-quote-line-vat>
+        ${[0, 5.5, 10, 20].map((rate) => `<option value="${rate}" ${rate === 10 ? "selected" : ""}>${String(rate).replace(".", ",")} %</option>`).join("")}
+      </select>
+      <span data-quote-line-total>0,00 &euro;</span>
+      <button class="button-reset quote-line-remove" type="button" data-quote-line-remove aria-label="Supprimer la ligne">&times;</button>
+    </div>
+  `;
+}
+
+function updateQuoteLineRow(row) {
+  if (!row) return;
+  const qty = Number(row.querySelector("[data-quote-line-qty]")?.value) || 0;
+  const price = Number(row.querySelector("[data-quote-line-price]")?.value) || 0;
+  const total = row.querySelector("[data-quote-line-total]");
+  if (total) total.textContent = formatMoney(roundMoney(qty * price));
+}
+
+function updateQuoteFormTotals(form) {
+  if (!form) return;
+  const rows = [...form.querySelectorAll("[data-quote-line]")];
+  const lines = rows.map((row) => ({
+    quantity: Number(row.querySelector("[data-quote-line-qty]")?.value) || 0,
+    unitPrice: Number(row.querySelector("[data-quote-line-price]")?.value) || 0,
+    vat: Number(row.querySelector("[data-quote-line-vat]")?.value) || 0
+  }));
+  const { totalTtc, vatBuckets } = quoteLinesTotals(lines);
+  const totalVat = roundMoney([...vatBuckets.values()].reduce((sum, value) => sum + value, 0));
+  const totalHt = roundMoney(totalTtc - totalVat);
+  const ht = form.querySelector("[data-quote-total-ht]");
+  const vat = form.querySelector("[data-quote-total-vat]");
+  const ttc = form.querySelector("[data-quote-total-ttc]");
+  if (ht) ht.textContent = formatMoney(totalHt);
+  if (vat) vat.textContent = formatMoney(totalVat);
+  if (ttc) ttc.textContent = formatMoney(totalTtc);
+}
+
+async function submitQuoteForm(root, form, restaurantId) {
+  const rows = [...form.querySelectorAll("[data-quote-line]")];
+  const lines = rows.map((row) => ({
+    name: row.querySelector("[data-quote-line-name]").value.trim(),
+    quantity: Number(row.querySelector("[data-quote-line-qty]").value) || 0,
+    unitPrice: Number(row.querySelector("[data-quote-line-price]").value) || 0,
+    vat: Number(row.querySelector("[data-quote-line-vat]").value) || 0,
+    itemId: row.dataset.catalogItemId || "",
+    categoryId: row.dataset.catalogCategoryId || "",
+    categoryName: row.dataset.catalogCategoryName || ""
+  })).filter((line) => line.name && line.quantity > 0);
+  if (!lines.length) throw new Error("Ajoutez au moins une ligne avec un libelle et une quantite.");
+  const { totalTtc } = quoteLinesTotals(lines);
+  const data = new FormData(form);
+  const customer = {
+    customerId: data.get("customerId") || "",
+    name: String(data.get("customerName") || "").trim(),
+    phone: String(data.get("customerPhone") || "").trim(),
+    email: String(data.get("customerEmail") || "").trim(),
+    address: String(data.get("customerAddress") || "").trim(),
+    taxId: String(data.get("customerTaxId") || "").trim(),
+    vatNumber: String(data.get("customerVatNumber") || "").trim()
+  };
+  if (!customer.name) throw new Error("Renseignez le nom du client.");
+  const eventDateValue = data.get("eventDate");
+  const validUntilValue = data.get("validUntil");
+  const now = new Date();
+  const sourceTable = {
+    label: String(data.get("eventLabel") || "").trim() || "Devis",
+    displayNumber: 0,
+    continuousNumber: 0,
+    dailyNumber: 0,
+    sessionKind: "room",
+    serviceKey: "",
+    dailyNumberScope: "",
+    covers: Number(data.get("covers")) || 0,
+    lines: lines.map(quoteLineToRoomOrderLine),
+    isOpen: false,
+    isClosed: false,
+    revision: 0,
+    tableNote: String(data.get("notes") || "").trim() || null,
+    customerName: customer.name || null,
+    customerPhone: customer.phone || null,
+    quotedAt: now.toISOString()
+  };
+  await createQuote(restaurantId, {
+    customer,
+    sourceTable,
+    totalTtc,
+    validUntil: validUntilValue ? new Date(`${validUntilValue}T12:00:00`).toISOString() : new Date(now.getTime() + 30 * 86400000).toISOString(),
+    eventLabel: String(data.get("eventLabel") || "").trim(),
+    eventDate: eventDateValue ? new Date(`${eventDateValue}T12:00:00`).toISOString() : null,
+    depositAmount: Number(data.get("depositAmount")) || 0,
+    conditions: String(data.get("conditions") || "").trim()
+  }, currentUser);
+}
+
+// ===========================================================================
+// Detail d'un devis : apercu (meme rendu que le PDF) et telechargement.
+// ===========================================================================
+function quoteDefaultConditions(restaurant = {}) {
+  const terms = String(restaurant.paymentTerms || "").trim();
+  const notice = String(restaurant.invoiceLegalNotice || "").trim();
+  return ["Devis valable jusqu'a la date indiquee. Prix TTC.", terms, notice].filter(Boolean).join(NL);
+}
+
+function padQuoteCell(text, width, align = "left") {
+  const value = String(text).length > width ? String(text).slice(0, width) : String(text);
+  return align === "right" ? value.padStart(width, " ") : value.padEnd(width, " ");
+}
+
+function quoteTableRow(cells, aligns) {
+  return cells.map((cell, index) => padQuoteCell(cell, QUOTE_COLUMN_WIDTHS[index], aligns[index])).join(" ");
+}
+
+function quoteItemLines(name, qtyLabel, priceLabel, vatLabel, totalLabel) {
+  const parts = ticketWrap(name, QUOTE_COLUMN_WIDTHS[0]);
+  const last = parts.length - 1;
+  return parts.map((part, index) => index === last
+    ? quoteTableRow([part, qtyLabel, priceLabel, vatLabel, totalLabel], ["left", "right", "right", "right", "right"])
+    : quoteTableRow([part, "", "", "", ""], ["left", "right", "right", "right", "right"]));
+}
+
+// Le devis reutilise les aides de mise en forme du ticket (ticketWrap/ticketRow/ticketAmount...),
+// avec une largeur de page plus grande (document A4, pas un ticket de caisse).
+function buildQuoteDocument({ quote = {}, restaurant = {} }) {
+  const width = QUOTE_WIDTH;
+  const lines = [];
+  const add = (text = "", bold = false) => lines.push({ text: String(text), bold });
+  const rule = (char = "-") => add(char.repeat(width));
+  const center = (text, bold = false) => ticketWrap(text, width).forEach((part) => add(" ".repeat(Math.floor((width - part.length) / 2)) + part, bold));
+  const row = (left, right, bold = false) => ticketRow(left, right, width, 0).forEach((text) => add(text, bold));
+
+  const customer = quote.customer || {};
+  const table = quote.sourceTable || {};
+  const lineItems = Array.isArray(table.lines) ? table.lines.filter((line) => Number(line.quantity) !== 0) : [];
+
+  center(String(firstText(restaurant.name, restaurant.tradeName, "Restaurant")).toUpperCase(), true);
+  const street = cleanStreetLine(firstText(restaurant.addressLine1, restaurant.address), restaurant.postalCode);
+  if (street) center(street);
+  const cityLine = [restaurant.postalCode, restaurant.city].filter(Boolean).join(" ");
+  if (cityLine) center(cityLine);
+  if (restaurant.phone) center(`Tel : ${formatClientPhone(restaurant.phone)}`);
+  const { siret, siren } = legalIdentifiers(restaurant);
+  if (siret) center(`SIRET : ${formatSiret(siret)}`);
+  else if (siren) center(`SIREN : ${formatSiret(siren)}`);
+  if (restaurant.vatNumber) center(`TVA : ${restaurant.vatNumber}`);
+  add("");
+  row("DEVIS", quote.quoteNumber || "", true);
+  row("Date", clientDateLabel(quote.issuedAt) || "-");
+  row("Valable jusqu'au", clientDateLabel(quote.validUntil) || "-");
+  rule("=");
+
+  add("CLIENT", true);
+  [
+    customer.name || "Client non renseigne",
+    customer.phone ? `Tel. : ${formatClientPhone(customer.phone)}` : "",
+    customer.email ? `Email : ${customer.email}` : "",
+    customer.address || "",
+    customer.taxId ? `SIRET/Fiscal : ${customer.taxId}` : "",
+    customer.vatNumber ? `TVA : ${customer.vatNumber}` : ""
+  ].filter(Boolean).forEach((line) => ticketWrap(line, width).forEach((part) => add(part)));
+  add("");
+  add("PRESTATION", true);
+  [
+    quote.eventLabel || (table.sessionKind === "takeaway" ? "A emporter" : "Sur place"),
+    quote.eventDate ? `Date evenement : ${clientDateLabel(quote.eventDate)}` : "",
+    table.covers ? `${table.covers} couverts` : "",
+    table.tableNote ? `Note : ${table.tableNote}` : ""
+  ].filter(Boolean).forEach((line) => ticketWrap(line, width).forEach((part) => add(part)));
+  rule();
+
+  add(quoteTableRow(["Designation", "Qte", "PU TTC", "TVA", "Total TTC"], ["left", "right", "right", "right", "right"]), true);
+  rule();
+  let total = 0;
+  const vatBuckets = new Map();
+  lineItems.forEach((line) => {
+    const quantity = Number(line.quantity) || 0;
+    const unitPrice = Number(line.unitPrice) || 0;
+    const rate = Number(line.vatOnSite) || 0;
+    const lineTotal = roundMoney(quantity * unitPrice);
+    total += lineTotal;
+    if (rate > 0 && lineTotal > 0) {
+      const vatAmount = lineTotal - lineTotal / (1 + rate / 100);
+      vatBuckets.set(rate, roundMoney((vatBuckets.get(rate) || 0) + vatAmount));
+    }
+    quoteItemLines(
+      line.name || "Article",
+      ticketQuantity(quantity),
+      ticketAmount(unitPrice),
+      `${String(rate).replace(".", ",")}%`,
+      ticketAmount(lineTotal)
+    ).forEach((part) => add(part));
+  });
+  if (!lineItems.length) center("Aucune ligne");
+  rule();
+
+  total = roundMoney(total);
+  const totalVat = roundMoney([...vatBuckets.values()].reduce((sum, value) => sum + value, 0));
+  const totalHt = roundMoney(total - totalVat);
+  [...vatBuckets.entries()].sort((a, b) => a[0] - b[0]).forEach(([rate, amount]) => row(`TVA ${String(rate).replace(".", ",")} %`, ticketMoney(amount)));
+  row("Total HT", ticketMoney(totalHt));
+  row("Total TTC", ticketMoney(total), true);
+  const deposit = roundMoney(Number(quote.depositAmount) || 0);
+  if (deposit > 0) {
+    row("Acompte demande", ticketMoney(deposit));
+    row("Reste a regler", ticketMoney(roundMoney(Math.max(total - deposit, 0))), true);
+  }
+  rule();
+
+  add("CONDITIONS", true);
+  const conditions = String(quote.conditions || "").trim() || quoteDefaultConditions(restaurant);
+  conditions.split(NL).forEach((paragraph) => ticketWrap(paragraph, width).forEach((part) => add(part)));
+
+  if (restaurant.iban || restaurant.bic) {
+    rule();
+    add("COORDONNEES BANCAIRES", true);
+    const holder = firstText(restaurant.legalName, restaurant.tradeName, restaurant.name);
+    if (holder) add(`Titulaire : ${holder}`);
+    if (restaurant.iban) add(`IBAN : ${restaurant.iban}`);
+    if (restaurant.bic) add(`BIC : ${restaurant.bic}`);
+    add(`Reference a indiquer : ${quote.quoteNumber || ""}`);
+  }
+  rule();
+  add("");
+  row("Bon pour accord", "Signature client");
+  return lines;
+}
+
+function openQuoteDetail(root, quoteId) {
+  const quote = (root.dashboardQuotes || []).find((item) => item.id === quoteId);
+  if (!quote) return;
+  const restaurant = root.dashboardRestaurant || {};
+  const canManage = QUOTE_MANAGER_ROLES.includes(root.dataset.restaurantRole || "");
+  const receipt = buildQuoteDocument({ quote, restaurant });
+  const overlay = showDashboardModal(
+    `Devis ${quote.quoteNumber || ""}`,
+    `<div class="ticket-sheet"><pre class="ticket-paper quote-paper">${receipt.map((line) => (line.bold ? `<b>${escapeHtml(line.text)}</b>` : escapeHtml(line.text))).join(NL)}</pre></div>`
+  );
+  const footer = document.createElement("footer");
+  footer.innerHTML = `
+    ${canManage ? `
+      <label class="quote-status-inline">Statut
+        <select data-quote-status-select>
+          ${Object.keys(QUOTE_STATUS_LABELS).map((status) => `<option value="${status}" ${quote.status === status ? "selected" : ""}>${QUOTE_STATUS_LABELS[status]}</option>`).join("")}
+        </select>
+      </label>
+    ` : ""}
+    <button class="primary-btn button-reset" type="button" data-quote-download>Telecharger en PDF</button>
+    <button class="outline-dark-btn button-reset" type="button" data-client-modal-close>Fermer</button>
+  `;
+  overlay.querySelector(".client-modal").appendChild(footer);
+  footer.querySelector("[data-quote-download]").addEventListener("click", () => {
+    const stamp = String(quote.quoteNumber || quote.id).replace(/[^a-zA-Z0-9_-]/g, "_");
+    downloadClientFile(buildDocumentPdf(receipt, { width: QUOTE_WIDTH, fontSize: 8.3 }), `${stamp}.pdf`, "application/pdf");
+  });
+  footer.querySelector("[data-quote-status-select]")?.addEventListener("change", async (event) => {
+    await updateQuoteStatus(root.dataset.restaurantId, quote.id, event.target.value);
+    closeDashboardModal();
+    await renderDashboard(root, currentUser, root.dataset.restaurantId, "quotes");
   });
 }
 
@@ -4684,6 +5316,7 @@ function tabLabel(tab) {
     menu: "QR menu",
     reservations: "Reservations",
     clients: "Comptes clients",
+    quotes: "Devis",
     team: "Equipe",
     downloads: "Downloads"
   }[tab] || tab;
@@ -4722,6 +5355,12 @@ function normalizeRestaurant(id, data) {
     shareCapital: data.shareCapital || profile.shareCapital || "",
     rcsCity: data.rcsCity || profile.rcsCity || "",
     apeCode: data.apeCode || profile.apeCode || "",
+    iban: data.iban || profile.iban || "",
+    bic: data.bic || profile.bic || "",
+    paymentTerms: data.paymentTerms || profile.paymentTerms || "",
+    invoiceLegalNotice: data.invoiceLegalNotice || profile.invoiceLegalNotice || "",
+    defaultVatOnSite: firstNumber(data.defaultVatOnSite, profile.defaultVatOnSite) ?? 10,
+    defaultVatTakeaway: firstNumber(data.defaultVatTakeaway, profile.defaultVatTakeaway) ?? 10,
     openingHours: resolveOpeningHours(data, profile)
   };
 }
