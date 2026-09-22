@@ -2861,8 +2861,7 @@ select:focus-visible {
   gap: 10px;
 }
 
-.profile-image-preview,
-.profile-image-empty {
+.profile-image-preview {
   min-height: 92px;
   display: grid;
   align-items: center;
@@ -2889,7 +2888,7 @@ select:focus-visible {
   text-decoration: none;
 }
 
-.profile-image-empty {
+.profile-image-preview.is-empty {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 900;

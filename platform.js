@@ -1423,6 +1423,10 @@ function initDashboardPage() {
     }
   });
   root.addEventListener("change", async (event) => {
+    if (event.target.matches("[data-profile-image-file]")) {
+      previewProfileImageFile(event.target);
+      return;
+    }
     if (event.target.matches("[data-catalog-image-file]")) {
       previewCatalogImageFile(event.target);
       autoSaveCatalogField(root, event.target, { immediate: true });
@@ -2533,15 +2537,27 @@ function menuFormHtml(restaurant, menu, canEdit) {
 function profileImageFieldHtml(label, inputName, imageUrl, canEdit, alt) {
   return `
     <label class="profile-image-field">${escapeHtml(label)}
-      ${imageUrl ? `
-        <span class="profile-image-preview">
-          <img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(alt)}" loading="lazy" />
-          <a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener noreferrer">Ouvrir</a>
-        </span>
-      ` : `<span class="profile-image-empty">Aucune image enregistree</span>`}
-      <input name="${escapeAttr(inputName)}" type="file" accept="image/png,image/jpeg,image/webp${inputName === "logoFile" ? ",image/svg+xml" : ""}" ${disabled(canEdit)} />
+      <span class="profile-image-preview${imageUrl ? "" : " is-empty"}" data-profile-image-preview>
+        ${imageUrl
+          ? `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(alt)}" loading="lazy" /><a href="${escapeAttr(imageUrl)}" target="_blank" rel="noopener noreferrer">Ouvrir</a>`
+          : "Aucune image enregistree"}
+      </span>
+      <input name="${escapeAttr(inputName)}" type="file" accept="image/png,image/jpeg,image/webp${inputName === "logoFile" ? ",image/svg+xml" : ""}" data-profile-image-file ${disabled(canEdit)} />
     </label>
   `;
+}
+
+// Apercu immediat au choix du fichier, avant meme d'enregistrer le profil (le fichier
+// n'est envoye a Storage qu'a la soumission du formulaire).
+function previewProfileImageFile(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const preview = input.closest(".profile-image-field")?.querySelector("[data-profile-image-preview]");
+  if (!preview) return;
+  preview.classList.remove("is-empty");
+  const url = URL.createObjectURL(file);
+  preview.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(file.name || "Apercu")}" />`;
+  preview.querySelector("img")?.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
 }
 
 function colorPickerFieldHtml(label, name, value, canEdit, palette) {
