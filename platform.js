@@ -2342,8 +2342,12 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       </button>
       <button class="dashboard-nav-backdrop button-reset" type="button" aria-label="Fermer les sections" data-dashboard-nav-backdrop></button>
       <nav class="dashboard-tabs" aria-label="Sections dashboard">
-        ${["overview", "profile", "hours", "public", "menu", "reservations", "clients", "quotes", "team", "downloads"].map((tab, index) => `
-          <button class="${tab === activeTab ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>
+        ${DASHBOARD_NAV_GROUPS.map((group) => `
+          <div class="dashboard-tab-group">
+            ${group.map((tab) => `
+              <button class="${tab === activeTab ? "is-active" : ""}" type="button" data-dashboard-tab="${tab}">${tabLabel(tab)}</button>
+            `).join("")}
+          </div>
         `).join("")}
       </nav>
       <section class="dashboard-panel ${activeTab === "overview" ? "is-active" : ""}" data-dashboard-panel="overview">${overviewHtml(restaurant, publicUrl, account)}</section>
@@ -6311,6 +6315,13 @@ function statusSelectHtml(reservation) {
     </select>
   `;
 }
+
+const DASHBOARD_NAV_GROUPS = [
+  ["overview", "profile", "hours", "public", "menu"],
+  ["reservations", "team"],
+  ["clients", "quotes"],
+  ["downloads"]
+];
 
 function tabLabel(tab) {
   return {
