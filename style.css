@@ -5929,6 +5929,36 @@ button.client-ledger-row:focus-visible {
   color: var(--text-muted);
 }
 
+.invoice-numbering-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -6px 0 18px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: #f5f9ff;
+  border: 1px solid #d3e5ff;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.invoice-numbering-status strong {
+  color: var(--poksol-navy);
+}
+
+.invoice-numbering-status a {
+  color: var(--poksol-blue);
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.invoice-numbering-status a:hover {
+  text-decoration: underline;
+}
+
 .quote-create-page {
   width: 100%;
 }

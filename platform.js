@@ -1308,6 +1308,23 @@ function initDashboardPage() {
       section?.querySelector("[data-quotes-list-view]")?.classList.remove("is-hidden");
       return;
     }
+    const invoiceCreateOpen = event.target.closest("[data-invoice-create-open]");
+    if (invoiceCreateOpen) {
+      event.preventDefault();
+      const section = invoiceCreateOpen.closest("[data-invoices-section]");
+      resetQuoteCreateForm(root, section?.querySelector("[data-dashboard-invoice-form]"));
+      section?.querySelector("[data-invoices-list-view]")?.classList.add("is-hidden");
+      section?.querySelector("[data-invoice-create-page]")?.classList.remove("is-hidden");
+      return;
+    }
+    const invoiceCreateClose = event.target.closest("[data-invoice-create-close]");
+    if (invoiceCreateClose) {
+      event.preventDefault();
+      const section = invoiceCreateClose.closest("[data-invoices-section]");
+      section?.querySelector("[data-invoice-create-page]")?.classList.add("is-hidden");
+      section?.querySelector("[data-invoices-list-view]")?.classList.remove("is-hidden");
+      return;
+    }
     const quoteAddClient = event.target.closest("[data-quote-add-client]");
     if (quoteAddClient) {
       event.preventDefault();
@@ -1471,6 +1488,10 @@ function initDashboardPage() {
       if (form.matches("[data-dashboard-quote-form]")) {
         requireQuotePermission(root);
         await submitQuoteForm(root, form, restaurantId);
+      }
+      if (form.matches("[data-dashboard-invoice-form]")) {
+        requireQuotePermission(root);
+        await submitInvoiceForm(root, form, restaurantId);
       }
       if (form.matches("[data-dashboard-jobtitle-form]")) await saveUserJobTitle(restaurantId, form, currentUser);
       if (form.matches("[data-dashboard-access-form]")) await reviewAccessRequest(restaurantId, form, event.submitter?.value, currentUser);
@@ -2372,7 +2393,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "quotes" ? "is-active" : ""}" data-dashboard-panel="quotes">${quotesHtml(quotes, customers, menu, role, quoteDrafts)}</section>
-      <section class="dashboard-panel ${activeTab === "invoices" ? "is-active" : ""}" data-dashboard-panel="invoices">${invoicesHtml(invoices, role)}</section>
+      <section class="dashboard-panel ${activeTab === "invoices" ? "is-active" : ""}" data-dashboard-panel="invoices">${invoicesHtml(invoices, role, restaurant, customers)}</section>
       <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam, accessRequests)}</section>
       <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -4620,7 +4641,7 @@ function quotePayloadFromForm(root, form) {
   const validUntilValue = data.get("validUntil");
   const now = new Date();
   const sourceTable = {
-    label: String(data.get("eventLabel") || "").trim() || "Devis",
+    label: String(data.get("eventLabel") || "").trim() || "Prestation",
     displayNumber: 0,
     continuousNumber: 0,
     dailyNumber: 0,
@@ -5341,7 +5362,10 @@ function invoiceSortTime(invoice = {}) {
   return dateFromFirestoreValue(invoice.createdAt || invoice.issuedAt)?.getTime() || 0;
 }
 
-async function createInvoiceFromQuote(restaurantId, quote, restaurant, dueDate, user) {
+// Coeur partage par les deux chemins de creation (depuis un devis, ou directe) : reserve le
+// prochain numero (compteur restaurants/{id}/counters/invoices, amorce sur restaurant.nextInvoiceNumber
+// tant qu'aucune facture n'existe), ecrit la facture, et tague le devis d'origine s'il y en a un.
+async function createInvoiceRecord(restaurantId, invoiceData, restaurant, user) {
   const services = await getServices();
   const { doc, collection, runTransaction, serverTimestamp } = services.firestoreModule;
   const invoiceRef = doc(collection(services.db, "restaurants", restaurantId, "invoices"));
@@ -5357,17 +5381,17 @@ async function createInvoiceFromQuote(restaurantId, quote, restaurant, dueDate, 
     transaction.set(invoiceRef, {
       invoiceNumber,
       status: "issued",
-      quoteId: quote.id,
-      quoteNumber: quote.quoteNumber || "",
-      customer: quote.customer,
-      sourceTable: quote.sourceTable,
-      totalTtc: quote.totalTtc,
-      eventLabel: quote.eventLabel || "",
-      eventDate: quote.eventDate || null,
-      depositAmount: quote.depositAmount || 0,
-      conditions: quote.conditions || "",
+      quoteId: invoiceData.quoteId || "",
+      quoteNumber: invoiceData.quoteNumber || "",
+      customer: invoiceData.customer,
+      sourceTable: invoiceData.sourceTable,
+      totalTtc: invoiceData.totalTtc,
+      eventLabel: invoiceData.eventLabel || "",
+      eventDate: invoiceData.eventDate || null,
+      depositAmount: invoiceData.depositAmount || 0,
+      conditions: invoiceData.conditions || "",
       issuedAt: now.toISOString(),
-      dueDate,
+      dueDate: invoiceData.dueDate,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       restaurantId,
@@ -5378,15 +5402,53 @@ async function createInvoiceFromQuote(restaurantId, quote, restaurant, dueDate, 
       updatedAtServer: serverTimestamp()
     });
     transaction.set(counterRef, { next: current + 1, updatedAt: now.toISOString(), updatedAtServer: serverTimestamp() }, { merge: true });
-    transaction.set(doc(services.db, "restaurants", restaurantId, "quotes", quote.id), {
-      invoiceId: invoiceRef.id,
-      invoiceNumber,
-      invoicedAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      updatedAtServer: serverTimestamp()
-    }, { merge: true });
+    if (invoiceData.quoteId) {
+      transaction.set(doc(services.db, "restaurants", restaurantId, "quotes", invoiceData.quoteId), {
+        invoiceId: invoiceRef.id,
+        invoiceNumber,
+        invoicedAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        updatedAtServer: serverTimestamp()
+      }, { merge: true });
+    }
   });
   return { id: invoiceRef.id, invoiceNumber };
+}
+
+async function createInvoiceFromQuote(restaurantId, quote, restaurant, dueDate, user) {
+  return createInvoiceRecord(restaurantId, {
+    quoteId: quote.id,
+    quoteNumber: quote.quoteNumber || "",
+    customer: quote.customer,
+    sourceTable: quote.sourceTable,
+    totalTtc: quote.totalTtc,
+    eventLabel: quote.eventLabel || "",
+    eventDate: quote.eventDate || null,
+    depositAmount: quote.depositAmount || 0,
+    conditions: quote.conditions || "",
+    dueDate
+  }, restaurant, user);
+}
+
+// Facture creee directement (sans devis) : meme formulaire que "Nouveau devis" (client,
+// lignes, catalogue, totaux reutilises via quotePayloadFromForm), plus une echeance.
+async function submitInvoiceForm(root, form, restaurantId) {
+  const payload = quotePayloadFromForm(root, form);
+  if (!payload.lines.length) throw new Error("Ajoutez au moins une ligne avec un libelle et une quantite.");
+  if (!payload.customer) throw new Error("Choisissez un client (ou ajoutez-en un avec le bouton « Ajouter un client »).");
+  const dueDateValue = new FormData(form).get("dueDate");
+  if (!dueDateValue) throw new Error("Indiquez une date d'echeance.");
+  const restaurant = root.dashboardRestaurant || {};
+  await createInvoiceRecord(restaurantId, {
+    customer: payload.customer,
+    sourceTable: payload.sourceTable,
+    totalTtc: payload.totalTtc,
+    eventLabel: payload.eventLabel,
+    eventDate: payload.eventDate,
+    depositAmount: payload.depositAmount,
+    conditions: payload.conditions,
+    dueDate: new Date(`${dueDateValue}T12:00:00`).toISOString()
+  }, restaurant, currentUser);
 }
 
 async function updateInvoiceStatus(restaurantId, invoiceId, status) {
@@ -5399,23 +5461,116 @@ async function updateInvoiceStatus(restaurantId, invoiceId, status) {
   }, { merge: true });
 }
 
-function invoicesHtml(invoices = [], role = "") {
+function invoiceNumberingStatusHtml(restaurant = {}, invoiceCount = 0) {
+  const prefix = String(restaurant.invoicePrefix || "FAC").trim() || "FAC";
+  const nextNumber = Number(restaurant.nextInvoiceNumber) || 1;
+  const preview = `${prefix}-${String(nextNumber).padStart(4, "0")}`;
+  return `
+    <div class="invoice-numbering-status">
+      ${invoiceCount === 0
+        ? `
+          <span>Prochaine facture : <strong>${escapeHtml(preview)}</strong></span>
+          <a href="poket-access.html?mode=edit">Choisir le numero de depart &rarr;</a>
+        `
+        : `<span>Numerotation en cours depuis <strong>${escapeHtml(preview)}</strong> (verrouillee : ${invoiceCount} facture${invoiceCount > 1 ? "s" : ""} deja emise${invoiceCount > 1 ? "s" : ""}, la loi interdit les trous dans la sequence).</span>`
+      }
+    </div>
+  `;
+}
+
+function invoicesHtml(invoices = [], role = "", restaurant = {}, customerAccounts = {}) {
   const canManage = QUOTE_MANAGER_ROLES.includes(role);
   const sorted = [...invoices].sort((a, b) => invoiceSortTime(b) - invoiceSortTime(a));
+  const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
+  const clients = customers.map(normalizeCustomerAccount);
   return `
-    <div class="quotes-head">
-      <div>
-        <h2>Factures</h2>
-        <p>${sorted.length} facture${sorted.length > 1 ? "s" : ""}.</p>
+    <div class="invoices-section" data-invoices-section>
+      <div class="invoices-list-view" data-invoices-list-view>
+        <div class="quotes-head">
+          <div>
+            <h2>Factures</h2>
+            <p>${sorted.length} facture${sorted.length > 1 ? "s" : ""}.</p>
+          </div>
+          ${canManage ? `
+            <button class="client-create-btn button-reset" type="button" data-invoice-create-open>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15h6"/></svg>
+              <strong>Nouvelle facture</strong>
+            </button>
+          ` : ""}
+        </div>
+        ${canManage ? invoiceNumberingStatusHtml(restaurant, sorted.length) : ""}
+        ${sorted.length ? `
+          <div class="client-ledger-table quotes-table">
+            <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emise le</span><span>Echeance</span><span>Total TTC</span><span>Statut</span></div>
+            ${sorted.map((invoice) => invoiceRowHtml(invoice)).join("")}
+          </div>
+        ` : `<div class="client-account-empty">Aucune facture pour le moment. Creez-en une directement, ou transformez un devis depuis l'onglet Devis.</div>`}
+        ${!canManage ? `<p class="alert-note">Votre role ne permet pas de creer des factures.</p>` : ""}
       </div>
+      ${canManage ? invoiceCreatePageHtml(clients, restaurant) : ""}
     </div>
-    ${sorted.length ? `
-      <div class="client-ledger-table quotes-table">
-        <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emise le</span><span>Echeance</span><span>Total TTC</span><span>Statut</span></div>
-        ${sorted.map((invoice) => invoiceRowHtml(invoice)).join("")}
-      </div>
-    ` : `<div class="client-account-empty">Aucune facture pour le moment. Transformez un devis en facture depuis l'onglet Devis.</div>`}
-    ${!canManage ? `<p class="alert-note">Votre role ne permet pas de creer des factures.</p>` : ""}
+  `;
+}
+
+// Reutilise volontairement les selecteurs/fonctions du formulaire Devis (client, lignes,
+// catalogue, totaux) : le comportement est identique, seuls les champs propres a la facture
+// (echeance au lieu de validite) et la soumission (submitInvoiceForm) different.
+function invoiceCreatePageHtml(clients = [], restaurant = {}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const dueDate = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  return `
+    <section class="quote-create-page is-hidden" data-invoice-create-page>
+      <header class="client-detail-header">
+        <button class="button-reset client-back-btn" type="button" data-invoice-create-close aria-label="Retour aux factures">&larr;</button>
+        <div>
+          <span>Facture</span>
+          <h2>Nouvelle facture</h2>
+        </div>
+      </header>
+      <form class="platform-form quote-form" data-dashboard-invoice-form>
+        <div class="quote-client-picker">
+          <label class="quote-client-select">Client
+            <select data-quote-customer-select>
+              ${quoteClientOptionsHtml(clients)}
+            </select>
+          </label>
+          <button class="outline-dark-btn button-reset" type="button" data-quote-add-client>+ Ajouter un client</button>
+        </div>
+        <div class="quote-client-summary" data-quote-client-summary>${quoteClientSummaryHtml(null)}</div>
+
+        <div class="form-grid">
+          <label>Intitule<input name="eventLabel" placeholder="Reception, buffet d'entreprise..." /></label>
+          <label>Date d'emission<input name="eventDate" type="date" value="${today}" /></label>
+          <label>
+            <select class="label-select" data-quote-covers-label>
+              ${["Couverts", "Convives"].map((word) => `<option value="${word}" ${word === quoteCoversLabelPreference() ? "selected" : ""}>${word}</option>`).join("")}
+            </select>
+            <input name="covers" type="number" min="0" step="1" />
+          </label>
+          <label>Date d'echeance<input name="dueDate" type="date" value="${dueDate}" required /></label>
+          <label>Acompte deja verse (EUR)<input name="depositAmount" type="number" min="0" step="0.01" /></label>
+        </div>
+        <label class="wide-field">Notes<textarea name="notes" rows="2"></textarea></label>
+
+        <div class="quote-lines" data-quote-lines>
+          <div class="quote-line-row quote-line-head"><span>Libelle</span><span>Qte</span><span>PU TTC</span><span>TVA</span><span>Total TTC</span><span></span></div>
+          ${quoteLineRowHtml()}
+        </div>
+        <button class="outline-dark-btn button-reset" type="button" data-quote-add-line>+ Ajouter une ligne</button>
+
+        <div class="quote-totals" data-quote-totals>
+          <span>Total HT <strong data-quote-total-ht>0,00 &euro;</strong></span>
+          <span>TVA <strong data-quote-total-vat>0,00 &euro;</strong></span>
+          <span>Total TTC <strong data-quote-total-ttc>0,00 &euro;</strong></span>
+        </div>
+
+        <label class="wide-field">Conditions<textarea name="conditions" rows="3">${escapeHtml(restaurant.paymentTerms || "Paiement a reception de facture.")}</textarea></label>
+        <div class="quote-form-actions">
+          <button class="primary-btn button-reset" type="submit">Creer la facture</button>
+        </div>
+        <small data-form-status></small>
+      </form>
+    </section>
   `;
 }
 
