@@ -5134,12 +5134,32 @@ class PdfDocument {
 }
 
 // Encadre avec titre en gras : renvoie la hauteur reellement utilisee.
-function pdfBox(doc, x, yTop, width, title, bodyLines, { minHeight = 60, pad = 10 } = {}) {
-  const size = 9.5;
+function measurePdfBoxHeight(width, bodyLines, { minHeight = 60, pad = 10, size = 9.5 } = {}) {
   const leading = size * 1.35;
   const innerWidth = width - pad * 2;
   const wrapped = bodyLines.flatMap((line) => wrapProportional(line, innerWidth, false, size));
-  const height = Math.max(minHeight, pad * 2 + leading * (1.3 + wrapped.length));
+  return Math.max(minHeight, pad * 2 + leading * (1.3 + wrapped.length));
+}
+
+// Plus petite taille (parmi PDF_BOX_FIT_SIZES) qui fait tenir bodyLines sous maxHeight,
+// pour des encadres a hauteur plafonnee (ex. Mentions legales / Coordonnees bancaires cote a
+// cote sur une facture) sans jamais faire disparaitre de texte : si meme la plus petite taille
+// deborde encore, on la garde quand meme plutot que de tronquer des mentions legales.
+const PDF_BOX_FIT_SIZES = [9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5];
+
+function fitPdfBoxSize(width, bodyLines, maxHeight, opts = {}) {
+  for (const size of PDF_BOX_FIT_SIZES) {
+    const height = measurePdfBoxHeight(width, bodyLines, { ...opts, size });
+    if (height <= maxHeight) return size;
+  }
+  return PDF_BOX_FIT_SIZES[PDF_BOX_FIT_SIZES.length - 1];
+}
+
+function pdfBox(doc, x, yTop, width, title, bodyLines, { minHeight = 60, pad = 10, size = 9.5, height: fixedHeight } = {}) {
+  const leading = size * 1.35;
+  const innerWidth = width - pad * 2;
+  const wrapped = bodyLines.flatMap((line) => wrapProportional(line, innerWidth, false, size));
+  const height = fixedHeight || Math.max(minHeight, pad * 2 + leading * (1.3 + wrapped.length));
   doc.rect(x, yTop, width, height, { stroke: "0.6 0.6 0.6" });
   doc.text(x + pad, yTop + pad, title, { bold: true, size: 10.5 });
   wrapped.forEach((line, index) => doc.text(x + pad, yTop + pad + leading * (1.3 + index), line, { size }));
@@ -6076,31 +6096,37 @@ async function buildInvoicePdf(invoice = {}, restaurant = {}) {
   });
   doc.y -= 12;
 
-  // -- mentions legales obligatoires (penalites de retard, indemnite de recouvrement) --
+  // -- mentions legales obligatoires (penalites de retard, indemnite de recouvrement) et
+  // coordonnees bancaires, cote a cote et a la meme hauteur, plafonnees a 15% de la page --
   const legalLines = [
     restaurant.paymentTerms || "Paiement a reception de facture.",
     restaurant.latePenaltyTerms || "En cas de retard de paiement, penalites au taux d'interet legal en vigueur, exigibles sans rappel.",
     restaurant.recoveryIndemnity ? `Indemnite forfaitaire de recouvrement : ${restaurant.recoveryIndemnity}` : "Indemnite forfaitaire de recouvrement : 40 EUR (art. L441-10 du code de commerce).",
     restaurant.invoiceLegalNotice || ""
-  ].filter(Boolean).join(NL);
-  doc.ensureSpace(70);
-  let boxTop = doc.pageHeight - doc.y;
-  let boxHeight = pdfBox(doc, margin, boxTop, width, "Mentions legales", legalLines.split(NL));
-  doc.y -= boxHeight + 16;
+  ].filter(Boolean).join(NL).split(NL);
+  const hasBankDetails = !!(restaurant.iban || restaurant.bic);
+  const bankLines = hasBankDetails ? [
+    firstText(restaurant.legalName, restaurant.tradeName, restaurant.name) ? `Titulaire : ${firstText(restaurant.legalName, restaurant.tradeName, restaurant.name)}` : "",
+    restaurant.iban ? `IBAN : ${restaurant.iban}` : "",
+    restaurant.bic ? `BIC : ${restaurant.bic}` : "",
+    `Reference a indiquer : ${invoice.invoiceNumber || ""}`
+  ].filter(Boolean) : [];
 
-  if (restaurant.iban || restaurant.bic) {
-    const holder = firstText(restaurant.legalName, restaurant.tradeName, restaurant.name);
-    const bankLines = [
-      holder ? `Titulaire : ${holder}` : "",
-      restaurant.iban ? `IBAN : ${restaurant.iban}` : "",
-      restaurant.bic ? `BIC : ${restaurant.bic}` : "",
-      `Reference a indiquer : ${invoice.invoiceNumber || ""}`
-    ].filter(Boolean);
-    doc.ensureSpace(60);
-    boxTop = doc.pageHeight - doc.y;
-    boxHeight = pdfBox(doc, margin, boxTop, width, "Coordonnees bancaires", bankLines);
-    doc.y -= boxHeight + 16;
+  const maxBoxHeight = doc.pageHeight * 0.15;
+  const bottomBoxWidth = hasBankDetails ? (width - 16) / 2 : width;
+  const legalSize = fitPdfBoxSize(bottomBoxWidth, legalLines, maxBoxHeight);
+  const legalFitHeight = measurePdfBoxHeight(bottomBoxWidth, legalLines, { size: legalSize });
+  const bankSize = hasBankDetails ? fitPdfBoxSize(bottomBoxWidth, bankLines, maxBoxHeight) : legalSize;
+  const bankFitHeight = hasBankDetails ? measurePdfBoxHeight(bottomBoxWidth, bankLines, { size: bankSize }) : 0;
+  const bottomBoxHeight = Math.max(legalFitHeight, bankFitHeight);
+
+  doc.ensureSpace(bottomBoxHeight + 16);
+  const bottomBoxTop = doc.pageHeight - doc.y;
+  pdfBox(doc, margin, bottomBoxTop, bottomBoxWidth, "Mentions legales", legalLines, { size: legalSize, height: bottomBoxHeight });
+  if (hasBankDetails) {
+    pdfBox(doc, margin + bottomBoxWidth + 16, bottomBoxTop, bottomBoxWidth, "Coordonnees bancaires", bankLines, { size: bankSize, height: bottomBoxHeight });
   }
+  doc.y -= bottomBoxHeight + 16;
 
   if (invoice.status === "paid") {
     doc.ensureSpace(30);
