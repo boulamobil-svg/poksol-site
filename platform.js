@@ -1493,6 +1493,9 @@ function initDashboardPage() {
         requireQuotePermission(root);
         await submitInvoiceForm(root, form, restaurantId);
       }
+      if (form.matches("[data-dashboard-invoice-numbering-form]")) {
+        await saveInvoiceNumbering(root, form);
+      }
       if (form.matches("[data-dashboard-jobtitle-form]")) await saveUserJobTitle(restaurantId, form, currentUser);
       if (form.matches("[data-dashboard-access-form]")) await reviewAccessRequest(restaurantId, form, event.submitter?.value, currentUser);
       if (form.matches("[data-dashboard-invite-form]")) {
@@ -5461,20 +5464,67 @@ async function updateInvoiceStatus(restaurantId, invoiceId, status) {
   }, { merge: true });
 }
 
-function invoiceNumberingStatusHtml(restaurant = {}, invoiceCount = 0) {
+// Prefixe/prochain numero de facture : reserve a l'owner, et seulement avant la toute premiere
+// facture (voir invoiceNumberingStatusHtml). Ecrit dans restaurants/{id}.restaurantProfile
+// (map imbriquee, comme poket-access.html) : un setDoc merge:true fusionne cette map en
+// profondeur, les autres champs de facturation (siret, iban...) ne sont pas touches.
+async function saveInvoiceNumbering(root, form) {
+  if ((root.dataset.restaurantRole || "") !== "owner") {
+    throw new Error("Seul le owner du restaurant peut choisir le numero de depart des factures.");
+  }
+  if ((root.dashboardInvoices || []).length > 0) {
+    throw new Error("Impossible : des factures existent deja, la numerotation est verrouillee.");
+  }
+  const services = await getServices();
+  const { doc, setDoc, serverTimestamp } = services.firestoreModule;
+  const data = new FormData(form);
+  const prefix = text(data, "invoicePrefix") || "FAC";
+  const nextNumber = Math.max(1, Number(text(data, "nextInvoiceNumber")) || 1);
+  await setDoc(doc(services.db, "restaurants", root.dataset.restaurantId), {
+    restaurantProfile: {
+      invoicePrefix: prefix,
+      nextInvoiceNumber: nextNumber,
+      updatedAt: serverTimestamp()
+    },
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+// Reglage sensible (voir [[firebase-rules-single-source]] : "legal/billing info = owner only") :
+// modifiable uniquement par l'owner, et seulement tant qu'aucune facture n'existe (sinon la
+// numerotation legale deja emise ne serait plus fiable). Deplace depuis poket-access.html pour
+// plus de securite : cette page est geree au quotidien, pas l'onboarding.
+function invoiceNumberingStatusHtml(restaurant = {}, invoiceCount = 0, role = "") {
   const prefix = String(restaurant.invoicePrefix || "FAC").trim() || "FAC";
   const nextNumber = Number(restaurant.nextInvoiceNumber) || 1;
   const preview = `${prefix}-${String(nextNumber).padStart(4, "0")}`;
+  if (invoiceCount > 0) {
+    return `
+      <div class="invoice-numbering-status">
+        <span>Numerotation en cours depuis <strong>${escapeHtml(preview)}</strong> (verrouillee : ${invoiceCount} facture${invoiceCount > 1 ? "s" : ""} deja emise${invoiceCount > 1 ? "s" : ""}, la loi interdit les trous dans la sequence).</span>
+      </div>
+    `;
+  }
+  if (role !== "owner") {
+    return `
+      <div class="invoice-numbering-status">
+        <span>Prochaine facture : <strong>${escapeHtml(preview)}</strong> (seul le owner peut choisir le numero de depart).</span>
+      </div>
+    `;
+  }
   return `
-    <div class="invoice-numbering-status">
-      ${invoiceCount === 0
-        ? `
-          <span>Prochaine facture : <strong>${escapeHtml(preview)}</strong></span>
-          <a href="poket-access.html?mode=edit">Choisir le numero de depart &rarr;</a>
-        `
-        : `<span>Numerotation en cours depuis <strong>${escapeHtml(preview)}</strong> (verrouillee : ${invoiceCount} facture${invoiceCount > 1 ? "s" : ""} deja emise${invoiceCount > 1 ? "s" : ""}, la loi interdit les trous dans la sequence).</span>`
-      }
-    </div>
+    <form class="invoice-numbering-form" data-dashboard-invoice-numbering-form>
+      <div class="invoice-numbering-status">
+        <span>Prochaine facture : <strong>${escapeHtml(preview)}</strong></span>
+      </div>
+      <p class="alert-note">Ce numero ne sera plus modifiable des la premiere facture creee : verifiez-le avec soin (reprise d'une numerotation existante, ou nouveau depart) avant de continuer.</p>
+      <div class="form-grid">
+        <label>Prefixe<input name="invoicePrefix" value="${escapeAttr(prefix)}" maxlength="12" required /></label>
+        <label>Prochain numero<input name="nextInvoiceNumber" type="number" min="1" step="1" value="${nextNumber}" required /></label>
+      </div>
+      <button class="outline-dark-btn button-reset" type="submit">Enregistrer la numerotation</button>
+      <small data-form-status></small>
+    </form>
   `;
 }
 
@@ -5498,7 +5548,7 @@ function invoicesHtml(invoices = [], role = "", restaurant = {}, customerAccount
             </button>
           ` : ""}
         </div>
-        ${canManage ? invoiceNumberingStatusHtml(restaurant, sorted.length) : ""}
+        ${canManage ? invoiceNumberingStatusHtml(restaurant, sorted.length, role) : ""}
         ${sorted.length ? `
           <div class="client-ledger-table quotes-table">
             <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emise le</span><span>Echeance</span><span>Total TTC</span><span>Statut</span></div>

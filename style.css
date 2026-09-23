@@ -5948,6 +5948,30 @@ button.client-ledger-row:focus-visible {
   color: var(--poksol-navy);
 }
 
+.invoice-numbering-form {
+  margin: -6px 0 18px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #f5f9ff;
+  border: 1px solid #d3e5ff;
+}
+
+.invoice-numbering-form .invoice-numbering-status {
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.invoice-numbering-form .alert-note {
+  margin-bottom: 14px;
+}
+
+.invoice-numbering-form .form-grid {
+  margin-top: 0;
+  margin-bottom: 14px;
+}
+
 .invoice-numbering-status a {
   color: var(--poksol-blue);
   font-weight: 900;

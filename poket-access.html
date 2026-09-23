@@ -175,10 +175,11 @@
               <label>Conditions de paiement *<input name="paymentTerms" required value="Paiement comptant a reception de facture." /></label>
               <label>Penalites de retard<input name="latePenaltyTerms" value="Penalites selon taux legal en vigueur." /></label>
               <label>Indemnite forfaitaire de recouvrement<input name="recoveryIndemnity" value="40 EUR" /></label>
-              <label>Prefixe facture *<input name="invoicePrefix" required value="FAC" /></label>
-              <label>Prochain numero de facture *<input name="nextInvoiceNumber" type="number" min="1" required value="1" /></label>
               <label class="wide-field">Mentions legales personnalisees<textarea name="invoiceLegalNotice" rows="4"></textarea></label>
             </div>
+            <p class="step-help">
+              Le prefixe et le prochain numero de facture se choisissent desormais depuis le dashboard (onglet Factures), reserve au owner, pour plus de securite.
+            </p>
           </section>
 
           <section class="access-step" data-access-step="4">

@@ -435,15 +435,13 @@ function validateProfile(profile) {
     profile.city &&
     profile.country &&
     hasContact &&
-    profile.paymentTerms &&
-    profile.invoicePrefix &&
-    Number(profile.nextInvoiceNumber) >= 1
+    profile.paymentTerms
   );
   if (!minimumOk) {
     return {
       minimumOk: false,
       strictOk: false,
-      message: "Completez les champs obligatoires : nom, adresse, ville, pays, contact, paiement et numerotation."
+      message: "Completez les champs obligatoires : nom, adresse, ville, pays, contact et paiement."
     };
   }
   if (profile.email && !isValidEmail(profile.email)) {
@@ -455,9 +453,6 @@ function validateProfile(profile) {
   if (profile.logoUrl && !isValidUrl(profile.logoUrl)) {
     return { minimumOk: true, strictOk: false, message: "L'adresse du logo doit etre une URL valide." };
   }
-  if (Number(profile.nextInvoiceNumber) < 1) {
-    return { minimumOk: true, strictOk: false, message: "Le prochain numero de facture doit etre superieur ou egal a 1." };
-  }
   return { minimumOk: true, strictOk: true, message: "" };
 }
 
@@ -465,6 +460,10 @@ function collectProfile() {
   const data = new FormData(form);
   const enabledSalesModes = data.getAll("enabledSalesModes");
   const openingHoursByDay = collectOpeningHours(data);
+  // Prefixe/prochain numero de facture : n'ont plus de champ dans ce formulaire (deplaces
+  // dans le dashboard, reserve au owner, pour plus de securite). On reprend telles quelles
+  // les valeurs deja chargees pour ce restaurant, pour ne jamais les ecraser en les enregistrant.
+  const existingProfile = loadLocalProfile() || {};
   const profile = {
     name: value(data, "name"),
     restaurantId: restaurantContext.restaurantId || "",
@@ -495,8 +494,8 @@ function collectProfile() {
     paymentTerms: value(data, "paymentTerms"),
     latePenaltyTerms: value(data, "latePenaltyTerms"),
     recoveryIndemnity: value(data, "recoveryIndemnity"),
-    invoicePrefix: value(data, "invoicePrefix"),
-    nextInvoiceNumber: Number(value(data, "nextInvoiceNumber") || 1),
+    invoicePrefix: existingProfile.invoicePrefix || "FAC",
+    nextInvoiceNumber: Number(existingProfile.nextInvoiceNumber) || 1,
     invoiceLegalNotice: value(data, "invoiceLegalNotice"),
     openingHours: openingHoursToList(openingHoursByDay),
     openingHoursByDay,
