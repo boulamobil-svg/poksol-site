@@ -5464,13 +5464,14 @@ async function updateInvoiceStatus(restaurantId, invoiceId, status) {
   }, { merge: true });
 }
 
-// Prefixe/prochain numero de facture : reserve a l'owner, et seulement avant la toute premiere
-// facture (voir invoiceNumberingStatusHtml). Ecrit dans restaurants/{id}.restaurantProfile
-// (map imbriquee, comme poket-access.html) : un setDoc merge:true fusionne cette map en
-// profondeur, les autres champs de facturation (siret, iban...) ne sont pas touches.
+// Prefixe/prochain numero de facture : reserve a l'owner et l'admin (voir user, 2026-09-23 :
+// exception a la regle generale "legal/billing info = owner only" pour ce champ precis), et
+// seulement avant la toute premiere facture (voir invoiceNumberingStatusHtml). Ecrit dans
+// restaurants/{id}.restaurantProfile (map imbriquee, comme poket-access.html) : un setDoc
+// merge:true fusionne cette map en profondeur, les autres champs (siret, iban...) ne sont pas touches.
 async function saveInvoiceNumbering(root, form) {
-  if ((root.dataset.restaurantRole || "") !== "owner") {
-    throw new Error("Seul le owner du restaurant peut choisir le numero de depart des factures.");
+  if (!["owner", "admin"].includes(root.dataset.restaurantRole || "")) {
+    throw new Error("Seuls le owner et les admins peuvent choisir le numero de depart des factures.");
   }
   if ((root.dashboardInvoices || []).length > 0) {
     throw new Error("Impossible : des factures existent deja, la numerotation est verrouillee.");
@@ -5490,10 +5491,10 @@ async function saveInvoiceNumbering(root, form) {
   }, { merge: true });
 }
 
-// Reglage sensible (voir [[firebase-rules-single-source]] : "legal/billing info = owner only") :
-// modifiable uniquement par l'owner, et seulement tant qu'aucune facture n'existe (sinon la
-// numerotation legale deja emise ne serait plus fiable). Deplace depuis poket-access.html pour
-// plus de securite : cette page est geree au quotidien, pas l'onboarding.
+// Reglage sensible (exception a [[firebase-rules-single-source]] "legal/billing info = owner
+// only" : owner ET admin peuvent modifier celui-ci), et seulement tant qu'aucune facture
+// n'existe (sinon la numerotation legale deja emise ne serait plus fiable). Deplace depuis
+// poket-access.html pour plus de securite : cette page est geree au quotidien, pas l'onboarding.
 function invoiceNumberingStatusHtml(restaurant = {}, invoiceCount = 0, role = "") {
   const prefix = String(restaurant.invoicePrefix || "FAC").trim() || "FAC";
   const nextNumber = Number(restaurant.nextInvoiceNumber) || 1;
@@ -5505,10 +5506,10 @@ function invoiceNumberingStatusHtml(restaurant = {}, invoiceCount = 0, role = ""
       </div>
     `;
   }
-  if (role !== "owner") {
+  if (!["owner", "admin"].includes(role)) {
     return `
       <div class="invoice-numbering-status">
-        <span>Prochaine facture : <strong>${escapeHtml(preview)}</strong> (seul le owner peut choisir le numero de depart).</span>
+        <span>Prochaine facture : <strong>${escapeHtml(preview)}</strong> (seuls le owner et les admins peuvent choisir le numero de depart).</span>
       </div>
     `;
   }
