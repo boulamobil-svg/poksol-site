@@ -28,6 +28,18 @@ const CLIENT_MANAGER_ROLES = ["owner", "admin", "manager"];
 const CLIENT_DELETE_ROLES = ["owner", "admin"];
 const CLIENT_IMPORT_LIMIT = 500;
 
+// Remplace le champ libre "Nom affichage" pour un particulier : le nom affiche partout
+// (liste clients, devis, factures...) est calcule comme "Titre Nom Prenom", jamais retape.
+const CIVILITY_OPTIONS = ["", "M.", "Mme"];
+
+function customerDisplayName(civility, lastName, firstName, companyName, contactName) {
+  return firstText(
+    [civility, lastName, firstName].filter(Boolean).join(" "),
+    companyName,
+    contactName
+  );
+}
+
 const CUSTOMER_ACCOUNT_FIELDS = [
   "movements", "accountMovements", "transactions", "ledger", "history",
   "balance", "solde", "accountBalance", "currentBalance", "balanceDue", "amountDue",
@@ -57,6 +69,9 @@ const CLIENT_IMPORT_HEADERS = {
   "display name": "displayName",
   "displayname": "displayName",
   "name": "displayName",
+  "titre": "civility",
+  "civilite": "civility",
+  "civility": "civility",
   "prenom": "firstName",
   "first name": "firstName",
   "nom": "lastName",
@@ -833,13 +848,18 @@ function customerAccountPayload(form) {
   const taxId = text(data, "taxId");
   const vatNumber = text(data, "vatNumber");
   const type = normalizeCustomerType(text(data, "type"), { companyName, taxId, vatNumber });
+  const civility = text(data, "civility");
+  const firstName = text(data, "firstName");
+  const lastName = text(data, "lastName");
+  const contactName = text(data, "contactName");
   return {
     type,
-    displayName: text(data, "displayName"),
-    firstName: text(data, "firstName"),
-    lastName: text(data, "lastName"),
+    displayName: customerDisplayName(civility, lastName, firstName, companyName, contactName),
+    civility,
+    firstName,
+    lastName,
     companyName,
-    contactName: text(data, "contactName"),
+    contactName,
     phone: text(data, "phone"),
     email: text(data, "email"),
     address: text(data, "address"),
@@ -1363,6 +1383,18 @@ function initDashboardPage() {
       }
       return;
     }
+    const invoicePreview = event.target.closest("[data-invoice-preview]");
+    if (invoicePreview) {
+      event.preventDefault();
+      const form = invoicePreview.closest("form");
+      const status = form?.querySelector("[data-form-status]");
+      try {
+        await previewInvoiceFromForm(root, form);
+      } catch (error) {
+        if (status) status.textContent = error.message || String(error);
+      }
+      return;
+    }
     const quoteSaveDraft = event.target.closest("[data-quote-save-draft]");
     if (quoteSaveDraft) {
       event.preventDefault();
@@ -1390,6 +1422,37 @@ function initDashboardPage() {
       if (draftId && window.confirm("Supprimer ce brouillon ?")) {
         await deleteQuoteDraft(root.dataset.restaurantId, draftId).catch(() => {});
         root.quoteDrafts = (root.quoteDrafts || []).filter((item) => item.id !== draftId);
+        draftRow.remove();
+      }
+      return;
+    }
+    const invoiceSaveDraft = event.target.closest("[data-invoice-save-draft]");
+    if (invoiceSaveDraft) {
+      event.preventDefault();
+      const form = invoiceSaveDraft.closest("form");
+      const status = form?.querySelector("[data-form-status]");
+      try {
+        await saveInvoiceFormAsDraft(root, form);
+      } catch (error) {
+        if (status) status.textContent = error.message || String(error);
+      }
+      return;
+    }
+    const invoiceDraftResume = event.target.closest("[data-invoice-draft-resume]");
+    if (invoiceDraftResume) {
+      event.preventDefault();
+      const draftId = invoiceDraftResume.closest("[data-invoice-draft-id]")?.dataset.invoiceDraftId;
+      resumeInvoiceDraft(root, draftId);
+      return;
+    }
+    const invoiceDraftDelete = event.target.closest("[data-invoice-draft-delete]");
+    if (invoiceDraftDelete) {
+      event.preventDefault();
+      const draftRow = invoiceDraftDelete.closest("[data-invoice-draft-id]");
+      const draftId = draftRow?.dataset.invoiceDraftId;
+      if (draftId && window.confirm("Supprimer ce brouillon ?")) {
+        await deleteInvoiceDraft(root.dataset.restaurantId, draftId).catch(() => {});
+        root.invoiceDrafts = (root.invoiceDrafts || []).filter((item) => item.id !== draftId);
         draftRow.remove();
       }
       return;
@@ -1684,7 +1747,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
   root.dataset.restaurantRole = role;
-  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests, quotes, pieceSaleEnabled, quoteDrafts, invoices] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests, quotes, pieceSaleEnabled, quoteDrafts, invoices, invoiceDrafts] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
@@ -1695,7 +1758,8 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
     listQuotes(restaurant.id).catch(() => []),
     getCatalogPieceSaleEnabled(restaurant.id).catch(() => false),
     listQuoteDrafts(restaurant.id).catch(() => []),
-    listInvoices(restaurant.id).catch(() => [])
+    listInvoices(restaurant.id).catch(() => []),
+    listInvoiceDrafts(restaurant.id).catch(() => [])
   ]);
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
@@ -1705,11 +1769,12 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dashboardRestaurant = restaurant;
   root.dashboardQuotes = quotes;
   root.dashboardInvoices = invoices;
+  root.invoiceDrafts = invoiceDrafts;
   root.quoteCatalogItems = catalogItemsForQuotes(dashboardMenu);
   root.quotePieceSaleEnabled = pieceSaleEnabled;
   root.quoteDrafts = quoteDrafts;
   root.quoteClients = (Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || []).map(normalizeCustomerAccount);
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes, quoteDrafts, invoices);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes, quoteDrafts, invoices, invoiceDrafts);
   applyClientTools(root);
 }
 
@@ -2367,7 +2432,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = [], quotes = [], quoteDrafts = [], invoices = []) {
+function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = [], quotes = [], quoteDrafts = [], invoices = [], invoiceDrafts = []) {
   const canEditProfile = ["owner", "admin"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -2396,7 +2461,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "quotes" ? "is-active" : ""}" data-dashboard-panel="quotes">${quotesHtml(quotes, customers, menu, role, quoteDrafts)}</section>
-      <section class="dashboard-panel ${activeTab === "invoices" ? "is-active" : ""}" data-dashboard-panel="invoices">${invoicesHtml(invoices, role, restaurant, customers)}</section>
+      <section class="dashboard-panel ${activeTab === "invoices" ? "is-active" : ""}" data-dashboard-panel="invoices">${invoicesHtml(invoices, role, restaurant, customers, invoiceDrafts)}</section>
       <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam, accessRequests)}</section>
       <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -3135,8 +3200,9 @@ function clientDetailHtml(client, reservations = [], role = "") {
       <div class="client-account-details">
         ${reservationDetailItemHtml("ID compte", client.id)}
         ${reservationDetailItemHtml("Type", client.type === "company" ? "Societe" : "Particulier")}
-        ${reservationDetailItemHtml("Prenom", client.firstName)}
+        ${reservationDetailItemHtml("Titre", client.civility)}
         ${reservationDetailItemHtml("Nom", client.lastName)}
+        ${reservationDetailItemHtml("Prenom", client.firstName)}
         ${reservationDetailItemHtml("Societe", client.companyName)}
         ${reservationDetailItemHtml("Contact", client.contactName)}
         ${reservationDetailItemHtml("Telephone", client.phone)}
@@ -3200,9 +3266,13 @@ function customerFieldsHtml(client = {}) {
           <option value="company" ${type === "company" ? "selected" : ""}>Societe</option>
         </select>
       </label>
-      <label>Nom affichage<input name="displayName" placeholder="Nom du client" value="${escapeAttr(client.displayName)}" /></label>
-      <label data-customer-field="individual">Prenom<input name="firstName" value="${escapeAttr(client.firstName)}" /></label>
+      <label data-customer-field="individual">Titre
+        <select name="civility">
+          ${CIVILITY_OPTIONS.map((option) => `<option value="${escapeAttr(option)}" ${option === (client.civility || "") ? "selected" : ""}>${option || "—"}</option>`).join("")}
+        </select>
+      </label>
       <label data-customer-field="individual">Nom<input name="lastName" value="${escapeAttr(client.lastName)}" /></label>
+      <label data-customer-field="individual">Prenom<input name="firstName" value="${escapeAttr(client.firstName)}" /></label>
       <label data-customer-field="company">Societe<input name="companyName" value="${escapeAttr(client.companyName)}" /></label>
       <label data-customer-field="company">Contact<input name="contactName" value="${escapeAttr(client.contactName)}" /></label>
       <label>Telephone<input name="phone" value="${escapeAttr(client.phone)}" /></label>
@@ -3294,6 +3364,7 @@ function planCustomerImport(rows, cards) {
     const payload = {
       type,
       displayName: data.displayName || "",
+      civility: data.civility || "",
       firstName: data.firstName || "",
       lastName: data.lastName || "",
       companyName: data.companyName || "",
@@ -3312,7 +3383,7 @@ function planCustomerImport(rows, cards) {
       return;
     }
     if (!payload.displayName) {
-      payload.displayName = firstText([payload.firstName, payload.lastName].filter(Boolean).join(" "), payload.companyName, payload.contactName);
+      payload.displayName = customerDisplayName(payload.civility, payload.lastName, payload.firstName, payload.companyName, payload.contactName);
     }
     const email = normalizeClientSearch(payload.email);
     const phone = normalizeClientPhone(payload.phone);
@@ -5365,6 +5436,39 @@ function invoiceSortTime(invoice = {}) {
   return dateFromFirestoreValue(invoice.createdAt || invoice.issuedAt)?.getTime() || 0;
 }
 
+// Brouillons de facture : meme principe que les brouillons de devis (restaurants/{id}/quote_drafts) :
+// collection separee (restaurants/{id}/invoice_drafts), aucun numero de facture consomme
+// tant que ce n'est pas transforme en facture reelle (voir createInvoiceRecord).
+async function listInvoiceDrafts(restaurantId) {
+  const services = await getServices();
+  const { collection, getDocs } = services.firestoreModule;
+  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "invoice_drafts"));
+  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() })).sort((a, b) => invoiceSortTime(b) - invoiceSortTime(a));
+}
+
+async function saveInvoiceDraft(restaurantId, draftId, payload, user) {
+  const services = await getServices();
+  const { doc, collection, serverTimestamp, setDoc } = services.firestoreModule;
+  const isNew = !draftId;
+  const draftRef = isNew
+    ? doc(collection(services.db, "restaurants", restaurantId, "invoice_drafts"))
+    : doc(services.db, "restaurants", restaurantId, "invoice_drafts", draftId);
+  await setDoc(draftRef, {
+    ...payload,
+    ...(isNew ? { createdAt: serverTimestamp() } : {}),
+    updatedAt: serverTimestamp(),
+    updatedBy: user?.uid || ""
+  }, { merge: true });
+  return draftRef.id;
+}
+
+async function deleteInvoiceDraft(restaurantId, draftId) {
+  if (!draftId) return;
+  const services = await getServices();
+  const { doc, deleteDoc } = services.firestoreModule;
+  await deleteDoc(doc(services.db, "restaurants", restaurantId, "invoice_drafts", draftId));
+}
+
 // Coeur partage par les deux chemins de creation (depuis un devis, ou directe) : reserve le
 // prochain numero (compteur restaurants/{id}/counters/invoices, amorce sur restaurant.nextInvoiceNumber
 // tant qu'aucune facture n'existe), ecrit la facture, et tague le devis d'origine s'il y en a un.
@@ -5452,6 +5556,106 @@ async function submitInvoiceForm(root, form, restaurantId) {
     conditions: payload.conditions,
     dueDate: new Date(`${dueDateValue}T12:00:00`).toISOString()
   }, restaurant, currentUser);
+  if (form.dataset.draftId) await deleteInvoiceDraft(restaurantId, form.dataset.draftId).catch(() => {});
+}
+
+async function saveInvoiceFormAsDraft(root, form) {
+  const status = form.querySelector("[data-form-status]");
+  const payload = quotePayloadFromForm(root, form);
+  const dueDateValue = new FormData(form).get("dueDate");
+  if (!payload.lines.length && !payload.customer && !payload.eventLabel) {
+    if (status) status.textContent = "Rien a enregistrer pour l'instant.";
+    return;
+  }
+  const restaurantId = root.dataset.restaurantId;
+  if (status) status.textContent = "Enregistrement du brouillon...";
+  const draftId = await saveInvoiceDraft(restaurantId, form.dataset.draftId || "", {
+    customerId: payload.customerId,
+    eventLabel: payload.eventLabel,
+    eventDate: payload.eventDate,
+    covers: payload.covers,
+    dueDate: dueDateValue ? new Date(`${dueDateValue}T12:00:00`).toISOString() : null,
+    depositAmount: payload.depositAmount,
+    notes: payload.notes,
+    conditions: payload.conditions,
+    lines: payload.lines
+  }, currentUser);
+  form.dataset.draftId = draftId;
+  if (status) status.textContent = "Brouillon enregistre. Vous pouvez continuer a modifier cette facture.";
+}
+
+// Reouvre la page de creation et pre-remplit tout depuis un brouillon (restaurants/{id}/invoice_drafts).
+function resumeInvoiceDraft(root, draftId) {
+  const draft = (root.invoiceDrafts || []).find((item) => item.id === draftId);
+  if (!draft) return;
+  const section = document.querySelector("[data-invoices-section]");
+  const form = section?.querySelector("[data-dashboard-invoice-form]");
+  if (!form) return;
+  form.dataset.draftId = draft.id;
+  form.querySelector("[data-quote-customer-select]").value = draft.customerId || "";
+  applyQuoteClientSelection(root, form);
+  form.elements.eventLabel.value = draft.eventLabel || "";
+  form.elements.eventDate.value = draft.eventDate ? String(draft.eventDate).slice(0, 10) : "";
+  form.elements.covers.value = draft.covers || "";
+  form.elements.dueDate.value = draft.dueDate ? String(draft.dueDate).slice(0, 10) : "";
+  form.elements.depositAmount.value = draft.depositAmount || "";
+  form.elements.notes.value = draft.notes || "";
+  form.elements.conditions.value = draft.conditions || "";
+  const linesContainer = form.querySelector("[data-quote-lines]");
+  linesContainer.querySelectorAll("[data-quote-line]").forEach((row) => row.remove());
+  const lines = Array.isArray(draft.lines) && draft.lines.length ? draft.lines : [null];
+  lines.forEach((line) => {
+    linesContainer.insertAdjacentHTML("beforeend", quoteLineRowHtml(line ? {
+      name: line.name,
+      price: Number(line.unitPrice) || 0,
+      vat: Number(line.vat) || 0,
+      itemId: line.itemId || "",
+      categoryId: line.categoryId || "",
+      categoryName: line.categoryName || ""
+    } : null, line ? Number(line.quantity) || 1 : 1));
+  });
+  linesContainer.querySelectorAll("[data-quote-line]").forEach(updateQuoteLineRow);
+  updateQuoteFormTotals(form);
+  section.querySelector("[data-invoices-list-view]")?.classList.add("is-hidden");
+  section.querySelector("[data-invoice-create-page]")?.classList.remove("is-hidden");
+}
+
+// Comme previewQuoteFromForm : PDF genere a la volee depuis le formulaire, rien n'est
+// enregistre ni numerote (le vrai numero de facture n'est reserve qu'a la creation reelle).
+async function previewInvoiceFromForm(root, form) {
+  const payload = quotePayloadFromForm(root, form);
+  if (!payload.lines.length) throw new Error("Ajoutez au moins une ligne avec un libelle et une quantite.");
+  const dueDateValue = new FormData(form).get("dueDate");
+  const restaurant = root.dashboardRestaurant || {};
+  const previewInvoice = {
+    invoiceNumber: "APERCU",
+    status: "issued",
+    issuedAt: new Date().toISOString(),
+    dueDate: dueDateValue ? new Date(`${dueDateValue}T12:00:00`).toISOString() : null,
+    customer: payload.customer || { name: "Client non renseigne" },
+    sourceTable: payload.sourceTable,
+    totalTtc: payload.totalTtc,
+    eventLabel: payload.eventLabel,
+    eventDate: payload.eventDate,
+    depositAmount: payload.depositAmount,
+    conditions: payload.conditions
+  };
+  const overlay = showDashboardModal("Apercu de la facture", `<p class="client-modal-wait">Generation du PDF...</p>`, { wide: true });
+  const blob = await buildInvoicePdf(previewInvoice, restaurant);
+  if (!document.body.contains(overlay)) return;
+  const objectUrl = URL.createObjectURL(blob);
+  overlay.dataset.invoiceObjectUrl = objectUrl;
+  overlay.querySelector(".client-modal-body").innerHTML = `<div class="quote-preview"><iframe src="${escapeAttr(objectUrl)}" title="Apercu de la facture"></iframe></div>`;
+  const cleanupUrl = () => URL.revokeObjectURL(objectUrl);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest("[data-client-modal-close]")) cleanupUrl();
+  });
+  const footer = document.createElement("footer");
+  footer.innerHTML = `
+    <p class="quote-preview-note">Apercu uniquement : la facture n'est pas encore enregistree, le vrai numero sera attribue a la creation.</p>
+    <button class="outline-dark-btn button-reset" type="button" data-client-modal-close>Fermer l'apercu</button>
+  `;
+  overlay.querySelector(".client-modal").appendChild(footer);
 }
 
 async function updateInvoiceStatus(restaurantId, invoiceId, status) {
@@ -5529,9 +5733,10 @@ function invoiceNumberingStatusHtml(restaurant = {}, invoiceCount = 0, role = ""
   `;
 }
 
-function invoicesHtml(invoices = [], role = "", restaurant = {}, customerAccounts = {}) {
+function invoicesHtml(invoices = [], role = "", restaurant = {}, customerAccounts = {}, drafts = []) {
   const canManage = QUOTE_MANAGER_ROLES.includes(role);
   const sorted = [...invoices].sort((a, b) => invoiceSortTime(b) - invoiceSortTime(a));
+  const sortedDrafts = [...drafts].sort((a, b) => invoiceSortTime(b) - invoiceSortTime(a));
   const customers = Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || [];
   const clients = customers.map(normalizeCustomerAccount);
   return `
@@ -5550,6 +5755,14 @@ function invoicesHtml(invoices = [], role = "", restaurant = {}, customerAccount
           ` : ""}
         </div>
         ${canManage ? invoiceNumberingStatusHtml(restaurant, sorted.length, role) : ""}
+        ${canManage && sortedDrafts.length ? `
+          <section class="quote-drafts" aria-labelledby="invoice-drafts-title">
+            <h3 id="invoice-drafts-title">Brouillons <span class="quote-drafts-count">${sortedDrafts.length}</span></h3>
+            <div class="quote-drafts-list">
+              ${sortedDrafts.map((draft) => invoiceDraftRowHtml(draft, clients)).join("")}
+            </div>
+          </section>
+        ` : ""}
         ${sorted.length ? `
           <div class="client-ledger-table quotes-table">
             <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emise le</span><span>Echeance</span><span>Total TTC</span><span>Statut</span></div>
@@ -5559,6 +5772,24 @@ function invoicesHtml(invoices = [], role = "", restaurant = {}, customerAccount
         ${!canManage ? `<p class="alert-note">Votre role ne permet pas de creer des factures.</p>` : ""}
       </div>
       ${canManage ? invoiceCreatePageHtml(clients, restaurant) : ""}
+    </div>
+  `;
+}
+
+function invoiceDraftRowHtml(draft = {}, clients = []) {
+  const client = clients.find((item) => item.id === draft.customerId);
+  const clientName = client?.displayName || client?.companyName || "Client non choisi";
+  const totalTtc = quoteLinesTotals(draft.lines || []).totalTtc;
+  return `
+    <div class="quote-draft-row" data-invoice-draft-id="${escapeAttr(draft.id)}">
+      <div class="quote-draft-info">
+        <strong>${escapeHtml(draft.eventLabel || clientName)}</strong>
+        <small>${escapeHtml([clientName, clientDateLabel(draft.updatedAt) ? `modifie le ${clientDateLabel(draft.updatedAt)}` : "", formatMoney(totalTtc)].filter(Boolean).join(" · "))}</small>
+      </div>
+      <div class="quote-draft-actions">
+        <button class="outline-dark-btn button-reset" type="button" data-invoice-draft-resume>Reprendre</button>
+        <button class="button-reset quote-line-remove" type="button" data-invoice-draft-delete aria-label="Supprimer le brouillon">&times;</button>
+      </div>
     </div>
   `;
 }
@@ -5617,6 +5848,8 @@ function invoiceCreatePageHtml(clients = [], restaurant = {}) {
 
         <label class="wide-field">Conditions<textarea name="conditions" rows="3">${escapeHtml(restaurant.paymentTerms || "Paiement a reception de facture.")}</textarea></label>
         <div class="quote-form-actions">
+          <button class="outline-dark-btn button-reset" type="button" data-invoice-preview>Previsualiser</button>
+          <button class="outline-dark-btn button-reset" type="button" data-invoice-save-draft>Enregistrer comme brouillon</button>
           <button class="primary-btn button-reset" type="submit">Creer la facture</button>
         </div>
         <small data-form-status></small>
@@ -5983,10 +6216,11 @@ function reservationMatchesClient(reservation = {}, client = {}) {
 }
 
 function normalizeCustomerAccount(customer = {}) {
+  const civility = firstText(customer.civility);
   const displayName = firstText(
     customer.displayName,
     customer.name,
-    [customer.firstName, customer.lastName].filter(Boolean).join(" "),
+    [civility, customer.lastName, customer.firstName].filter(Boolean).join(" "),
     customer.contactName,
     customer.companyName
   );
@@ -5995,6 +6229,7 @@ function normalizeCustomerAccount(customer = {}) {
     customerCollection: customerCollectionName(customer.customerCollection),
     type: normalizeCustomerType(firstText(customer.type), customer),
     displayName,
+    civility,
     firstName: firstText(customer.firstName),
     lastName: firstText(customer.lastName),
     contactName: firstText(customer.contactName),
@@ -6311,6 +6546,7 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 const CLIENT_EXPORT_COLUMNS = [
   ["Type", 14],
   ["Nom affichage", 26],
+  ["Titre", 10],
   ["Prénom", 16],
   ["Nom", 18],
   ["Société", 24],
@@ -6340,6 +6576,7 @@ function clientExportRow(rawCustomer, reservations = []) {
   return [
     client.type === "company" ? "Société" : "Particulier",
     client.displayName,
+    client.civility,
     client.firstName,
     client.lastName,
     client.companyName,
