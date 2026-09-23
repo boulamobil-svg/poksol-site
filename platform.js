@@ -1285,6 +1285,12 @@ function initDashboardPage() {
       openQuoteDetail(root, quoteRow.dataset.quoteRow);
       return;
     }
+    const invoiceRow = event.target.closest("[data-invoice-row]");
+    if (invoiceRow) {
+      event.preventDefault();
+      openInvoiceDetail(root, invoiceRow.dataset.invoiceRow);
+      return;
+    }
     const quoteCreateOpen = event.target.closest("[data-quote-create-open]");
     if (quoteCreateOpen) {
       event.preventDefault();
@@ -1654,7 +1660,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.dataset.restaurantId = restaurant.id;
   const role = await resolveRestaurantRole(restaurant, user);
   root.dataset.restaurantRole = role;
-  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests, quotes, pieceSaleEnabled, quoteDrafts] = await Promise.all([
+  const [reservations, customerAccounts, members, menu, catalogMenu, userProfile, accessRequests, quotes, pieceSaleEnabled, quoteDrafts, invoices] = await Promise.all([
     listReservations(restaurant.id).catch(() => []),
     listCustomers(restaurant.id).catch((error) => ({ customers: [], errors: [readableFirebaseError(error)], checkedCollections: [] })),
     listMembers(restaurant.id).catch(() => []),
@@ -1664,7 +1670,8 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
     ["owner", "admin"].includes(role) ? listAccessRequests(restaurant.id).catch(() => []) : Promise.resolve([]),
     listQuotes(restaurant.id).catch(() => []),
     getCatalogPieceSaleEnabled(restaurant.id).catch(() => false),
-    listQuoteDrafts(restaurant.id).catch(() => [])
+    listQuoteDrafts(restaurant.id).catch(() => []),
+    listInvoices(restaurant.id).catch(() => [])
   ]);
   const dashboardMenu = catalogMenu?.categories?.length
     ? { ...(menu || {}), ...catalogMenu, title: menu?.title || catalogMenu.title, type: menu?.type || "catalog" }
@@ -1673,11 +1680,12 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.clientExportSource = { customers: customerAccounts, reservations };
   root.dashboardRestaurant = restaurant;
   root.dashboardQuotes = quotes;
+  root.dashboardInvoices = invoices;
   root.quoteCatalogItems = catalogItemsForQuotes(dashboardMenu);
   root.quotePieceSaleEnabled = pieceSaleEnabled;
   root.quoteDrafts = quoteDrafts;
   root.quoteClients = (Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || []).map(normalizeCustomerAccount);
-  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes, quoteDrafts);
+  root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes, quoteDrafts, invoices);
   applyClientTools(root);
 }
 
@@ -2335,7 +2343,7 @@ function restaurantChooserHtml(restaurants, message = "") {
   `;
 }
 
-function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = [], quotes = [], quoteDrafts = []) {
+function dashboardHtml(restaurant, role, reservations, customers, members, menu, activeTab = "overview", account = null, accessRequests = [], quotes = [], quoteDrafts = [], invoices = []) {
   const canEditProfile = ["owner", "admin"].includes(role);
   const canManageTeam = ["owner", "admin"].includes(role);
   const publicUrl = `${window.location.origin}/restaurants/?slug=${encodeURIComponent(restaurant.slug || restaurant.id)}`;
@@ -2364,6 +2372,7 @@ function dashboardHtml(restaurant, role, reservations, customers, members, menu,
       <section class="dashboard-panel ${activeTab === "reservations" ? "is-active" : ""}" data-dashboard-panel="reservations">${reservationsHtml(reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "clients" ? "is-active" : ""}" data-dashboard-panel="clients">${clientsHtml(customers, reservations, role)}</section>
       <section class="dashboard-panel ${activeTab === "quotes" ? "is-active" : ""}" data-dashboard-panel="quotes">${quotesHtml(quotes, customers, menu, role, quoteDrafts)}</section>
+      <section class="dashboard-panel ${activeTab === "invoices" ? "is-active" : ""}" data-dashboard-panel="invoices">${invoicesHtml(invoices, role)}</section>
       <section class="dashboard-panel ${activeTab === "team" ? "is-active" : ""}" data-dashboard-panel="team">${teamHtml(members, canManageTeam, accessRequests)}</section>
       <section class="dashboard-panel ${activeTab === "downloads" ? "is-active" : ""}" data-dashboard-panel="downloads">${downloadsHtml()}</section>
     </div>
@@ -5276,6 +5285,10 @@ async function openQuoteDetail(root, quoteId) {
         </select>
       </label>
     ` : ""}
+    ${canManage ? (quote.invoiceId
+      ? `<span class="quote-preview-note">Facture ${escapeHtml(quote.invoiceNumber || "")} deja creee.</span>`
+      : `<button class="outline-dark-btn button-reset" type="button" data-quote-to-invoice>Transformer en facture</button>`
+    ) : ""}
     <button class="primary-btn button-reset" type="button" data-quote-download>Telecharger en PDF</button>
     <button class="outline-dark-btn button-reset" type="button" data-client-modal-close>Fermer</button>
   `;
@@ -5289,6 +5302,417 @@ async function openQuoteDetail(root, quoteId) {
     cleanupUrl();
     closeDashboardModal();
     await renderDashboard(root, currentUser, root.dataset.restaurantId, "quotes");
+  });
+  footer.querySelector("[data-quote-to-invoice]")?.addEventListener("click", () => {
+    openQuoteToInvoiceConfirm(root, quote);
+  });
+}
+
+// ===========================================================================
+// Factures : creees uniquement depuis un devis existant (bouton "Transformer
+// en facture" dans le detail du devis). Numerotation legale sequentielle,
+// propre (compteur restaurants/{id}/counters/invoices, amorce sur le
+// "Prochain numero de facture" configure dans poket-access.html > Facturation),
+// jamais reutilisee par l'application (aucun equivalent cote app a ce jour).
+// ===========================================================================
+const INVOICE_STATUS_LABELS = {
+  issued: "Emise",
+  paid: "Payee",
+  cancelled: "Annulee"
+};
+const INVOICE_STATUS_TONES = {
+  issued: "even",
+  paid: "credit",
+  cancelled: "owed"
+};
+
+function invoiceStatusLabel(status) {
+  return INVOICE_STATUS_LABELS[status] || "Emise";
+}
+
+async function listInvoices(restaurantId) {
+  const services = await getServices();
+  const { collection, getDocs } = services.firestoreModule;
+  const snaps = await getDocs(collection(services.db, "restaurants", restaurantId, "invoices"));
+  return snaps.docs.map((snap) => ({ id: snap.id, ...snap.data() })).sort((a, b) => invoiceSortTime(b) - invoiceSortTime(a));
+}
+
+function invoiceSortTime(invoice = {}) {
+  return dateFromFirestoreValue(invoice.createdAt || invoice.issuedAt)?.getTime() || 0;
+}
+
+async function createInvoiceFromQuote(restaurantId, quote, restaurant, dueDate, user) {
+  const services = await getServices();
+  const { doc, collection, runTransaction, serverTimestamp } = services.firestoreModule;
+  const invoiceRef = doc(collection(services.db, "restaurants", restaurantId, "invoices"));
+  const counterRef = doc(services.db, "restaurants", restaurantId, "counters", "invoices");
+  const now = new Date();
+  const prefix = String(restaurant.invoicePrefix || "FAC").trim() || "FAC";
+  const seed = Number(restaurant.nextInvoiceNumber) || 1;
+  let invoiceNumber = "";
+  await runTransaction(services.db, async (transaction) => {
+    const counterSnap = await transaction.get(counterRef);
+    const current = counterSnap.exists() ? Number(counterSnap.data()?.next) || seed : seed;
+    invoiceNumber = `${prefix}-${String(current).padStart(4, "0")}`;
+    transaction.set(invoiceRef, {
+      invoiceNumber,
+      status: "issued",
+      quoteId: quote.id,
+      quoteNumber: quote.quoteNumber || "",
+      customer: quote.customer,
+      sourceTable: quote.sourceTable,
+      totalTtc: quote.totalTtc,
+      eventLabel: quote.eventLabel || "",
+      eventDate: quote.eventDate || null,
+      depositAmount: quote.depositAmount || 0,
+      conditions: quote.conditions || "",
+      issuedAt: now.toISOString(),
+      dueDate,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      restaurantId,
+      invoiceId: invoiceRef.id,
+      createdBy: user?.uid || "",
+      createdByEmail: user?.email || "",
+      createdAtServer: serverTimestamp(),
+      updatedAtServer: serverTimestamp()
+    });
+    transaction.set(counterRef, { next: current + 1, updatedAt: now.toISOString(), updatedAtServer: serverTimestamp() }, { merge: true });
+    transaction.set(doc(services.db, "restaurants", restaurantId, "quotes", quote.id), {
+      invoiceId: invoiceRef.id,
+      invoiceNumber,
+      invoicedAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      updatedAtServer: serverTimestamp()
+    }, { merge: true });
+  });
+  return { id: invoiceRef.id, invoiceNumber };
+}
+
+async function updateInvoiceStatus(restaurantId, invoiceId, status) {
+  const services = await getServices();
+  const { doc, setDoc, serverTimestamp } = services.firestoreModule;
+  await setDoc(doc(services.db, "restaurants", restaurantId, "invoices", invoiceId), {
+    status,
+    updatedAt: new Date().toISOString(),
+    updatedAtServer: serverTimestamp()
+  }, { merge: true });
+}
+
+function invoicesHtml(invoices = [], role = "") {
+  const canManage = QUOTE_MANAGER_ROLES.includes(role);
+  const sorted = [...invoices].sort((a, b) => invoiceSortTime(b) - invoiceSortTime(a));
+  return `
+    <div class="quotes-head">
+      <div>
+        <h2>Factures</h2>
+        <p>${sorted.length} facture${sorted.length > 1 ? "s" : ""}.</p>
+      </div>
+    </div>
+    ${sorted.length ? `
+      <div class="client-ledger-table quotes-table">
+        <div class="client-ledger-row client-ledger-head quote-row"><span>Numero</span><span>Client</span><span>Emise le</span><span>Echeance</span><span>Total TTC</span><span>Statut</span></div>
+        ${sorted.map((invoice) => invoiceRowHtml(invoice)).join("")}
+      </div>
+    ` : `<div class="client-account-empty">Aucune facture pour le moment. Transformez un devis en facture depuis l'onglet Devis.</div>`}
+    ${!canManage ? `<p class="alert-note">Votre role ne permet pas de creer des factures.</p>` : ""}
+  `;
+}
+
+function invoiceRowHtml(invoice = {}) {
+  const customer = invoice.customer || {};
+  const tone = INVOICE_STATUS_TONES[invoice.status] || "even";
+  return `
+    <button type="button" class="client-ledger-row quote-row is-clickable" data-invoice-row="${escapeAttr(invoice.id)}">
+      <span><strong>${escapeHtml(invoice.invoiceNumber || invoice.id)}</strong></span>
+      <span>${escapeHtml(customer.name || "Client non renseigne")}</span>
+      <span>${escapeHtml(clientDateLabel(invoice.issuedAt) || "-")}</span>
+      <span>${escapeHtml(clientDateLabel(invoice.dueDate) || "-")}</span>
+      <span>${escapeHtml(formatMoney(invoice.totalTtc))}</span>
+      <span><span class="quote-status-badge is-${tone}">${escapeHtml(invoiceStatusLabel(invoice.status))}</span></span>
+    </button>
+  `;
+}
+
+// Petite confirmation avant conversion : la date d'echeance n'est pas sur le devis
+// (le devis a une "date de validite", la facture a une echeance de paiement distincte).
+function openQuoteToInvoiceConfirm(root, quote) {
+  const today = new Date().toISOString().slice(0, 10);
+  const overlay = showDashboardModal("Transformer en facture", `
+    <form class="platform-form" data-quote-to-invoice-form>
+      <p class="quote-preview-note">Le devis ${escapeHtml(quote.quoteNumber || "")} sera transforme en facture avec un numero definitif. Cette action est irreversible.</p>
+      <label>Date d'echeance<input name="dueDate" type="date" value="${today}" required /></label>
+      <button class="primary-btn button-reset" type="submit">Confirmer et creer la facture</button>
+      <small data-form-status></small>
+    </form>
+  `);
+  const form = overlay.querySelector("[data-quote-to-invoice-form]");
+  const status = form.querySelector("[data-form-status]");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      requireQuotePermission(root);
+      if (quote.invoiceId) throw new Error("Ce devis a deja ete transforme en facture.");
+      status.textContent = "Creation de la facture...";
+      const restaurantId = root.dataset.restaurantId;
+      const restaurant = root.dashboardRestaurant || {};
+      const dueDateValue = new FormData(form).get("dueDate");
+      const dueDate = dueDateValue ? new Date(`${dueDateValue}T12:00:00`).toISOString() : new Date().toISOString();
+      const { id } = await createInvoiceFromQuote(restaurantId, quote, restaurant, dueDate, currentUser);
+      closeDashboardModal();
+      await renderDashboard(root, currentUser, restaurantId, "invoices");
+      await openInvoiceDetail(root, id);
+    } catch (error) {
+      status.textContent = error?.code === "permission-denied"
+        ? "Action refusee par Firestore : votre role ne permet pas cette operation."
+        : (error.message || String(error));
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Construit le PDF complet de la facture : meme mise en page que le devis
+// (PdfDocument, pdfBox, tableau), en-tete "FACTURE", echeance au lieu de
+// validite, et un encadre "Mentions legales" (penalites de retard, indemnite
+// forfaitaire de recouvrement) obligatoire sur une facture B2B francaise.
+// ---------------------------------------------------------------------------
+async function buildInvoicePdf(invoice = {}, restaurant = {}) {
+  const doc = new PdfDocument();
+  const margin = doc.margin;
+  const width = doc.contentWidth;
+  const customer = invoice.customer || {};
+  const table = invoice.sourceTable || {};
+  const lineItems = Array.isArray(table.lines) ? table.lines.filter((line) => Number(line.quantity) !== 0) : [];
+
+  let logo = null;
+  const logoUrl = firstText(restaurant.documentLogoUrl, restaurant.logoUrl);
+  if (logoUrl) {
+    try {
+      const pixels = await loadLogoPixels(logoUrl);
+      logo = { name: await doc.addImageAsset(pixels), width: pixels.width, height: pixels.height };
+    } catch (error) {
+      logo = null;
+    }
+  }
+  const restaurantName = String(firstText(restaurant.name, restaurant.tradeName, "Restaurant"));
+  const headerTop = doc.pageHeight - doc.y;
+  let leftY;
+  if (logo) {
+    doc.image(margin, headerTop, logo.width, logo.height, logo.name);
+    leftY = headerTop + logo.height + 8;
+  } else {
+    doc.text(margin, headerTop, restaurantName, { bold: true, size: 16 });
+    leftY = headerTop + 22;
+  }
+  const street = cleanStreetLine(firstText(restaurant.addressLine1, restaurant.address), restaurant.postalCode);
+  const addressLines = [
+    street,
+    [restaurant.postalCode, restaurant.city].filter(Boolean).join(" "),
+    restaurant.phone ? `Tel : ${formatClientPhone(restaurant.phone)}` : "",
+    restaurant.email || "",
+    quoteHeaderLegalLine(restaurant)
+  ].filter(Boolean);
+  addressLines.forEach((line) => {
+    doc.text(margin, leftY, line, { size: 9.5 });
+    leftY += 13.5;
+  });
+
+  const rightX = doc.pageWidth - margin;
+  doc.textRight(rightX, doc.pageHeight - doc.y, "FACTURE", { bold: true, size: 22 });
+  let rightY = doc.pageHeight - doc.y + 26;
+  [
+    invoice.invoiceNumber || "",
+    `Date : ${clientDateLabel(invoice.issuedAt) || "-"}`,
+    `Echeance : ${clientDateLabel(invoice.dueDate) || "-"}`,
+    invoice.quoteNumber ? `Devis d'origine : ${invoice.quoteNumber}` : ""
+  ].filter(Boolean).forEach((line) => {
+    doc.textRight(rightX, rightY, line, { size: 10 });
+    rightY += 14;
+  });
+
+  doc.y -= Math.max(leftY, rightY) - (doc.pageHeight - doc.y) + 6;
+  doc.line(margin, doc.pageHeight - doc.y, doc.pageWidth - margin, doc.pageHeight - doc.y);
+  doc.y -= 16;
+
+  const boxWidth = (width - 16) / 2;
+  const clientLines = [
+    customer.name || "Client non renseigne",
+    customer.phone ? `Tel. : ${formatClientPhone(customer.phone)}` : "",
+    customer.email ? `Email : ${customer.email}` : "",
+    customer.address || "",
+    customer.taxId ? `SIRET/Fiscal : ${customer.taxId}` : "",
+    customer.vatNumber ? `TVA : ${customer.vatNumber}` : ""
+  ].filter(Boolean);
+  const prestationLines = [
+    invoice.eventLabel || (table.sessionKind === "takeaway" ? "A emporter" : "Sur place"),
+    invoice.eventDate ? `Date evenement : ${clientDateLabel(invoice.eventDate)}` : "",
+    table.covers ? `${table.covers} couverts` : "",
+    table.tableNote ? `Note : ${table.tableNote}` : ""
+  ].filter(Boolean);
+  doc.ensureSpace(100);
+  const topY = doc.pageHeight - doc.y;
+  const clientHeight = pdfBox(doc, margin, topY, boxWidth, "Client", clientLines);
+  const prestationHeight = pdfBox(doc, margin + boxWidth + 16, topY, boxWidth, "Prestation", prestationLines);
+  doc.y -= Math.max(clientHeight, prestationHeight) + 20;
+
+  const columns = [
+    { label: "Designation", width: width * 0.46, align: "left" },
+    { label: "Qte", width: width * 0.09, align: "right" },
+    { label: "PU TTC", width: width * 0.15, align: "right" },
+    { label: "TVA", width: width * 0.10, align: "right" },
+    { label: "Total TTC", width: width * 0.20, align: "right" }
+  ];
+  const colX = [margin];
+  columns.forEach((column, index) => colX.push(colX[index] + column.width));
+
+  const drawTableHeader = () => {
+    doc.ensureSpace(30);
+    const rowTop = doc.pageHeight - doc.y;
+    doc.rect(margin, rowTop, width, 22, { stroke: "0.6 0.6 0.6", fill: "0.91 0.91 0.91" });
+    columns.forEach((column, index) => {
+      const cellX = colX[index];
+      if (column.align === "right") doc.textRight(cellX + column.width - 6, rowTop + 6, column.label, { bold: true, size: 9.5 });
+      else doc.text(cellX + 6, rowTop + 6, column.label, { bold: true, size: 9.5 });
+    });
+    doc.y -= 22;
+  };
+  drawTableHeader();
+
+  let total = 0;
+  const vatBuckets = new Map();
+  lineItems.forEach((line) => {
+    const quantity = Number(line.quantity) || 0;
+    const unitPrice = Number(line.unitPrice) || 0;
+    const rate = Number(line.vatOnSite) || 0;
+    const lineTotal = roundMoney(quantity * unitPrice);
+    total += lineTotal;
+    if (rate > 0 && lineTotal > 0) {
+      const vatAmount = lineTotal - lineTotal / (1 + rate / 100);
+      vatBuckets.set(rate, roundMoney((vatBuckets.get(rate) || 0) + vatAmount));
+    }
+    const cells = [line.name || "Article", ticketQuantity(quantity), ticketAmount(unitPrice), `${String(rate).replace(".", ",")}%`, ticketAmount(lineTotal)];
+    const wrapped = wrapProportional(cells[0], columns[0].width - 12, false, 9.5);
+    const rowHeight = Math.max(20, wrapped.length * 13 + 6);
+    doc.ensureSpace(rowHeight);
+    if (doc.pageHeight - doc.y === doc.margin) drawTableHeader();
+    const rowTop = doc.pageHeight - doc.y;
+    doc.rect(margin, rowTop, width, rowHeight, { stroke: "0.75 0.75 0.75", lineWidth: 0.4 });
+    wrapped.forEach((part, index) => doc.text(colX[0] + 6, rowTop + 6 + index * 13, part, { size: 9.5 }));
+    cells.slice(1).forEach((value, index) => {
+      const column = columns[index + 1];
+      doc.textRight(colX[index + 1] + column.width - 6, rowTop + 6, value, { size: 9.5 });
+    });
+    doc.y -= rowHeight;
+  });
+  if (!lineItems.length) {
+    doc.ensureSpace(24);
+    const rowTop = doc.pageHeight - doc.y;
+    doc.rect(margin, rowTop, width, 22, { stroke: "0.75 0.75 0.75", lineWidth: 0.4 });
+    doc.text(margin + 6, rowTop + 6, "Aucune ligne", { size: 9.5 });
+    doc.y -= 22;
+  }
+  doc.y -= 16;
+
+  total = roundMoney(total);
+  const totalVat = roundMoney([...vatBuckets.values()].reduce((sum, value) => sum + value, 0));
+  const totalHt = roundMoney(total - totalVat);
+  const deposit = roundMoney(Number(invoice.depositAmount) || 0);
+  const totalsRows = [
+    ...[...vatBuckets.entries()].sort((a, b) => a[0] - b[0]).map(([rate, amount]) => [`TVA ${String(rate).replace(".", ",")} %`, formatMoney(amount), false]),
+    ["Total HT", formatMoney(totalHt), false],
+    ["Total TTC", formatMoney(total), true]
+  ];
+  if (deposit > 0) {
+    totalsRows.push(["Acompte deja verse", formatMoney(deposit), false]);
+    totalsRows.push(["Net a payer", formatMoney(roundMoney(Math.max(total - deposit, 0))), true]);
+  }
+  const totalsWidth = 230;
+  const totalsX = doc.pageWidth - margin - totalsWidth;
+  doc.ensureSpace(totalsRows.length * 15 + 6);
+  totalsRows.forEach(([label, value, bold]) => {
+    const rowTop = doc.pageHeight - doc.y;
+    doc.text(totalsX, rowTop, label, { bold, size: 10 });
+    doc.textRight(doc.pageWidth - margin, rowTop, value, { bold, size: 10 });
+    doc.y -= 15;
+  });
+  doc.y -= 12;
+
+  // -- mentions legales obligatoires (penalites de retard, indemnite de recouvrement) --
+  const legalLines = [
+    restaurant.paymentTerms || "Paiement a reception de facture.",
+    restaurant.latePenaltyTerms || "En cas de retard de paiement, penalites au taux d'interet legal en vigueur, exigibles sans rappel.",
+    restaurant.recoveryIndemnity ? `Indemnite forfaitaire de recouvrement : ${restaurant.recoveryIndemnity}` : "Indemnite forfaitaire de recouvrement : 40 EUR (art. L441-10 du code de commerce).",
+    restaurant.invoiceLegalNotice || ""
+  ].filter(Boolean).join(NL);
+  doc.ensureSpace(70);
+  let boxTop = doc.pageHeight - doc.y;
+  let boxHeight = pdfBox(doc, margin, boxTop, width, "Mentions legales", legalLines.split(NL));
+  doc.y -= boxHeight + 16;
+
+  if (restaurant.iban || restaurant.bic) {
+    const holder = firstText(restaurant.legalName, restaurant.tradeName, restaurant.name);
+    const bankLines = [
+      holder ? `Titulaire : ${holder}` : "",
+      restaurant.iban ? `IBAN : ${restaurant.iban}` : "",
+      restaurant.bic ? `BIC : ${restaurant.bic}` : "",
+      `Reference a indiquer : ${invoice.invoiceNumber || ""}`
+    ].filter(Boolean);
+    doc.ensureSpace(60);
+    boxTop = doc.pageHeight - doc.y;
+    boxHeight = pdfBox(doc, margin, boxTop, width, "Coordonnees bancaires", bankLines);
+    doc.y -= boxHeight + 16;
+  }
+
+  if (invoice.status === "paid") {
+    doc.ensureSpace(30);
+    doc.text(margin, doc.pageHeight - doc.y, "Facture acquittee", { bold: true, size: 12 });
+  }
+
+  return doc.build();
+}
+
+async function openInvoiceDetail(root, invoiceId) {
+  const invoices = root.dashboardInvoices || [];
+  const invoice = invoices.find((item) => item.id === invoiceId);
+  if (!invoice) return;
+  const restaurant = root.dashboardRestaurant || {};
+  const canManage = QUOTE_MANAGER_ROLES.includes(root.dataset.restaurantRole || "");
+  const overlay = showDashboardModal(
+    `Facture ${invoice.invoiceNumber || ""}`,
+    `<p class="client-modal-wait">Generation du PDF...</p>`,
+    { wide: true }
+  );
+  const blob = await buildInvoicePdf(invoice, restaurant);
+  if (!document.body.contains(overlay)) return;
+  const objectUrl = URL.createObjectURL(blob);
+  overlay.dataset.invoiceObjectUrl = objectUrl;
+  overlay.querySelector(".client-modal-body").innerHTML = `<div class="quote-preview"><iframe src="${escapeAttr(objectUrl)}" title="Apercu de la facture"></iframe></div>`;
+  const cleanupUrl = () => URL.revokeObjectURL(objectUrl);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest("[data-client-modal-close]")) cleanupUrl();
+  });
+  const footer = document.createElement("footer");
+  footer.innerHTML = `
+    ${canManage ? `
+      <label class="quote-status-inline">Statut
+        <select data-invoice-status-select>
+          ${Object.keys(INVOICE_STATUS_LABELS).map((status) => `<option value="${status}" ${invoice.status === status ? "selected" : ""}>${INVOICE_STATUS_LABELS[status]}</option>`).join("")}
+        </select>
+      </label>
+    ` : ""}
+    <button class="primary-btn button-reset" type="button" data-invoice-download>Telecharger en PDF</button>
+    <button class="outline-dark-btn button-reset" type="button" data-client-modal-close>Fermer</button>
+  `;
+  overlay.querySelector(".client-modal").appendChild(footer);
+  footer.querySelector("[data-invoice-download]").addEventListener("click", () => {
+    const stamp = String(invoice.invoiceNumber || invoice.id).replace(/[^a-zA-Z0-9_-]/g, "_");
+    downloadClientFile(blob, `${stamp}.pdf`, "application/pdf");
+  });
+  footer.querySelector("[data-invoice-status-select]")?.addEventListener("change", async (event) => {
+    await updateInvoiceStatus(root.dataset.restaurantId, invoice.id, event.target.value);
+    cleanupUrl();
+    closeDashboardModal();
+    await renderDashboard(root, currentUser, root.dataset.restaurantId, "invoices");
   });
 }
 
@@ -6423,7 +6847,7 @@ function statusSelectHtml(reservation) {
 const DASHBOARD_NAV_GROUPS = [
   ["overview", "profile", "hours", "public", "menu"],
   ["reservations", "team"],
-  ["clients", "quotes"],
+  ["clients", "quotes", "invoices"],
   ["downloads"]
 ];
 
@@ -6437,6 +6861,7 @@ function tabLabel(tab) {
     reservations: "Reservations",
     clients: "Comptes clients",
     quotes: "Devis",
+    invoices: "Factures",
     team: "Equipe",
     downloads: "Downloads"
   }[tab] || tab;
@@ -6478,8 +6903,16 @@ function normalizeRestaurant(id, data) {
     apeCode: data.apeCode || profile.apeCode || "",
     iban: data.iban || profile.iban || "",
     bic: data.bic || profile.bic || "",
+    billingEmail: data.billingEmail || profile.billingEmail || "",
+    billingPhone: data.billingPhone || profile.billingPhone || "",
     paymentTerms: data.paymentTerms || profile.paymentTerms || "",
+    latePenaltyTerms: data.latePenaltyTerms || profile.latePenaltyTerms || "",
+    recoveryIndemnity: data.recoveryIndemnity || profile.recoveryIndemnity || "",
     invoiceLegalNotice: data.invoiceLegalNotice || profile.invoiceLegalNotice || "",
+    // Rempli par poket-access.html (section Facturation), jamais consomme cote app : le site
+    // les utilise pour numeroter ses factures (voir createInvoiceFromQuote / buildInvoicePdf).
+    invoicePrefix: data.invoicePrefix || profile.invoicePrefix || "FAC",
+    nextInvoiceNumber: numberValue(data.nextInvoiceNumber, profile.nextInvoiceNumber) || 1,
     defaultVatOnSite: firstNumber(data.defaultVatOnSite, profile.defaultVatOnSite) ?? 10,
     defaultVatTakeaway: firstNumber(data.defaultVatTakeaway, profile.defaultVatTakeaway) ?? 10,
     openingHours: resolveOpeningHours(data, profile)
