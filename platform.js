@@ -1248,6 +1248,15 @@ function initDashboardPage() {
   if (!root) return;
   root.innerHTML = alertHtml("Chargement du dashboard...");
   root.addEventListener("click", async (event) => {
+    if (!event.target.closest(".quote-client-combobox")) {
+      root.querySelectorAll("[data-quote-client-combobox-list]:not([hidden])").forEach((list) => { list.hidden = true; });
+    }
+    const quoteClientOption = event.target.closest("[data-quote-client-option]");
+    if (quoteClientOption) {
+      event.preventDefault();
+      selectQuoteClientOption(root, quoteClientOption);
+      return;
+    }
     const login = event.target.closest("[data-platform-login]");
     if (login) signIn();
     const tabButton = event.target.closest("[data-dashboard-tab]");
@@ -1676,9 +1685,20 @@ function initDashboardPage() {
       updateQuoteLineRow(quoteRowEl);
       updateQuoteFormTotals(quoteRowEl?.closest("form"));
     }
+    if (event.target.matches("[data-quote-client-search]")) {
+      filterQuoteClientCombobox(event.target);
+    }
+  });
+  root.addEventListener("focusin", (event) => {
+    if (event.target.matches("[data-quote-client-search]")) {
+      filterQuoteClientCombobox(event.target);
+    }
   });
   root.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeClientColumnMenus(root);
+    if (event.key === "Escape") {
+      closeClientColumnMenus(root);
+      root.querySelectorAll("[data-quote-client-combobox-list]:not([hidden])").forEach((list) => { list.hidden = true; });
+    }
   });
   root.addEventListener("pointerdown", (event) => {
     const handle = event.target.closest("[data-category-drag-handle]");
@@ -4512,11 +4532,7 @@ function quoteCreatePageHtml(clients = []) {
       </header>
       <form class="platform-form quote-form" data-dashboard-quote-form>
         <div class="quote-client-picker">
-          <label class="quote-client-select">Client
-            <select data-quote-customer-select>
-              ${quoteClientOptionsHtml(clients)}
-            </select>
-          </label>
+          ${quoteClientPickerFieldHtml(clients)}
           <button class="outline-dark-btn button-reset" type="button" data-quote-add-client>+ Ajouter un client</button>
         </div>
         <div class="quote-client-summary" data-quote-client-summary>${quoteClientSummaryHtml(null)}</div>
@@ -4566,6 +4582,38 @@ function quoteClientOptionsHtml(clients = [], selectedId = "") {
   `;
 }
 
+// Champ client "combobox" : un champ texte pour taper/filtrer (comme la recherche du widget
+// catalogue), avec un <select> cache qui reste la source de verite pour tout le reste du code
+// (applyQuoteClientSelection, submitQuoteForm/submitInvoiceForm, resumeQuoteDraft...). Choisir
+// une suggestion met a jour le select et declenche son evenement "change" comme d'habitude.
+function quoteClientComboboxOptionsHtml(clients = []) {
+  return clients.map((client) => `
+    <button type="button" class="button-reset quote-client-combobox-option" data-quote-client-option="${escapeAttr(client.id)}" data-quote-client-option-name="${escapeAttr((client.displayName || client.companyName || "Client").toLowerCase())}">
+      ${escapeHtml(client.displayName || client.companyName || "Client")}
+    </button>
+  `).join("");
+}
+
+function quoteClientPickerFieldHtml(clients = [], selectedId = "") {
+  const selected = clients.find((client) => client.id === selectedId);
+  return `
+    <div class="quote-client-select" data-quote-client-combo>
+      <span class="field-label">Client</span>
+      <div class="quote-client-combobox">
+        <input type="text" class="quote-client-search" data-quote-client-search autocomplete="off"
+          placeholder="${clients.length ? "Rechercher un client..." : "Aucun client enregistre"}"
+          value="${escapeAttr(selected ? (selected.displayName || selected.companyName || "") : "")}" />
+        <select data-quote-customer-select class="quote-client-select-hidden">
+          ${quoteClientOptionsHtml(clients, selectedId)}
+        </select>
+        <div class="quote-client-combobox-list" data-quote-client-combobox-list hidden>
+          ${quoteClientComboboxOptionsHtml(clients)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function quoteClientSummaryHtml(client) {
   if (!client) {
     return `<p class="quote-client-empty">Choisissez un client existant, ou ajoutez-en un avec le bouton ci-dessus.</p>`;
@@ -4583,13 +4631,41 @@ function quoteClientSummaryHtml(client) {
   `;
 }
 
-// Repercute le client choisi dans le formulaire (resume en lecture seule).
+// Repercute le client choisi dans le formulaire (resume en lecture seule + champ de recherche).
 function applyQuoteClientSelection(root, form) {
   const select = form.querySelector("[data-quote-customer-select]");
   const summary = form.querySelector("[data-quote-client-summary]");
   if (!select || !summary) return;
   const client = (root.quoteClients || []).find((item) => item.id === select.value) || null;
   summary.innerHTML = quoteClientSummaryHtml(client);
+  const search = form.querySelector("[data-quote-client-search]");
+  if (search) search.value = client ? (client.displayName || client.companyName || "") : "";
+}
+
+function filterQuoteClientCombobox(input, { openOnly = false } = {}) {
+  const combo = input.closest("[data-quote-client-combo]");
+  const list = combo?.querySelector("[data-quote-client-combobox-list]");
+  if (!list) return;
+  if (!openOnly) {
+    const term = normalizeClientSearch(input.value);
+    let visibleCount = 0;
+    list.querySelectorAll("[data-quote-client-option]").forEach((option) => {
+      const match = !term || normalizeClientSearch(option.dataset.quoteClientOptionName).includes(term);
+      option.classList.toggle("is-hidden", !match);
+      if (match) visibleCount += 1;
+    });
+  }
+  list.hidden = false;
+}
+
+function selectQuoteClientOption(root, optionEl) {
+  const combo = optionEl.closest("[data-quote-client-combo]");
+  const select = combo?.querySelector("[data-quote-customer-select]");
+  const list = combo?.querySelector("[data-quote-client-combobox-list]");
+  if (!select) return;
+  select.value = optionEl.dataset.quoteClientOption;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  if (list) list.hidden = true;
 }
 
 // « Ajouter un client » : le meme formulaire que Comptes clients, dans une fenetre. La fenetre
@@ -4621,6 +4697,8 @@ function openQuoteAddClient(root, form) {
       const select = form.querySelector("[data-quote-customer-select]");
       if (select) {
         select.innerHTML = quoteClientOptionsHtml(root.quoteClients, newClient.id);
+        const combobox = form.querySelector("[data-quote-client-combobox-list]");
+        if (combobox) combobox.innerHTML = quoteClientComboboxOptionsHtml(root.quoteClients);
         applyQuoteClientSelection(root, form);
       }
     } catch (error) {
@@ -5831,11 +5909,7 @@ function invoiceCreatePageHtml(clients = [], restaurant = {}) {
       </header>
       <form class="platform-form quote-form" data-dashboard-invoice-form>
         <div class="quote-client-picker">
-          <label class="quote-client-select">Client
-            <select data-quote-customer-select>
-              ${quoteClientOptionsHtml(clients)}
-            </select>
-          </label>
+          ${quoteClientPickerFieldHtml(clients)}
           <button class="outline-dark-btn button-reset" type="button" data-quote-add-client>+ Ajouter un client</button>
         </div>
         <div class="quote-client-summary" data-quote-client-summary>${quoteClientSummaryHtml(null)}</div>
