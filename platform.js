@@ -4175,6 +4175,29 @@ async function createQuote(restaurantId, payload, user) {
   return quoteRef.id;
 }
 
+// Corrige un devis deja emis (client, lignes, montants...) sans toucher a son numero, sa date
+// d'emission ni son historique : contrairement a une facture, un devis n'a pas de contrainte
+// legale de numerotation continue, il reste modifiable tant qu'il n'a pas ete transforme en facture.
+async function updateQuoteRecord(restaurantId, quoteId, payload, user) {
+  const services = await getServices();
+  const { doc, setDoc, serverTimestamp } = services.firestoreModule;
+  const now = new Date();
+  await setDoc(doc(services.db, "restaurants", restaurantId, "quotes", quoteId), {
+    sourceTable: payload.sourceTable,
+    customer: payload.customer,
+    validUntil: payload.validUntil,
+    totalTtc: payload.totalTtc,
+    eventLabel: payload.eventLabel || "",
+    eventDate: payload.eventDate || null,
+    depositAmount: payload.depositAmount || 0,
+    conditions: payload.conditions || "",
+    updatedAt: now.toISOString(),
+    updatedBy: user?.uid || "",
+    updatedByEmail: user?.email || "",
+    updatedAtServer: serverTimestamp()
+  }, { merge: true });
+}
+
 async function updateQuoteStatus(restaurantId, quoteId, status) {
   const services = await getServices();
   const { doc, setDoc, serverTimestamp } = services.firestoreModule;
@@ -4830,6 +4853,21 @@ async function submitQuoteForm(root, form, restaurantId) {
   const payload = quotePayloadFromForm(root, form);
   if (!payload.lines.length) throw new Error("Ajoutez au moins une ligne avec un libelle et une quantite.");
   if (!payload.customer) throw new Error("Choisissez un client (ou ajoutez-en un avec le bouton « Ajouter un client »).");
+  const editQuoteId = form.dataset.editQuoteId;
+  if (editQuoteId) {
+    await updateQuoteRecord(restaurantId, editQuoteId, {
+      customer: payload.customer,
+      sourceTable: payload.sourceTable,
+      totalTtc: payload.totalTtc,
+      validUntil: payload.validUntil,
+      eventLabel: payload.eventLabel,
+      eventDate: payload.eventDate,
+      depositAmount: payload.depositAmount,
+      conditions: payload.conditions
+    }, currentUser);
+    delete form.dataset.editQuoteId;
+    return;
+  }
   await createQuote(restaurantId, {
     customer: payload.customer,
     sourceTable: payload.sourceTable,
@@ -4908,6 +4946,7 @@ async function saveQuoteFormAsDraft(root, form) {
 function resetQuoteCreateForm(root, form) {
   if (!form) return;
   delete form.dataset.draftId;
+  delete form.dataset.editQuoteId;
   form.reset();
   applyQuoteClientSelection(root, form);
   const linesContainer = form.querySelector("[data-quote-lines]");
@@ -4916,6 +4955,8 @@ function resetQuoteCreateForm(root, form) {
   updateQuoteFormTotals(form);
   const status = form.querySelector("[data-form-status]");
   if (status) status.textContent = "";
+  const submitBtn = form.querySelector("button[type=submit]");
+  if (submitBtn) submitBtn.textContent = form.matches("[data-dashboard-invoice-form]") ? "Creer la facture" : "Creer le devis";
 }
 
 function resumeQuoteDraft(root, draftId) {
@@ -4949,6 +4990,46 @@ function resumeQuoteDraft(root, draftId) {
   });
   linesContainer.querySelectorAll("[data-quote-line]").forEach(updateQuoteLineRow);
   updateQuoteFormTotals(form);
+  section.querySelector("[data-quotes-list-view]")?.classList.add("is-hidden");
+  section.querySelector("[data-quote-create-page]")?.classList.remove("is-hidden");
+}
+
+// Corrige un devis deja emis : reouvre la page de creation, pre-remplie depuis le devis reel
+// (pas un brouillon), et bascule submitQuoteForm en mode mise a jour via editQuoteId.
+function openQuoteEditForm(root, quote) {
+  const section = document.querySelector("[data-quotes-section]");
+  const form = section?.querySelector("[data-dashboard-quote-form]");
+  if (!form) return;
+  delete form.dataset.draftId;
+  form.dataset.editQuoteId = quote.id;
+  form.querySelector("[data-quote-customer-select]").value = quote.customer?.customerId || "";
+  applyQuoteClientSelection(root, form);
+  form.elements.eventLabel.value = quote.eventLabel || "";
+  form.elements.eventDate.value = quote.eventDate ? String(quote.eventDate).slice(0, 10) : "";
+  form.elements.covers.value = quote.sourceTable?.covers || "";
+  form.elements.validUntil.value = quote.validUntil ? String(quote.validUntil).slice(0, 10) : "";
+  form.elements.depositAmount.value = quote.depositAmount || "";
+  form.elements.notes.value = quote.sourceTable?.tableNote || "";
+  form.elements.conditions.value = quote.conditions || "";
+  const linesContainer = form.querySelector("[data-quote-lines]");
+  linesContainer.querySelectorAll("[data-quote-line]").forEach((row) => row.remove());
+  const lines = Array.isArray(quote.sourceTable?.lines) && quote.sourceTable.lines.length ? quote.sourceTable.lines : [null];
+  lines.forEach((line) => {
+    linesContainer.insertAdjacentHTML("beforeend", quoteLineRowHtml(line ? {
+      name: line.name,
+      price: Number(line.unitPrice) || 0,
+      vat: Number(line.vatOnSite) || 0,
+      itemId: line.itemId || "",
+      categoryId: line.categoryId || "",
+      categoryName: line.categoryName || ""
+    } : null, line ? Number(line.quantity) || 1 : 1));
+  });
+  linesContainer.querySelectorAll("[data-quote-line]").forEach(updateQuoteLineRow);
+  updateQuoteFormTotals(form);
+  const submitBtn = form.querySelector("button[type=submit]");
+  if (submitBtn) submitBtn.textContent = "Enregistrer les modifications";
+  const status = form.querySelector("[data-form-status]");
+  if (status) status.textContent = "";
   section.querySelector("[data-quotes-list-view]")?.classList.add("is-hidden");
   section.querySelector("[data-quote-create-page]")?.classList.remove("is-hidden");
 }
@@ -5478,6 +5559,7 @@ async function openQuoteDetail(root, quoteId) {
         </select>
       </label>
     ` : ""}
+    ${canManage && !quote.invoiceId ? `<button class="outline-dark-btn button-reset" type="button" data-quote-edit>Modifier</button>` : ""}
     ${canManage ? (quote.invoiceId
       ? `<span class="quote-preview-note">Facture ${escapeHtml(quote.invoiceNumber || "")} deja creee.</span>`
       : `<button class="outline-dark-btn button-reset" type="button" data-quote-to-invoice>Transformer en facture</button>`
@@ -5498,6 +5580,11 @@ async function openQuoteDetail(root, quoteId) {
   });
   footer.querySelector("[data-quote-to-invoice]")?.addEventListener("click", () => {
     openQuoteToInvoiceConfirm(root, quote);
+  });
+  footer.querySelector("[data-quote-edit]")?.addEventListener("click", () => {
+    cleanupUrl();
+    closeDashboardModal();
+    openQuoteEditForm(root, quote);
   });
 }
 
