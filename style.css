@@ -6465,3 +6465,101 @@ button.quote-row:focus-visible {
   border-radius: 12px;
   background: #eef1f4;
 }
+
+/* --- Editorial pilot: Chez Marwan public page only (data-restaurant-slug stamped by
+   applyPublicRestaurantTheme/hydratePublicMenuPage in platform.js). Every rule below is
+   scoped under [data-restaurant-slug="chez-marwan"] and adds to, never edits, the shared
+   .restaurant-*/.eyebrow/.menu-item-* rules above, so every other restaurant is unaffected. --- */
+
+[data-restaurant-slug="chez-marwan"] {
+  --editorial-serif: "Fraunces", Georgia, "Times New Roman", serif;
+}
+
+/* Quieter kicker: a warm italic word instead of a tracked-out SaaS eyebrow badge */
+[data-restaurant-slug="chez-marwan"] .eyebrow {
+  font-family: var(--editorial-serif);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 18px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--restaurant-accent);
+}
+
+[data-restaurant-slug="chez-marwan"] .restaurant-pill {
+  font-family: var(--editorial-serif);
+  font-style: italic;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Headline personality: one serif display moment, sized and weighted with intent */
+[data-restaurant-slug="chez-marwan"] .restaurant-identity h1 {
+  font-family: var(--editorial-serif);
+  font-weight: 560;
+  font-size: clamp(50px, 7.4vw, 96px);
+  letter-spacing: -0.01em;
+}
+
+[data-restaurant-slug="chez-marwan"] .restaurant-identity p {
+  font-size: 20px;
+  max-width: 620px;
+}
+
+[data-restaurant-slug="chez-marwan"] .restaurant-section h2,
+[data-restaurant-slug="chez-marwan"] .restaurant-side-card h2 {
+  font-family: var(--editorial-serif);
+  font-weight: 520;
+  font-size: clamp(28px, 3.2vw, 36px);
+}
+
+/* Radius by purpose: reading surfaces go quiet/architectural, the photo frame keeps a
+   single generous signature radius, pills/buttons keep their existing full-pill shape */
+[data-restaurant-slug="chez-marwan"] .restaurant-section,
+[data-restaurant-slug="chez-marwan"] .restaurant-side-card {
+  border-radius: 4px;
+  background: rgba(255, 250, 243, 0.6);
+  border: 1px solid rgba(10, 37, 64, 0.14);
+  box-shadow: none;
+}
+
+[data-restaurant-slug="chez-marwan"] .restaurant-cover-card {
+  border-radius: 2px;
+  box-shadow: 0 24px 48px -18px rgba(10, 37, 64, 0.4);
+}
+
+[data-restaurant-slug="chez-marwan"] .menu-item-card {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+/* Photography gets more room to lead */
+[data-restaurant-slug="chez-marwan"] .restaurant-cover-photo {
+  min-height: 340px;
+}
+
+[data-restaurant-slug="chez-marwan"] .restaurant-cover-info strong {
+  font-family: var(--editorial-serif);
+  font-size: 21px;
+  font-weight: 560;
+}
+
+/* Warmer editorial composition: hairline rule instead of a stacked shadow card, more air */
+[data-restaurant-slug="chez-marwan"] .restaurant-layout {
+  gap: 32px;
+}
+
+[data-restaurant-slug="chez-marwan"] .restaurant-section {
+  padding: 40px;
+}
+
+[data-restaurant-slug="chez-marwan"] .restaurant-section::before,
+[data-restaurant-slug="chez-marwan"] .restaurant-side-card::before {
+  content: "";
+  display: block;
+  width: 44px;
+  height: 2px;
+  margin-bottom: 18px;
+  background: var(--restaurant-accent);
+}

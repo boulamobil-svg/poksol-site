@@ -2145,9 +2145,11 @@ function applyPublicRestaurantTheme(restaurant = {}) {
   const accentColor = normalizeHexColor(theme.accentColor, "#1976F3");
   document.body.style.setProperty("--restaurant-primary", primaryColor);
   document.body.style.setProperty("--restaurant-accent", accentColor);
+  if (restaurant.slug || restaurant.id) document.body.dataset.restaurantSlug = restaurant.slug || restaurant.id;
 }
 
 function hydratePublicMenuPage(root, restaurant, menu) {
+  if (restaurant.slug || restaurant.id) document.body.dataset.restaurantSlug = restaurant.slug || restaurant.id;
   const title = root.querySelector("[data-menu-page-title]");
   const subtitle = root.querySelector("[data-menu-page-subtitle]");
   const backLink = root.querySelector("[data-menu-page-back]");
@@ -7355,18 +7357,6 @@ function downloadsHtml() {
   `;
 }
 
-function parseMenuItems(raw) {
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [category, name, description, price] = line.split("|").map((part) => (part || "").trim());
-      return { category, name, description, price };
-    })
-    .filter((item) => item.name);
-}
-
 function normalizeCatalogCategory(category = {}) {
   const name = firstText(category.name, category.label, category.title, category.categoryName, category.categoryPrefix, category.id);
   const publicDisplayName = firstText(category.publicDisplayName, category.menuDisplayName, category.displayName);
@@ -7759,20 +7749,6 @@ function isReservationWithinOpeningHours(hours, dateValue, timeValue) {
 function minutesFromTime(value) {
   const [hours, minutes] = normalizeTime(value).split(":").map(Number);
   return (hours || 0) * 60 + (minutes || 0);
-}
-
-function saveAccessSessionForRestaurant(user, restaurantId, inviteCode = "", role = "") {
-  localStorage.setItem("poksolAccessSession", JSON.stringify({
-    active: true,
-    userId: user?.uid || "",
-    email: user?.email || "",
-    restaurantId,
-    profileComplete: true,
-    source: inviteCode ? "invite" : "account",
-    inviteCode,
-    role,
-    updatedAt: new Date().toISOString()
-  }));
 }
 
 function setupReservationHoursUi(restaurant) {
