@@ -214,30 +214,27 @@ select:focus-visible {
 .hero-content {
   display: grid;
   grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 64px;
   max-width: 1180px;
   margin: 76px auto 0;
 }
 
 .hero-text {
+  padding-top: 36px;
+}
+
+.hero-text {
   grid-column: 2;
 }
 
-.hero-brand-logo {
-  display: block;
-  width: min(330px, 68%);
-  height: auto;
-  margin: 0 0 20px;
-}
 
 .screenshots-zone {
   grid-column: 1;
   grid-row: 1;
 }
 
-.eyebrow,
-.product-kicker {
+.eyebrow {
   color: var(--poksol-green);
   font-size: 13px;
   font-weight: 800;
@@ -247,14 +244,11 @@ select:focus-visible {
 }
 
 .hero-text h1 {
-  font-size: clamp(46px, 6vw, 72px);
-  line-height: 1.05;
+  font-size: clamp(42px, 5.4vw, 64px);
+  font-weight: 800;
+  line-height: 1.08;
   margin: 0 0 24px;
-  letter-spacing: 0;
-}
-
-.hero-text h1 span {
-  color: var(--poksol-blue);
+  letter-spacing: -0.01em;
 }
 
 .hero-text p {
@@ -289,31 +283,6 @@ select:focus-visible {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.65);
   background: rgba(255, 255, 255, 0.08);
-}
-
-.badges {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-top: 42px;
-}
-
-.badges div {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 16px;
-  border-left: 2px solid rgba(66, 201, 111, 0.8);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.badges strong {
-  color: var(--poksol-green);
-  font-size: 16px;
-}
-
-.badges small {
-  color: rgba(255, 255, 255, 0.65);
 }
 
 .screenshots-zone {
@@ -530,6 +499,37 @@ select:focus-visible {
   padding: 8px 14px;
   font-size: 14px;
   font-weight: 700;
+}
+
+/* Status pill: same component for "live" and "coming soon" so the state is
+   communicated consistently rather than through a decorative caps label. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.status-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill-live {
+  color: #0f7b47;
+  background: #e6f7ed;
+}
+
+.status-pill-soon {
+  color: var(--text-muted);
+  background: #eef1f5;
 }
 
 .product-actions {
@@ -794,34 +794,29 @@ select:focus-visible {
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
+  gap: 0;
+  border-top: 1px solid var(--line);
 }
 
 .upcoming-card {
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 28px;
-  box-shadow: 0 14px 35px rgba(10, 37, 64, 0.07);
-  border: 1px solid var(--line);
+  padding: 26px 22px;
+  border-right: 1px solid var(--line);
   text-align: left;
 }
 
-.upcoming-card span {
-  color: var(--poksol-blue);
-  font-size: 12px;
-  font-weight: 900;
-  text-transform: uppercase;
+.upcoming-card:last-child {
+  border-right: 0;
 }
 
 .upcoming-card h3 {
-  margin: 0 0 10px;
-  font-size: 24px;
+  margin: 0 0 8px;
+  font-size: 21px;
 }
 
 .upcoming-card p {
-  margin: 0;
-  color: var(--poksol-green);
-  font-weight: 800;
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 .portal-hero {
@@ -3391,6 +3386,9 @@ select:focus-visible {
     radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.9), transparent 16%),
     radial-gradient(circle at 72% 34%, color-mix(in srgb, var(--restaurant-accent) 72%, transparent), transparent 18%),
     linear-gradient(135deg, color-mix(in srgb, var(--restaurant-accent) 56%, #d46f36), #f4c37e 46%, var(--restaurant-primary));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .restaurant-cover-photo span {
@@ -4596,8 +4594,7 @@ body.menu-page-body.translated-rtl {
 
 @media (max-width: 900px) {
   .navbar,
-  .actions,
-  .badges {
+  .actions {
     flex-direction: column;
   }
 
@@ -4621,7 +4618,6 @@ body.menu-page-body.translated-rtl {
 
   .hero-content,
   .product-hero-content,
-  .badges,
   .product-actions {
     grid-template-columns: 1fr;
   }
@@ -4643,6 +4639,15 @@ body.menu-page-body.translated-rtl {
     grid-template-columns: 1fr;
   }
 
+  .upcoming-card {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .upcoming-card:last-child {
+    border-bottom: 0;
+  }
+
   .screenshots-zone {
     margin-top: 30px;
   }
@@ -4658,12 +4663,7 @@ body.menu-page-body.translated-rtl {
     text-align: center;
   }
 
-  .hero-brand-logo {
-    margin-inline: auto;
-  }
-
-  .actions,
-  .badges {
+  .actions {
     align-items: center;
     justify-content: center;
   }
