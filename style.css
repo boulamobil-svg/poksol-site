@@ -704,39 +704,22 @@ select:focus-visible {
 .future-card {
   min-height: 210px;
   padding: 24px;
-  border-radius: 18px;
+  border-radius: 10px;
   background: white;
   border: 1px solid var(--line);
-  box-shadow: 0 14px 32px rgba(10, 37, 64, 0.06);
+  border-top: 3px solid var(--poksol-blue);
 }
 
 .future-card-link {
   color: inherit;
   text-decoration: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .future-card-link:hover,
 .future-card-link:focus-visible {
   transform: translateY(-3px);
-  box-shadow: 0 20px 42px rgba(10, 37, 64, 0.12);
-}
-
-.future-card span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  color: white;
-  background: var(--poksol-blue);
-  font-weight: 900;
-  margin-bottom: 18px;
-}
-
-.future-card:nth-child(2) span {
-  background: var(--poksol-green);
+  border-top-color: var(--poksol-green);
 }
 
 .future-card h3 {
@@ -746,8 +729,13 @@ select:focus-visible {
 }
 
 .future-card p {
+  margin: 0;
   font-size: 16px;
   line-height: 1.55;
+}
+
+.future-card .status-pill {
+  margin: 14px 0 0;
 }
 
 .future-note {
@@ -876,14 +864,11 @@ select:focus-visible {
 }
 
 .portal-panel,
-.admin-card,
-.admin-table-card,
-.admin-policy,
 .portal-roadmap {
   background: white;
   border: 1px solid var(--line);
-  border-radius: 22px;
-  box-shadow: var(--card-shadow);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(10, 37, 64, 0.05);
 }
 
 .portal-panel {
@@ -912,15 +897,17 @@ select:focus-visible {
 .portal-tag {
   display: inline-flex;
   margin-bottom: 18px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #edf6ff;
   color: var(--poksol-blue);
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .portal-tag.green {
-  color: var(--poksol-green);
+  background: #e6f7ed;
+  color: #0f7b47;
 }
 
 .profile-card {
@@ -4608,6 +4595,12 @@ body.menu-page-body.translated-rtl {
     border-radius: 20px;
   }
 
+  /* The nav CTA used to sit right after the logo, asking for a click before
+     the visitor has read anything. Push it after the nav links. */
+  .navbar .demo-btn {
+    order: 4;
+  }
+
   .nav-links a {
     padding: 6px 8px;
   }
@@ -6466,17 +6459,17 @@ button.quote-row:focus-visible {
   background: #eef1f4;
 }
 
-/* --- Editorial pilot: Chez Marwan public page only (data-restaurant-slug stamped by
-   applyPublicRestaurantTheme/hydratePublicMenuPage in platform.js). Every rule below is
-   scoped under [data-restaurant-slug="chez-marwan"] and adds to, never edits, the shared
-   .restaurant-*/.eyebrow/.menu-item-* rules above, so every other restaurant is unaffected. --- */
+/* --- Editorial public-restaurant look, generalized from the Chez Marwan pilot to every
+   restaurant (scoped to .restaurant-public-body, present on every public restaurant page,
+   so admin/onboarding/portal pages are untouched). Adds to, never edits, the shared
+   .restaurant-*/.eyebrow/.menu-item-* rules above. --- */
 
-[data-restaurant-slug="chez-marwan"] {
+.restaurant-public-body {
   --editorial-serif: "Fraunces", Georgia, "Times New Roman", serif;
 }
 
 /* Quieter kicker: a warm italic word instead of a tracked-out SaaS eyebrow badge */
-[data-restaurant-slug="chez-marwan"] .eyebrow {
+.restaurant-public-body .eyebrow {
   font-family: var(--editorial-serif);
   font-style: italic;
   font-weight: 600;
@@ -6486,7 +6479,7 @@ button.quote-row:focus-visible {
   color: var(--restaurant-accent);
 }
 
-[data-restaurant-slug="chez-marwan"] .restaurant-pill {
+.restaurant-public-body .restaurant-pill {
   font-family: var(--editorial-serif);
   font-style: italic;
   font-weight: 600;
@@ -6495,20 +6488,20 @@ button.quote-row:focus-visible {
 }
 
 /* Headline personality: one serif display moment, sized and weighted with intent */
-[data-restaurant-slug="chez-marwan"] .restaurant-identity h1 {
+.restaurant-public-body .restaurant-identity h1 {
   font-family: var(--editorial-serif);
   font-weight: 560;
   font-size: clamp(50px, 7.4vw, 96px);
   letter-spacing: -0.01em;
 }
 
-[data-restaurant-slug="chez-marwan"] .restaurant-identity p {
+.restaurant-public-body .restaurant-identity p {
   font-size: 20px;
   max-width: 620px;
 }
 
-[data-restaurant-slug="chez-marwan"] .restaurant-section h2,
-[data-restaurant-slug="chez-marwan"] .restaurant-side-card h2 {
+.restaurant-public-body .restaurant-section h2,
+.restaurant-public-body .restaurant-side-card h2 {
   font-family: var(--editorial-serif);
   font-weight: 520;
   font-size: clamp(28px, 3.2vw, 36px);
@@ -6516,46 +6509,46 @@ button.quote-row:focus-visible {
 
 /* Radius by purpose: reading surfaces go quiet/architectural, the photo frame keeps a
    single generous signature radius, pills/buttons keep their existing full-pill shape */
-[data-restaurant-slug="chez-marwan"] .restaurant-section,
-[data-restaurant-slug="chez-marwan"] .restaurant-side-card {
+.restaurant-public-body .restaurant-section,
+.restaurant-public-body .restaurant-side-card {
   border-radius: 4px;
   background: rgba(255, 250, 243, 0.6);
   border: 1px solid rgba(10, 37, 64, 0.14);
   box-shadow: none;
 }
 
-[data-restaurant-slug="chez-marwan"] .restaurant-cover-card {
+.restaurant-public-body .restaurant-cover-card {
   border-radius: 2px;
   box-shadow: 0 24px 48px -18px rgba(10, 37, 64, 0.4);
 }
 
-[data-restaurant-slug="chez-marwan"] .menu-item-card {
+.restaurant-public-body .menu-item-card {
   border-radius: 10px;
   box-shadow: none;
 }
 
 /* Photography gets more room to lead */
-[data-restaurant-slug="chez-marwan"] .restaurant-cover-photo {
+.restaurant-public-body .restaurant-cover-photo {
   min-height: 340px;
 }
 
-[data-restaurant-slug="chez-marwan"] .restaurant-cover-info strong {
+.restaurant-public-body .restaurant-cover-info strong {
   font-family: var(--editorial-serif);
   font-size: 21px;
   font-weight: 560;
 }
 
 /* Warmer editorial composition: hairline rule instead of a stacked shadow card, more air */
-[data-restaurant-slug="chez-marwan"] .restaurant-layout {
+.restaurant-public-body .restaurant-layout {
   gap: 32px;
 }
 
-[data-restaurant-slug="chez-marwan"] .restaurant-section {
+.restaurant-public-body .restaurant-section {
   padding: 40px;
 }
 
-[data-restaurant-slug="chez-marwan"] .restaurant-section::before,
-[data-restaurant-slug="chez-marwan"] .restaurant-side-card::before {
+.restaurant-public-body .restaurant-section::before,
+.restaurant-public-body .restaurant-side-card::before {
   content: "";
   display: block;
   width: 44px;
