@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Poksol - Solutions business mobiles</title>
-  <link rel="stylesheet" href="style.css?v=20260929-1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" />
+  <link rel="stylesheet" href="style.css?v=20260930-1" />
 </head>
 <body>
   <header class="hero">
@@ -28,20 +31,25 @@
     </nav>
 
     <section class="hero-content">
-      <div class="hero-text">
-        <h1>Reservations, salle et caisse.<br>Toute la gestion tient dans une poche.</h1>
+      <h1 class="hero-title" data-hero-title aria-label="Commandez. Servez. Encaissez.">
+        <span class="word"><span class="word-inner">Commandez.</span></span>
+        <span class="word"><span class="word-inner">Servez.</span></span>
+        <span class="word"><span class="word-inner">Encaissez.</span></span>
+      </h1>
+
+      <div class="hero-sub" data-hero-reveal>
         <p>
           Poksol construit des applications mobiles pour la restauration et le commerce,
           pensees pour tourner en salle, pas derriere un bureau.
         </p>
 
         <div class="actions">
-          <a class="primary-btn" href="poket-restaurants.html">Decouvrir Poket Restaurants</a>
+          <a class="primary-btn" href="poket-restaurants.html" data-magnetic><span>Decouvrir Poket Restaurants</span></a>
           <a class="outline-btn" href="index.html#contact">Nous contacter</a>
         </div>
       </div>
 
-      <div class="screenshots-zone">
+      <div class="hero-showcase" data-hero-reveal>
         <div class="screenshots-header">
           <span>Poket Restaurants</span>
           <strong>Ecrans reels de l'application</strong>
@@ -73,6 +81,12 @@
         </div>
       </div>
     </section>
+    <div class="hero-grain" aria-hidden="true"></div>
+    <noscript>
+      <style>
+        .hero-title .word-inner, .hero-sub, .hero-showcase { transform: none !important; opacity: 1 !important; }
+      </style>
+    </noscript>
   </header>
 
   <main>
@@ -151,7 +165,52 @@
     </section>
   </main>
 
-  <script src="app.js?v=20260929-1"></script>
-  <script type="module" src="platform.js?v=20260929-1"></script>
+  <script src="app.js?v=20260930-1"></script>
+  <script type="module" src="platform.js?v=20260930-1"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script>
+    (function () {
+      var prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var canHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+      var isMobile = window.innerWidth < 768;
+
+      // Hero entrance: headline words rise in, then the subtitle/CTA and the
+      // screenshot showcase fade up behind them. Skipped entirely if the
+      // visitor asked for reduced motion.
+      if (window.gsap && !prefersReducedMotion) {
+        var tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+        tl.to(".hero-title .word-inner", {
+          y: "0%",
+          opacity: 1,
+          duration: isMobile ? 0.6 : 0.9,
+          stagger: isMobile ? 0.08 : 0.12,
+        }).to(
+          "[data-hero-reveal]",
+          { y: 0, opacity: 1, duration: 0.8, stagger: 0.15 },
+          "-=0.35"
+        );
+      } else {
+        document.querySelectorAll(".hero-title .word-inner, [data-hero-reveal]").forEach(function (el) {
+          el.style.transform = "none";
+          el.style.opacity = "1";
+        });
+      }
+
+      // Magnetic CTA: only on real pointer devices, per Lume's touch guidance.
+      if (window.gsap && canHover && !prefersReducedMotion) {
+        document.querySelectorAll("[data-magnetic]").forEach(function (btn) {
+          btn.addEventListener("mousemove", function (event) {
+            var rect = btn.getBoundingClientRect();
+            var x = event.clientX - rect.left - rect.width / 2;
+            var y = event.clientY - rect.top - rect.height / 2;
+            gsap.to(btn, { x: x * 0.25, y: y * 0.25, duration: 0.4, ease: "power2.out" });
+          });
+          btn.addEventListener("mouseleave", function () {
+            gsap.to(btn, { x: 0, y: 0, duration: 0.7, ease: "elastic.out(1, 0.5)" });
+          });
+        });
+      }
+    })();
+  </script>
 </body>
 </html>

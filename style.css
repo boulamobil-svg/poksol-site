@@ -53,10 +53,23 @@ select:focus-visible {
 }
 
 .hero {
+  position: relative;
   min-height: 720px;
-  padding: 30px 8% 58px;
+  padding: 30px 8% 100px;
   color: white;
-  background: linear-gradient(120deg, #0a2540, #173e62);
+  background: radial-gradient(circle at 78% 12%, rgba(25, 118, 243, 0.16), transparent 42%), linear-gradient(160deg, #050b14 0%, #0a2540 62%, #071a30 100%);
+  overflow: hidden;
+}
+
+/* Cinematic grain: a faint noise texture over the hero only, never the rest of the site. */
+.hero-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
 }
 
 .product-hero {
@@ -212,26 +225,10 @@ select:focus-visible {
 }
 
 .hero-content {
-  display: grid;
-  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1fr);
-  align-items: start;
-  gap: 64px;
+  position: relative;
+  z-index: 2;
   max-width: 1180px;
-  margin: 76px auto 0;
-}
-
-.hero-text {
-  padding-top: 36px;
-}
-
-.hero-text {
-  grid-column: 2;
-}
-
-
-.screenshots-zone {
-  grid-column: 1;
-  grid-row: 1;
+  margin: 64px auto 0;
 }
 
 .eyebrow {
@@ -243,19 +240,44 @@ select:focus-visible {
   text-transform: uppercase;
 }
 
-.hero-text h1 {
-  font-size: clamp(42px, 5.4vw, 64px);
-  font-weight: 800;
-  line-height: 1.08;
-  margin: 0 0 24px;
-  letter-spacing: -0.01em;
+/* Full-width cinematic headline: each word is clipped and rises in on load
+   (see the inline script at the bottom of index.html). Falls back to fully
+   visible, static text if JS or GSAP never runs. */
+.hero-title {
+  margin: 0;
+  font-family: "Bebas Neue", "Aptos Display", sans-serif;
+  font-size: clamp(46px, 11vw, 168px);
+  font-weight: 400;
+  line-height: 0.94;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+  overflow-wrap: break-word;
 }
 
-.hero-text p {
-  font-size: 22px;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.82);
-  max-width: 680px;
+.hero-title .word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.hero-title .word-inner {
+  display: inline-block;
+  transform: translateY(115%);
+  opacity: 0;
+}
+
+.hero-sub {
+  max-width: 640px;
+  margin-top: 34px;
+  transform: translateY(24px);
+  opacity: 0;
+}
+
+.hero-sub p {
+  font-size: 20px;
+  line-height: 1.55;
+  color: rgba(244, 240, 232, 0.78);
+  margin: 0;
 }
 
 .actions {
@@ -285,20 +307,61 @@ select:focus-visible {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.screenshots-zone {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 8px;
-  padding: 22px;
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.24);
+/* Hero-only CTA treatment: a fill-sweep on hover, layered on top of the
+   shared .primary-btn used elsewhere on the site (untouched there). */
+.hero .primary-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero .primary-btn span {
+  position: relative;
+  z-index: 1;
+}
+
+.hero .primary-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--poksol-blue-dark);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s cubic-bezier(0.77, 0, 0.175, 1);
+  z-index: 0;
+}
+
+.hero .primary-btn:hover::before,
+.hero .primary-btn:focus-visible::before {
+  transform: scaleX(1);
+}
+
+.hero-showcase {
+  margin: 72px auto 0;
+  max-width: 360px;
+  transform: translateY(24px);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-title .word-inner,
+  .hero-sub,
+  .hero-showcase {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.hero-showcase {
+  text-align: center;
 }
 
 .screenshots-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
-  color: var(--poksol-navy);
+  color: rgba(244, 240, 232, 0.6);
 }
 
 .screenshots-header span {
@@ -309,6 +372,7 @@ select:focus-visible {
 
 .screenshots-header strong {
   font-size: 14px;
+  font-weight: 600;
 }
 
 .screenshots-carousel {
@@ -321,10 +385,10 @@ select:focus-visible {
   max-width: 290px;
   margin: 0 auto;
   overflow: hidden;
-  border: 1px solid #d3e5ff;
+  border: 1px solid rgba(244, 240, 232, 0.14);
   border-radius: 8px;
-  background: #f8fafc;
-  box-shadow: 0 18px 45px rgba(25, 118, 243, 0.16);
+  background: #050b14;
+  box-shadow: 0 0 0 1px rgba(25, 118, 243, 0.08), 0 40px 90px rgba(0, 0, 0, 0.55), 0 0 60px rgba(25, 118, 243, 0.12);
 }
 
 .carousel-track {
@@ -364,10 +428,10 @@ select:focus-visible {
   transform: translateY(-50%);
   width: 38px;
   height: 38px;
-  border: 1px solid #d3e5ff;
+  border: 1px solid rgba(244, 240, 232, 0.18);
   border-radius: 50%;
-  background: white;
-  color: var(--poksol-navy);
+  background: rgba(244, 240, 232, 0.06);
+  color: rgba(244, 240, 232, 0.85);
   font-size: 30px;
   line-height: 1;
   cursor: pointer;
@@ -403,7 +467,7 @@ select:focus-visible {
   border: 0;
   border-radius: 50%;
   padding: 0;
-  background: #b8c7d8;
+  background: rgba(244, 240, 232, 0.28);
   cursor: pointer;
 }
 
@@ -4609,23 +4673,9 @@ body.menu-page-body.translated-rtl {
     bottom: -5px;
   }
 
-  .hero-content,
   .product-hero-content,
   .product-actions {
     grid-template-columns: 1fr;
-  }
-
-  .hero-text,
-  .screenshots-zone {
-    grid-column: 1;
-  }
-
-  .hero-text {
-    grid-row: 1;
-  }
-
-  .screenshots-zone {
-    grid-row: 2;
   }
 
   .upcoming-cards {
@@ -4641,15 +4691,14 @@ body.menu-page-body.translated-rtl {
     border-bottom: 0;
   }
 
-  .screenshots-zone {
-    margin-top: 30px;
+  .hero-showcase {
+    margin-top: 48px;
   }
 
   .screenshots-carousel {
     padding-inline: 42px;
   }
 
-  .hero-text,
   .product-hero-content,
   .products,
   .product-page {
