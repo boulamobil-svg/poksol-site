@@ -242,10 +242,17 @@ select:focus-visible {
 
 /* Full-width cinematic headline: each word is clipped and rises in on load
    (see the inline script at the bottom of index.html). Falls back to fully
-   visible, static text if JS or GSAP never runs. */
+   visible, static text if JS or GSAP never runs. Font-display is "optional"
+   on the Google Fonts request (not "swap"): if Bebas Neue isn't ready within
+   the short block window, the browser commits to the fallback for this page
+   load and never swaps later -- no post-paint reflow. "Impact" is listed
+   before the site's normal sans-serif because its condensed, tall
+   proportions are much closer to Bebas Neue's, so a visitor who gets the
+   fallback (no swap will ever correct it) still sees something in the right
+   spirit instead of a much wider humanist sans. */
 .hero-title {
   margin: 0;
-  font-family: "Bebas Neue", "Aptos Display", sans-serif;
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
   font-size: clamp(46px, 11vw, 168px);
   font-weight: 400;
   line-height: 0.94;

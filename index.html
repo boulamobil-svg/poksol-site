@@ -6,7 +6,15 @@
   <title>Poksol - Solutions business mobiles</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" />
+  <!-- display=optional, not swap: the hero title is a huge clamp(46px..168px)
+       headline. With swap, a late-arriving font forces a re-layout that can
+       move everything below it by 100px+ (measured: ~149px height change,
+       CLS contribution ~0.02 on this exact title/content, see the .hero-title
+       comment in style.css). optional lets the browser decide once, within
+       its short block window, and never swap afterward, so there is no
+       post-paint shift. Do not change this back to swap to "fix" a flash of
+       fallback font -- that flash is the intended trade-off, not a bug. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=optional" />
   <link rel="stylesheet" href="style.css?v=20260930-1" />
 </head>
 <body>
