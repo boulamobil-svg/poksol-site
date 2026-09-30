@@ -205,7 +205,13 @@ select:focus-visible {
 .primary-btn,
 .product-action,
 .app-link {
-  background: var(--poksol-blue);
+  /* #1872ec, not --poksol-blue (#1976F3): white text on the raw brand blue
+     is 4.26:1, just under WCAG AA's 4.5:1 for this button's actual 16px
+     bold label. This is the minimal darkening that clears the threshold
+     (4.51:1) -- visually indistinguishable from the original blue. The
+     --poksol-blue variable itself is untouched, so text/border/other uses
+     of the brand blue elsewhere are unaffected. */
+  background: #1872ec;
   color: white;
   text-decoration: none;
   padding: 15px 24px;
@@ -372,7 +378,10 @@ select:focus-visible {
 }
 
 .screenshots-header span {
-  color: var(--poksol-blue);
+  /* #3c8bf5, not --poksol-blue (#1976F3): at 12px this text is 3.65:1 on
+     #0a2540, under WCAG AA's 4.5:1. Lightened just enough to clear it
+     (4.59:1) while staying recognizably the same brand blue. */
+  color: #3c8bf5;
   font-size: 12px;
   font-weight: 900;
 }
