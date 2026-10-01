@@ -6721,3 +6721,62 @@ body.dark-theme .status-pill-soon {
     border-bottom-color: rgba(244, 240, 232, 0.14);
   }
 }
+
+/* --- Dark theme unification (Etape 2, section "contact"): same flat
+   #071a30 as the two sections above for an invisible transition. The
+   .platform-form/.platform-card/.form-grid classes are shared with
+   admin.html's dashboard forms, so every rule here is scoped through
+   .contact-platform-section as well as body.dark-theme -- admin.html
+   never gets the dark-theme class, so it's double-protected. Every color
+   below was picked by computing its WCAG ratio first (see commit message
+   for the numbers); none of this is eyeballed. --- */
+
+body.dark-theme .contact-platform-section {
+  background: #071a30;
+  padding-top: 70px;
+}
+
+body.dark-theme .contact-platform-section .platform-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .contact-platform-section h2 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+body.dark-theme .contact-platform-section .platform-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .contact-platform-section .platform-form label {
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme .contact-platform-section .platform-form input,
+body.dark-theme .contact-platform-section .platform-form textarea {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.5);
+  color: #fff;
+}
+
+body.dark-theme .contact-platform-section .platform-form input::placeholder,
+body.dark-theme .contact-platform-section .platform-form textarea::placeholder {
+  color: rgba(244, 240, 232, 0.58);
+}
+
+body.dark-theme .contact-platform-section .platform-form input:focus,
+body.dark-theme .contact-platform-section .platform-form textarea:focus {
+  border-color: #5b9dff;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 4px rgba(91, 157, 255, 0.25);
+}
+
+body.dark-theme .contact-platform-section .platform-form small {
+  color: rgba(244, 240, 232, 0.72);
+}
