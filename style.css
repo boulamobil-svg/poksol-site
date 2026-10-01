@@ -6621,3 +6621,56 @@ button.quote-row:focus-visible {
   margin-bottom: 18px;
   background: var(--restaurant-accent);
 }
+
+/* --- Dark theme unification (Etape 2, section "produits"): every rule below
+   is scoped under body.dark-theme so it only ever applies to pages whose
+   <body> carries that class. Today that's index.html only -- admin.html and
+   restaurants/* share this same stylesheet but never get the class, so they
+   render exactly as before. Adapts the hero's Dark Cinematic language (navy,
+   glass cards, Bebas Neue for section titles) without copying the hero's own
+   drama: no grain, no huge type, readable body copy in the system font. --- */
+
+body.dark-theme .products {
+  background: #071a30;
+  color: rgba(244, 240, 232, 0.86);
+}
+
+body.dark-theme .products h2 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+body.dark-theme .products > p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .single-product {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .single-product h3 {
+  color: #fff;
+}
+
+body.dark-theme .single-product p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .product-link-cta {
+  color: #5b9dff;
+}
+
+body.dark-theme .features-list span {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 240, 232, 0.88);
+  border: 1px solid rgba(244, 240, 232, 0.16);
+}
+
+body.dark-theme .status-pill-live {
+  background: rgba(15, 123, 71, 0.22);
+  color: #4ade80;
+}
