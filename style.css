@@ -6997,3 +6997,206 @@ body.dark-theme [data-platform-account] .platform-form textarea:focus {
 body.dark-theme [data-platform-account] .platform-form small {
   color: rgba(244, 240, 232, 0.72);
 }
+
+/* --- Dark theme unification (Etape 4, poket-access.html -- the wizard):
+   same glass-card formula as the rest. .access-hero was already dark
+   (verified, >=6.5:1 even at its worst radial-glow point), left untouched.
+   .outline-dark-btn/.ghost-action/.portal-tag are reused unscoped from
+   earlier steps, so "Retour" and the sidebar tags already render
+   correctly with zero extra work here.
+
+   Finding: .access-status (the one message box used for every state --
+   connecting, error, success) has no separate error/success styling in
+   the JS (grep confirmed: every statusBox.textContent assignment uses the
+   same box, no class toggling). There is nothing red/green to adapt
+   because that distinction doesn't exist yet in the app -- only the one
+   neutral/green-accented style, now dark-adapted below. */
+
+body.dark-theme .access-page {
+  background: #071a30;
+}
+
+body.dark-theme .access-sidebar,
+body.dark-theme .access-form-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .access-user-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .access-user-card:hover {
+  border-color: rgba(91, 157, 255, 0.5);
+}
+
+body.dark-theme .access-user-card h2 {
+  color: #fff;
+}
+
+body.dark-theme .access-user-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .invite-card input {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.5);
+  color: #fff;
+}
+
+body.dark-theme .invite-card small {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .access-steps button {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme .access-steps button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(91, 157, 255, 0.4);
+}
+
+/* .access-steps button.is-active keeps --poksol-blue -- same pre-existing
+   4.26:1 debt as the other raw-blue buttons, tracked separately, not
+   fixed here. */
+
+body.dark-theme .access-status {
+  background: rgba(66, 201, 111, 0.14);
+  color: #fff;
+}
+
+body.dark-theme .restaurant-mode-card {
+  background: rgba(25, 118, 243, 0.12);
+  border-color: rgba(25, 118, 243, 0.3);
+}
+
+body.dark-theme .restaurant-mode-card strong {
+  color: #5b9dff;
+}
+
+body.dark-theme .restaurant-mode-card span {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .restaurant-mode-card.is-existing {
+  background: rgba(66, 201, 111, 0.14);
+  border-color: rgba(66, 201, 111, 0.3);
+}
+
+body.dark-theme .restaurant-mode-card.is-existing strong {
+  color: #4ade80;
+}
+
+body.dark-theme .access-step h2 {
+  color: #fff;
+}
+
+body.dark-theme .step-help {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .access-form-card .form-grid label,
+body.dark-theme .access-form-card .field-label-group,
+body.dark-theme .access-form-card .hours-row label {
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme .access-form-card .form-grid select.label-select {
+  color: #fff;
+}
+
+body.dark-theme .access-form-card .form-grid input,
+body.dark-theme .access-form-card .form-grid select,
+body.dark-theme .access-form-card .form-grid textarea,
+body.dark-theme .access-form-card .hours-row input {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.5);
+  color: #fff;
+}
+
+body.dark-theme .access-form-card input::placeholder,
+body.dark-theme .access-form-card textarea::placeholder {
+  color: rgba(244, 240, 232, 0.58);
+}
+
+body.dark-theme .access-form-card input:focus,
+body.dark-theme .access-form-card select:focus,
+body.dark-theme .access-form-card textarea:focus {
+  border-color: #5b9dff;
+  box-shadow: 0 0 0 4px rgba(91, 157, 255, 0.25);
+}
+
+body.dark-theme .sales-modes {
+  border-color: rgba(244, 240, 232, 0.3);
+}
+
+body.dark-theme .sales-modes legend {
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme .sales-modes input,
+body.dark-theme .day-toggle input {
+  accent-color: #5b9dff;
+}
+
+body.dark-theme .logo-preview {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(244, 240, 232, 0.35);
+  color: rgba(244, 240, 232, 0.6);
+}
+
+body.dark-theme .logo-upload-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .logo-upload-card strong {
+  color: #fff;
+}
+
+body.dark-theme .logo-upload-card span,
+body.dark-theme .logo-upload-card small {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .logo-upload-card input[type="file"] {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(244, 240, 232, 0.35);
+  color: #fff;
+}
+
+body.dark-theme .soft-warning {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
+}
+
+body.dark-theme .hours-row {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .hours-row:focus-within {
+  border-color: rgba(91, 157, 255, 0.5);
+}
+
+body.dark-theme .profile-summary div {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .profile-summary dt {
+  color: rgba(244, 240, 232, 0.6);
+}
+
+body.dark-theme .profile-summary dd {
+  color: #fff;
+}
+
+body.dark-theme .access-form-actions {
+  border-top-color: rgba(244, 240, 232, 0.14);
+}
