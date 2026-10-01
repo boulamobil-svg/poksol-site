@@ -6880,3 +6880,120 @@ body.dark-theme .outline-dark-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: #5b9dff;
 }
+
+/* --- Dark theme unification (Etape 4, account.html): no Bebas Neue push
+   here -- this is a functional client portal, kept sober per spec ("encore
+   plus sobre"). .portal-hero was already dark navy (verified, >=7.9:1 even
+   at its worst radial-glow point), left untouched. .profile-card/.ghost-
+   action are shared with poket-restaurants.html/poket-access.html and
+   already got (or will get) the same dark treatment, scoped consistently
+   so nothing leaks to admin.html. The JS-rendered signed-in state
+   (.restaurant-mini-card/.mini-actions/.empty-state/.download-grid) is
+   intentionally left untouched here: those are admin-dashboard-shared
+   components and styling them borders the explicit "don't touch admin"
+   boundary -- flagged as a follow-up, not done silently. */
+
+body.dark-theme .portal-page {
+  background: #071a30;
+}
+
+body.dark-theme .portal-panel,
+body.dark-theme .portal-roadmap {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .portal-panel h2,
+body.dark-theme .portal-roadmap h2 {
+  color: #fff;
+}
+
+body.dark-theme .portal-panel p,
+body.dark-theme .portal-muted {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .portal-tag {
+  background: rgba(25, 118, 243, 0.18);
+  color: #5b9dff;
+}
+
+body.dark-theme .portal-tag.green {
+  background: rgba(66, 201, 111, 0.18);
+  color: #4ade80;
+}
+
+body.dark-theme .device-status {
+  background: rgba(66, 201, 111, 0.12);
+}
+
+body.dark-theme .device-status strong {
+  color: #fff;
+}
+
+body.dark-theme .device-status span {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .ghost-action {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.3);
+  color: #fff;
+}
+
+body.dark-theme .ghost-action:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #5b9dff;
+}
+
+body.dark-theme .roadmap-list article {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-theme .roadmap-list span {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+/* Signed-out / error card rendered by platform.js into [data-platform-account] */
+body.dark-theme [data-platform-account] .platform-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme [data-platform-account] .platform-card h2 {
+  color: #fff;
+}
+
+body.dark-theme [data-platform-account] .platform-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme [data-platform-account] .platform-form label {
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme [data-platform-account] .platform-form input,
+body.dark-theme [data-platform-account] .platform-form textarea {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.5);
+  color: #fff;
+}
+
+body.dark-theme [data-platform-account] .platform-form input::placeholder,
+body.dark-theme [data-platform-account] .platform-form textarea::placeholder {
+  color: rgba(244, 240, 232, 0.58);
+}
+
+body.dark-theme [data-platform-account] .platform-form input:focus,
+body.dark-theme [data-platform-account] .platform-form textarea:focus {
+  border-color: #5b9dff;
+  box-shadow: 0 0 0 4px rgba(91, 157, 255, 0.25);
+}
+
+body.dark-theme [data-platform-account] .platform-form small {
+  color: rgba(244, 240, 232, 0.72);
+}
