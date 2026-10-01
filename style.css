@@ -6674,3 +6674,50 @@ body.dark-theme .status-pill-live {
   background: rgba(15, 123, 71, 0.22);
   color: #4ade80;
 }
+
+/* --- Dark theme unification (Etape 2, section "upcoming"): same technique
+   as the produits section -- flat #071a30 matching it exactly for an
+   invisible transition, dividers instead of individual glass cards (these
+   three are intentionally quieter than the real product above them). --- */
+
+body.dark-theme .upcoming {
+  background: #071a30;
+  color: rgba(244, 240, 232, 0.86);
+}
+
+body.dark-theme .upcoming h2 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+body.dark-theme .upcoming > p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .upcoming-cards {
+  border-top: 1px solid rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .upcoming-card {
+  border-right: 1px solid rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .upcoming-card h3 {
+  color: #fff;
+}
+
+body.dark-theme .upcoming-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .status-pill-soon {
+  background: rgba(244, 240, 232, 0.1);
+  color: rgba(244, 240, 232, 0.86);
+}
+
+@media (max-width: 900px) {
+  body.dark-theme .upcoming-card {
+    border-bottom-color: rgba(244, 240, 232, 0.14);
+  }
+}
