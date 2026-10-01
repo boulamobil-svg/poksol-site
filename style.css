@@ -259,7 +259,7 @@ select:focus-visible {
 .hero-title {
   margin: 0;
   font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
-  font-size: clamp(46px, 11vw, 168px);
+  font-size: clamp(46px, 7vw, 110px);
   font-weight: 400;
   line-height: 0.94;
   letter-spacing: 0.005em;
