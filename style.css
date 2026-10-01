@@ -6780,3 +6780,103 @@ body.dark-theme .contact-platform-section .platform-form textarea:focus {
 body.dark-theme .contact-platform-section .platform-form small {
   color: rgba(244, 240, 232, 0.72);
 }
+
+/* --- Dark theme unification (Etape 3, poket-restaurants.html): same
+   #071a30 flat background and glass-card formula as index.html for
+   cross-page consistency. .product-hero was already dark navy (verified:
+   white text stays >=8.3:1 even at its worst gradient point) so it's left
+   untouched -- no scope creep. .future-note was already a dark navy box
+   too, same reasoning. status-pill-live/soon and the Bebas Neue stack
+   are reused unscoped from the Etape 2 rules, so "En production" here
+   renders identically to the homepage automatically. */
+
+body.dark-theme .product-page {
+  background: #071a30;
+}
+
+body.dark-theme .product-hero-content h1 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+body.dark-theme .product-visual {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .product-access-panel,
+body.dark-theme .future-version,
+body.dark-theme .future-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .product-access-panel h2,
+body.dark-theme .future-version h2 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+body.dark-theme .product-access-panel p,
+body.dark-theme .future-version p,
+body.dark-theme .future-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .future-card h3 {
+  color: #fff;
+}
+
+body.dark-theme .profile-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .profile-card strong {
+  color: #fff;
+}
+
+body.dark-theme .profile-card span {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .attached-restaurant-card {
+  background: rgba(66, 201, 111, 0.12);
+  border-color: rgba(66, 201, 111, 0.25);
+}
+
+body.dark-theme .attached-restaurant-card span {
+  color: #4ade80;
+}
+
+body.dark-theme .attached-restaurant-card strong {
+  color: #fff;
+}
+
+body.dark-theme .coming-soon {
+  background: rgba(66, 201, 111, 0.12);
+  border-color: rgba(66, 201, 111, 0.25);
+}
+
+body.dark-theme .coming-soon p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .outline-dark-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(244, 240, 232, 0.3);
+  color: #fff;
+}
+
+body.dark-theme .outline-dark-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #5b9dff;
+}
