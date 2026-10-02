@@ -259,7 +259,7 @@ select:focus-visible {
 .hero-title {
   margin: 0;
   font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
-  font-size: clamp(46px, 11vw, 168px);
+  font-size: clamp(46px, 7vw, 110px);
   font-weight: 400;
   line-height: 0.94;
   letter-spacing: 0.005em;
@@ -6620,4 +6620,583 @@ button.quote-row:focus-visible {
   height: 2px;
   margin-bottom: 18px;
   background: var(--restaurant-accent);
+}
+
+/* --- Dark theme unification (Etape 2, section "produits"): every rule below
+   is scoped under body.dark-theme so it only ever applies to pages whose
+   <body> carries that class. Today that's index.html only -- admin.html and
+   restaurants/* share this same stylesheet but never get the class, so they
+   render exactly as before. Adapts the hero's Dark Cinematic language (navy,
+   glass cards, Bebas Neue for section titles) without copying the hero's own
+   drama: no grain, no huge type, readable body copy in the system font. --- */
+
+body.dark-theme .products {
+  background: #071a30;
+  color: rgba(244, 240, 232, 0.86);
+}
+
+body.dark-theme .products h2 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+body.dark-theme .products > p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .single-product {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .single-product h3 {
+  color: #fff;
+}
+
+body.dark-theme .single-product p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .product-link-cta {
+  color: #5b9dff;
+}
+
+body.dark-theme .features-list span {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 240, 232, 0.88);
+  border: 1px solid rgba(244, 240, 232, 0.16);
+}
+
+body.dark-theme .status-pill-live {
+  background: rgba(15, 123, 71, 0.22);
+  color: #4ade80;
+}
+
+/* --- Dark theme unification (Etape 2, section "upcoming"): same technique
+   as the produits section -- flat #071a30 matching it exactly for an
+   invisible transition, dividers instead of individual glass cards (these
+   three are intentionally quieter than the real product above them). --- */
+
+body.dark-theme .upcoming {
+  background: #071a30;
+  color: rgba(244, 240, 232, 0.86);
+}
+
+body.dark-theme .upcoming h2 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+body.dark-theme .upcoming > p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .upcoming-cards {
+  border-top: 1px solid rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .upcoming-card {
+  border-right: 1px solid rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .upcoming-card h3 {
+  color: #fff;
+}
+
+body.dark-theme .upcoming-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .status-pill-soon {
+  background: rgba(244, 240, 232, 0.1);
+  color: rgba(244, 240, 232, 0.86);
+}
+
+@media (max-width: 900px) {
+  body.dark-theme .upcoming-card {
+    border-bottom-color: rgba(244, 240, 232, 0.14);
+  }
+}
+
+/* --- Dark theme unification (Etape 2, section "contact"): same flat
+   #071a30 as the two sections above for an invisible transition. The
+   .platform-form/.platform-card/.form-grid classes are shared with
+   admin.html's dashboard forms, so every rule here is scoped through
+   .contact-platform-section as well as body.dark-theme -- admin.html
+   never gets the dark-theme class, so it's double-protected. Every color
+   below was picked by computing its WCAG ratio first (see commit message
+   for the numbers); none of this is eyeballed. --- */
+
+body.dark-theme .contact-platform-section {
+  background: #071a30;
+  padding-top: 70px;
+}
+
+body.dark-theme .contact-platform-section .platform-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .contact-platform-section h2 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+body.dark-theme .contact-platform-section .platform-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .contact-platform-section .platform-form label {
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme .contact-platform-section .platform-form input,
+body.dark-theme .contact-platform-section .platform-form textarea {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.5);
+  color: #fff;
+}
+
+body.dark-theme .contact-platform-section .platform-form input::placeholder,
+body.dark-theme .contact-platform-section .platform-form textarea::placeholder {
+  color: rgba(244, 240, 232, 0.58);
+}
+
+body.dark-theme .contact-platform-section .platform-form input:focus,
+body.dark-theme .contact-platform-section .platform-form textarea:focus {
+  border-color: #5b9dff;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 4px rgba(91, 157, 255, 0.25);
+}
+
+body.dark-theme .contact-platform-section .platform-form small {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+/* --- Dark theme unification (Etape 3, poket-restaurants.html): same
+   #071a30 flat background and glass-card formula as index.html for
+   cross-page consistency. .product-hero was already dark navy (verified:
+   white text stays >=8.3:1 even at its worst gradient point) so it's left
+   untouched -- no scope creep. .future-note was already a dark navy box
+   too, same reasoning. status-pill-live/soon and the Bebas Neue stack
+   are reused unscoped from the Etape 2 rules, so "En production" here
+   renders identically to the homepage automatically. */
+
+body.dark-theme .product-page {
+  background: #071a30;
+}
+
+body.dark-theme .product-hero-content h1 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+body.dark-theme .product-visual {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .product-access-panel,
+body.dark-theme .future-version,
+body.dark-theme .future-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .product-access-panel h2,
+body.dark-theme .future-version h2 {
+  font-family: "Bebas Neue", Impact, "Aptos Display", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+body.dark-theme .product-access-panel p,
+body.dark-theme .future-version p,
+body.dark-theme .future-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .future-card h3 {
+  color: #fff;
+}
+
+body.dark-theme .profile-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .profile-card strong {
+  color: #fff;
+}
+
+body.dark-theme .profile-card span {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .attached-restaurant-card {
+  background: rgba(66, 201, 111, 0.12);
+  border-color: rgba(66, 201, 111, 0.25);
+}
+
+body.dark-theme .attached-restaurant-card span {
+  color: #4ade80;
+}
+
+body.dark-theme .attached-restaurant-card strong {
+  color: #fff;
+}
+
+body.dark-theme .coming-soon {
+  background: rgba(66, 201, 111, 0.12);
+  border-color: rgba(66, 201, 111, 0.25);
+}
+
+body.dark-theme .coming-soon p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .outline-dark-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(244, 240, 232, 0.3);
+  color: #fff;
+}
+
+body.dark-theme .outline-dark-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #5b9dff;
+}
+
+/* --- Dark theme unification (Etape 4, account.html): no Bebas Neue push
+   here -- this is a functional client portal, kept sober per spec ("encore
+   plus sobre"). .portal-hero was already dark navy (verified, >=7.9:1 even
+   at its worst radial-glow point), left untouched. .profile-card/.ghost-
+   action are shared with poket-restaurants.html/poket-access.html and
+   already got (or will get) the same dark treatment, scoped consistently
+   so nothing leaks to admin.html. The JS-rendered signed-in state
+   (.restaurant-mini-card/.mini-actions/.empty-state/.download-grid) is
+   intentionally left untouched here: those are admin-dashboard-shared
+   components and styling them borders the explicit "don't touch admin"
+   boundary -- flagged as a follow-up, not done silently. */
+
+body.dark-theme .portal-page {
+  background: #071a30;
+}
+
+body.dark-theme .portal-panel,
+body.dark-theme .portal-roadmap {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .portal-panel h2,
+body.dark-theme .portal-roadmap h2 {
+  color: #fff;
+}
+
+body.dark-theme .portal-panel p,
+body.dark-theme .portal-muted {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .portal-tag {
+  background: rgba(25, 118, 243, 0.18);
+  color: #5b9dff;
+}
+
+body.dark-theme .portal-tag.green {
+  background: rgba(66, 201, 111, 0.18);
+  color: #4ade80;
+}
+
+body.dark-theme .device-status {
+  background: rgba(66, 201, 111, 0.12);
+}
+
+body.dark-theme .device-status strong {
+  color: #fff;
+}
+
+body.dark-theme .device-status span {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .ghost-action {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.3);
+  color: #fff;
+}
+
+body.dark-theme .ghost-action:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #5b9dff;
+}
+
+body.dark-theme .roadmap-list article {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-theme .roadmap-list span {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+/* Signed-out / error card rendered by platform.js into [data-platform-account] */
+body.dark-theme [data-platform-account] .platform-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme [data-platform-account] .platform-card h2 {
+  color: #fff;
+}
+
+body.dark-theme [data-platform-account] .platform-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme [data-platform-account] .platform-form label {
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme [data-platform-account] .platform-form input,
+body.dark-theme [data-platform-account] .platform-form textarea {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.5);
+  color: #fff;
+}
+
+body.dark-theme [data-platform-account] .platform-form input::placeholder,
+body.dark-theme [data-platform-account] .platform-form textarea::placeholder {
+  color: rgba(244, 240, 232, 0.58);
+}
+
+body.dark-theme [data-platform-account] .platform-form input:focus,
+body.dark-theme [data-platform-account] .platform-form textarea:focus {
+  border-color: #5b9dff;
+  box-shadow: 0 0 0 4px rgba(91, 157, 255, 0.25);
+}
+
+body.dark-theme [data-platform-account] .platform-form small {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+/* --- Dark theme unification (Etape 4, poket-access.html -- the wizard):
+   same glass-card formula as the rest. .access-hero was already dark
+   (verified, >=6.5:1 even at its worst radial-glow point), left untouched.
+   .outline-dark-btn/.ghost-action/.portal-tag are reused unscoped from
+   earlier steps, so "Retour" and the sidebar tags already render
+   correctly with zero extra work here.
+
+   Finding: .access-status (the one message box used for every state --
+   connecting, error, success) has no separate error/success styling in
+   the JS (grep confirmed: every statusBox.textContent assignment uses the
+   same box, no class toggling). There is nothing red/green to adapt
+   because that distinction doesn't exist yet in the app -- only the one
+   neutral/green-accented style, now dark-adapted below. */
+
+body.dark-theme .access-page {
+  background: #071a30;
+}
+
+body.dark-theme .access-sidebar,
+body.dark-theme .access-form-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+body.dark-theme .access-user-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .access-user-card:hover {
+  border-color: rgba(91, 157, 255, 0.5);
+}
+
+body.dark-theme .access-user-card h2 {
+  color: #fff;
+}
+
+body.dark-theme .access-user-card p {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .invite-card input {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.5);
+  color: #fff;
+}
+
+body.dark-theme .invite-card small {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .access-steps button {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme .access-steps button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(91, 157, 255, 0.4);
+}
+
+/* .access-steps button.is-active keeps --poksol-blue -- same pre-existing
+   4.26:1 debt as the other raw-blue buttons, tracked separately, not
+   fixed here. */
+
+body.dark-theme .access-status {
+  background: rgba(66, 201, 111, 0.14);
+  color: #fff;
+}
+
+body.dark-theme .restaurant-mode-card {
+  background: rgba(25, 118, 243, 0.12);
+  border-color: rgba(25, 118, 243, 0.3);
+}
+
+body.dark-theme .restaurant-mode-card strong {
+  color: #5b9dff;
+}
+
+body.dark-theme .restaurant-mode-card span {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .restaurant-mode-card.is-existing {
+  background: rgba(66, 201, 111, 0.14);
+  border-color: rgba(66, 201, 111, 0.3);
+}
+
+body.dark-theme .restaurant-mode-card.is-existing strong {
+  color: #4ade80;
+}
+
+body.dark-theme .access-step h2 {
+  color: #fff;
+}
+
+body.dark-theme .step-help {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .access-form-card .form-grid label,
+body.dark-theme .access-form-card .field-label-group,
+body.dark-theme .access-form-card .hours-row label {
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme .access-form-card .form-grid select.label-select {
+  color: #fff;
+}
+
+body.dark-theme .access-form-card .form-grid input,
+body.dark-theme .access-form-card .form-grid select,
+body.dark-theme .access-form-card .form-grid textarea,
+body.dark-theme .access-form-card .hours-row input {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.5);
+  color: #fff;
+}
+
+body.dark-theme .access-form-card input::placeholder,
+body.dark-theme .access-form-card textarea::placeholder {
+  color: rgba(244, 240, 232, 0.58);
+}
+
+body.dark-theme .access-form-card input:focus,
+body.dark-theme .access-form-card select:focus,
+body.dark-theme .access-form-card textarea:focus {
+  border-color: #5b9dff;
+  box-shadow: 0 0 0 4px rgba(91, 157, 255, 0.25);
+}
+
+body.dark-theme .sales-modes {
+  border-color: rgba(244, 240, 232, 0.3);
+}
+
+body.dark-theme .sales-modes legend {
+  color: rgba(244, 240, 232, 0.9);
+}
+
+body.dark-theme .sales-modes input,
+body.dark-theme .day-toggle input {
+  accent-color: #5b9dff;
+}
+
+body.dark-theme .logo-preview {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(244, 240, 232, 0.35);
+  color: rgba(244, 240, 232, 0.6);
+}
+
+body.dark-theme .logo-upload-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .logo-upload-card strong {
+  color: #fff;
+}
+
+body.dark-theme .logo-upload-card span,
+body.dark-theme .logo-upload-card small {
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .logo-upload-card input[type="file"] {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(244, 240, 232, 0.35);
+  color: #fff;
+}
+
+body.dark-theme .soft-warning {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
+}
+
+body.dark-theme .hours-row {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .hours-row:focus-within {
+  border-color: rgba(91, 157, 255, 0.5);
+}
+
+body.dark-theme .profile-summary div {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(244, 240, 232, 0.14);
+}
+
+body.dark-theme .profile-summary dt {
+  color: rgba(244, 240, 232, 0.6);
+}
+
+body.dark-theme .profile-summary dd {
+  color: #fff;
+}
+
+body.dark-theme .access-form-actions {
+  border-top-color: rgba(244, 240, 232, 0.14);
 }
