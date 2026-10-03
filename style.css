@@ -7289,3 +7289,92 @@ body.dark-theme .profile-summary dd {
 body.dark-theme .access-form-actions {
   border-top-color: rgba(244, 240, 232, 0.14);
 }
+
+/* --- Dark theme unification (Etape 7, footer commun): index, poket-restaurants,
+   account, poket-access only. Scoped under body.dark-theme, so restaurants/*
+   (own "Propulse par Poksol" footer) and admin.html never render it. Colors
+   checked on #04111f: links .72 = 8.93:1, copyright .6 = 6.46:1, brand tagline
+   7.21:1, focus ring 6.98:1. --- */
+
+body.dark-theme .site-footer {
+  background: #04111f;
+  border-top: 1px solid rgba(244, 240, 232, 0.14);
+  padding: 56px 8% 28px;
+  color: rgba(244, 240, 232, 0.72);
+}
+
+body.dark-theme .site-footer-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 40px;
+}
+
+body.dark-theme .site-footer .brand {
+  color: #fff;
+  text-decoration: none;
+  width: fit-content;
+}
+
+body.dark-theme .site-footer .brand img {
+  width: 48px;
+  height: 48px;
+}
+
+body.dark-theme .site-footer .brand strong {
+  font-size: 24px;
+}
+
+body.dark-theme .site-footer-mail {
+  display: inline-block;
+  margin-top: 18px;
+  color: #5b9dff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+body.dark-theme .site-footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+body.dark-theme .site-footer-links a {
+  width: fit-content;
+  padding: 6px 0;
+  color: rgba(244, 240, 232, 0.72);
+  text-decoration: none;
+}
+
+body.dark-theme .site-footer-links a:hover,
+body.dark-theme .site-footer-mail:hover,
+body.dark-theme .site-footer .brand:hover {
+  color: #fff;
+}
+
+body.dark-theme .site-footer a:focus-visible {
+  outline: 2px solid #5b9dff;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+body.dark-theme .site-footer-copy {
+  max-width: 1180px;
+  margin: 40px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid rgba(244, 240, 232, 0.14);
+  font-size: 14px;
+  color: rgba(244, 240, 232, 0.6);
+}
+
+@media (max-width: 760px) {
+  body.dark-theme .site-footer {
+    padding: 44px 6% 24px;
+  }
+
+  body.dark-theme .site-footer-inner {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
