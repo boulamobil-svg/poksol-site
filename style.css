@@ -491,6 +491,95 @@ select:focus-visible {
   background: var(--poksol-blue);
 }
 
+/* Desktop (>=1024px): headline stays full width, then subtitle/CTAs sit beside a
+   fanned trio of app screens (centre one in front) instead of a lone carousel
+   floating below them. The carousel markup/JS is untouched: here its track is
+   pinned (transform overridden) and arrows/dots hidden, so all three slides show
+   at once. Below 1024px and on mobile the original carousel is unchanged. */
+@media (min-width: 1024px) {
+  .hero-content {
+    --phone-w: clamp(170px, 17vw, 250px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) calc(var(--phone-w) * 2.4);
+    column-gap: 56px;
+    align-items: start;
+  }
+
+  .hero-title {
+    grid-column: 1 / -1;
+  }
+
+  .hero-sub {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .hero-sub .actions {
+    flex-wrap: wrap;
+  }
+
+  .hero-showcase {
+    grid-column: 2;
+    grid-row: 2;
+    max-width: none;
+    margin: 40px 0 0;
+  }
+
+  .screenshots-carousel {
+    padding: 0;
+  }
+
+  .carousel-arrow,
+  .carousel-dots {
+    display: none;
+  }
+
+  .carousel-viewport {
+    max-width: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .carousel-track {
+    display: block;
+    position: relative;
+    height: calc(var(--phone-w) * 2340 / 1080 + 40px);
+    transform: none !important;
+    transition: none;
+  }
+
+  .screenshot-slide {
+    position: absolute;
+    top: 0;
+    width: var(--phone-w);
+    border: 1px solid rgba(244, 240, 232, 0.14);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #050b14;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+  }
+
+  .screenshot-slide:nth-child(1) {
+    left: 0;
+    z-index: 1;
+    transform: translateY(40px);
+  }
+
+  .screenshot-slide:nth-child(2) {
+    left: calc(var(--phone-w) * 0.7);
+    z-index: 3;
+  }
+
+  .screenshot-slide:nth-child(3) {
+    right: 0;
+    z-index: 2;
+    transform: translateY(40px);
+  }
+}
+
 .products,
 .product-page {
   padding: 68px 8%;
