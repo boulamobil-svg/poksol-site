@@ -3,170 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Compte Poksol | Portail client</title>
-  <meta name="description" content="Gerez votre compte Poksol : connexion securisee, restaurant rattache, appareil autorise et telechargements de l'application Poket Restaurants." />
+  <title>Mon compte | Poksol</title>
+  <meta name="description" content="Votre espace Poksol : vos informations et vos applications, celles qui sont actives et celles auxquelles vous avez souscrit." />
   <link rel="icon" href="poksol_icon.svg" type="image/svg+xml" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Compte Poksol | Portail client" />
-  <meta property="og:description" content="Connexion, restaurant rattache et telechargements centralises pour votre compte Poksol." />
+  <meta property="og:title" content="Mon compte | Poksol" />
+  <meta property="og:description" content="Vos informations et vos applications Poksol, au même endroit." />
   <meta property="og:image" content="https://poksol.com/poksol_icon.svg" />
   <meta property="og:url" content="https://poksol.com/account.html" />
-  <link rel="stylesheet" href="style.css?v=20260930-1" />
+  <link rel="preload" href="assets/fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="refonte.css?v=20261023-1" />
 </head>
-<body class="dark-theme">
-  <header class="portal-hero">
-    <nav class="navbar">
-      <div class="brand">
-        <img src="poksol_icon.svg" alt="Poksol" />
-        <div>
-          <strong>POK<span>SOL</span></strong>
-          <small>Your business in your pocket</small>
+<body class="rf">
+  <header class="rf-hero rf-hero--compact">
+    <canvas class="rf-pattern" data-matrix="calm" aria-hidden="true"></canvas>
+    <div class="rf-wrap">
+      <div class="rf-header">
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <nav class="rf-nav" aria-label="Navigation principale">
+          <a href="poket-restaurants.html">Poket Restaurants</a>
+          <a href="vtc-hero.html">VTC HERO</a>
+          <a href="account.html" aria-current="page">Compte</a>
+          <a href="index.html#contact">Contact</a>
+        </nav>
+        <details class="rf-menu">
+          <summary>Menu</summary>
+          <nav aria-label="Navigation principale (mobile)">
+            <a href="poket-restaurants.html">Poket Restaurants</a>
+            <a href="vtc-hero.html">VTC HERO</a>
+            <a href="account.html" aria-current="page">Compte</a>
+            <a href="index.html#contact">Contact</a>
+          </nav>
+        </details>
+      </div>
+
+      <div class="rf-hero-body">
+        <h1>Mon compte</h1>
+        <p class="rf-lede">Vos informations et vos applications Poksol, au même endroit.</p>
+        <div class="rf-actions">
+          <button class="rf-btn" type="button" data-compte-login>Se connecter avec Google</button>
+          <button class="rf-btn rf-btn--quiet is-hidden" type="button" data-compte-logout>Se déconnecter</button>
         </div>
       </div>
-
-      <div class="nav-links">
-        <a href="index.html">Accueil</a>
-        <a href="poket-restaurants.html">Poket Restaurants</a>
-        <a class="is-active" href="account.html" aria-current="page">Compte</a>
-        <a href="index.html#contact">Contact</a>
-      </div>
-
-      <a class="demo-btn" href="admin.html">Dashboard restaurant</a>
-    </nav>
-
-    <section class="portal-hero-content">
-      <h1>Portail client Poksol</h1>
-      <p>
-        Connexion utilisateur, restaurant rattache, appareil autorise,
-        produits actifs et telechargements centralises.
-      </p>
-      <div class="actions">
-        <button class="primary-btn button-reset" type="button" data-account-login>
-          Se connecter
-        </button>
-        <button class="outline-btn button-reset is-hidden" type="button" data-account-logout>
-          Se deconnecter
-        </button>
-        <a class="outline-btn" href="admin.html">Ouvrir le dashboard restaurant</a>
-      </div>
-    </section>
+    </div>
   </header>
 
-  <main class="portal-page">
-    <section class="portal-grid" aria-label="Apercu du compte Poksol">
-      <article class="portal-panel portal-profile">
-        <span class="portal-tag">Compte</span>
-        <h2>Utilisateur</h2>
-        <p class="portal-muted" data-account-state>Connexion en cours d'initialisation.</p>
-        <div class="profile-card">
-          <div class="profile-avatar" data-account-avatar>PK</div>
-          <div>
-            <strong data-account-name>Utilisateur Poksol</strong>
-            <span data-account-email>En attente de connexion securisee</span>
-          </div>
-        </div>
-      </article>
-
-      <article class="portal-panel">
-        <span class="portal-tag green">Appareil</span>
-        <h2>Appareil autorise</h2>
-        <p>
-          Un utilisateur standard ne pourra utiliser qu'un seul appareil actif.
-          Le changement d'appareil devra etre valide par un owner/admin.
-        </p>
-        <div class="device-status">
-          <strong data-device-title>Limite prevue</strong>
-          <span data-device-status>1 appareil par utilisateur standard</span>
-        </div>
-        <button class="ghost-action" type="button" data-future-action="device-reset">
-          Demander une reinitialisation
-        </button>
-      </article>
-
-      <article class="portal-panel">
-        <span class="portal-tag">Produit actif</span>
-        <h2>Poket Restaurants</h2>
-        <p>
-          Acces centralise a l'application navigateur, Android, Windows et aux notes de version.
-        </p>
-        <div class="portal-actions-list">
-          <a href="poket-access.html">Ouvrir l'application</a>
-          <a href="poket-access.html?mode=edit">Modifier mon restaurant</a>
-          <a href="poket-access.html?mode=new">Creer un nouveau restaurant</a>
-          <a href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+43.apk" data-release-link="android" download>Telecharger Android</a>
-          <a href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+43.zip" data-release-link="windows" download>Telecharger Windows</a>
-        </div>
-      </article>
-    </section>
-
-    <section class="portal-roadmap">
-      <div>
-        <h2>Connexion, roles et securite</h2>
+  <main data-compte aria-live="polite">
+    <section class="rf-section">
+      <div class="rf-wrap">
+        <p class="rf-fine">Chargement de votre compte…</p>
+        <noscript><p class="rf-fine">JavaScript est nécessaire pour afficher votre compte.</p></noscript>
       </div>
-      <div class="roadmap-list">
-        <article>
-          <strong>01</strong>
-          <span>Firebase Auth / Google (actif)</span>
-        </article>
-        <article>
-          <strong>02</strong>
-          <span>Profil utilisateur Poksol (actif)</span>
-        </article>
-        <article>
-          <strong>03</strong>
-          <span>Invitations et roles owner/admin (actif)</span>
-        </article>
-        <article>
-          <strong>04</strong>
-          <span>Controle d'appareil actif (a venir)</span>
-        </article>
-      </div>
-    </section>
-
-    <section class="platform-section" data-platform-account>
-      <section class="platform-card">
-        <h2>Chargement du portail...</h2>
-      </section>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div class="site-footer-inner">
-      <div class="site-footer-brand">
-        <a class="brand" href="index.html" aria-label="Poksol - accueil">
-          <img src="poksol_icon.svg" alt="" />
-          <div>
-            <strong>POK<span>SOL</span></strong>
-            <small>Your business in your pocket</small>
-          </div>
-        </a>
-        <a class="site-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
+  <footer class="rf-footer">
+    <div class="rf-wrap">
+      <div>
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <a class="rf-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
       </div>
-      <nav class="site-footer-links" aria-label="Navigation du pied de page">
-        <a href="index.html#produit">Solutions</a>
+      <nav aria-label="Navigation du pied de page">
         <a href="poket-restaurants.html">Poket Restaurants</a>
+        <a href="vtc-hero.html">VTC HERO</a>
         <a href="account.html">Compte</a>
         <a href="index.html#contact">Contact</a>
       </nav>
-      <nav class="site-footer-links" aria-label="Informations légales">
+      <nav aria-label="Informations légales">
         <a href="mentions-legales.html">Mentions légales</a>
         <a href="cgu.html">CGU</a>
         <a href="politique-confidentialite.html">Politique de confidentialité</a>
       </nav>
+      <p class="rf-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
     </div>
-    <p class="site-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
   </footer>
 
-  <script src="app.js?v=20260930-1"></script>
-  <script type="module" src="platform.js?v=20260930-1"></script>
+  <script type="module" src="compte.js?v=20261023-1"></script>
+  <script src="refonte.js?v=20261023-1" defer></script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
