@@ -4,254 +4,141 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Poksol - Solutions business mobiles</title>
-  <meta name="description" content="Poksol concoit des solutions mobiles pour piloter votre restaurant, commerce ou activite de services : caisse, commandes et cuisine, depuis votre telephone." />
+  <meta name="description" content="Poksol conçoit des solutions mobiles pour piloter votre restaurant, commerce ou activité de services : caisse, commandes et cuisine, depuis votre téléphone." />
   <link rel="icon" href="poksol_icon.svg" type="image/svg+xml" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Poksol - Solutions business mobiles" />
-  <meta property="og:description" content="Des solutions mobiles pour piloter votre restaurant, commerce ou activite de services, depuis votre telephone." />
+  <meta property="og:description" content="Des solutions mobiles pour piloter votre restaurant, commerce ou activité de services, depuis votre téléphone." />
   <meta property="og:image" content="https://poksol.com/poksol_icon.svg" />
   <meta property="og:url" content="https://poksol.com/" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <!-- display=optional, not swap: the hero title is a huge clamp(46px..168px)
-       headline. With swap, a late-arriving font forces a re-layout that can
-       move everything below it by 100px+ (measured: ~149px height change,
-       CLS contribution ~0.02 on this exact title/content, see the .hero-title
-       comment in style.css). optional lets the browser decide once, within
-       its short block window, and never swap afterward, so there is no
-       post-paint shift. Do not change this back to swap to "fix" a flash of
-       fallback font -- that flash is the intended trade-off, not a bug. -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=optional" />
-  <link rel="stylesheet" href="style.css?v=20260930-1" />
+  <link rel="preload" href="assets/fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="refonte.css?v=20261023-1" />
 </head>
-<body class="dark-theme">
-  <header class="hero">
-    <nav class="navbar">
-      <div class="brand">
-        <img src="poksol_icon.svg" alt="Poksol" />
-        <div>
-          <strong>POK<span>SOL</span></strong>
-          <small>Your business in your pocket</small>
-        </div>
+<body class="rf">
+  <header class="rf-hero">
+    <canvas class="rf-pattern" data-matrix aria-hidden="true"></canvas>
+    <div class="rf-wrap">
+      <div class="rf-header">
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <nav class="rf-nav" aria-label="Navigation principale">
+          <a href="poket-restaurants.html">Poket Restaurants</a>
+          <a href="vtc-hero.html">VTC HERO</a>
+          <a href="account.html">Compte</a>
+          <a href="#contact">Contact</a>
+          <a class="rf-btn rf-btn--quiet rf-btn--sm" href="#contact">Demander une démo</a>
+        </nav>
+        <details class="rf-menu">
+          <summary>Menu</summary>
+          <nav aria-label="Navigation principale (mobile)">
+            <a href="poket-restaurants.html">Poket Restaurants</a>
+            <a href="vtc-hero.html">VTC HERO</a>
+            <a href="account.html">Compte</a>
+            <a href="#contact">Contact</a>
+          </nav>
+        </details>
       </div>
 
-      <div class="nav-links">
-        <a class="is-active" href="index.html" aria-current="page">Accueil</a>
-        <a href="#produit">Solutions</a>
-        <a href="account.html">Compte</a>
-        <a href="index.html#contact">Contact</a>
-      </div>
+      <div class="rf-hero-body">
+        <h1>Votre activité vous suit. Partout.</h1>
+        <p class="rf-lede">Poksol conçoit des applications mobiles pour piloter un restaurant, un commerce ou une société de VTC, depuis le téléphone.</p>
+        <div class="rf-actions">
+          <a class="rf-btn" href="poket-restaurants.html">Découvrir Poket Restaurants</a>
+          <a class="rf-link" href="vtc-hero.html">Voir VTC HERO</a>
+        </div>
 
-      <a class="demo-btn" href="poket-restaurants.html">Voir Poket Restaurants</a>
-    </nav>
-
-    <section class="hero-content">
-      <h1 class="hero-title" data-hero-title aria-label="Votre activite vous suit. Partout.">
-        <span class="word"><span class="word-inner">Votre activite vous suit.</span></span>
-        <span class="word"><span class="word-inner">Partout.</span></span>
-      </h1>
-
-      <div class="hero-sub" data-hero-reveal>
-        <p>
-          Poksol concoit des solutions mobiles pour piloter votre commerce, votre restaurant
-          ou votre activite de services, depuis votre telephone.
-        </p>
-
-        <div class="actions">
-          <a class="primary-btn" href="poket-restaurants.html" data-magnetic><span>Decouvrir Poket Restaurants</span></a>
-          <a class="outline-btn" href="index.html#produit">Decouvrir nos solutions</a>
+        <div class="rf-stage" role="group" aria-label="Captures de Poket Restaurants : réservations, salle, à emporter">
+          <figure class="rf-phone rf-phone--side rf-phone-1"><img src="assets/screenshots/poket-reservations-full.png" alt="Poket Restaurants : agenda des réservations" width="1080" height="2340" /></figure>
+          <figure class="rf-phone rf-phone-2"><img src="assets/screenshots/poket-salle-full.png" alt="Poket Restaurants : plan de salle et aperçu de la caisse" width="1080" height="2340" /></figure>
+          <figure class="rf-phone rf-phone--side rf-phone-3"><img src="assets/screenshots/poket-emporte-full.png" alt="Poket Restaurants : commandes à emporter" width="1080" height="2340" /></figure>
         </div>
       </div>
-
-      <div class="hero-showcase" data-hero-reveal>
-        <div class="screenshots-header">
-          <span>Poket Restaurants</span>
-          <strong>Ecrans reels de l'application</strong>
-        </div>
-        <div class="screenshots-carousel" data-carousel aria-label="Captures de Poket Restaurants">
-          <button class="carousel-arrow carousel-arrow-prev" type="button" data-carousel-prev aria-label="Capture precedente">&#8249;</button>
-          <div class="carousel-viewport">
-            <div class="carousel-track" data-carousel-track>
-          <figure class="screenshot-slide is-active" data-carousel-slide>
-            <img src="assets/screenshots/poket-reservations-full.png" alt="Apercu Poket Restaurants - reservations" />
-            <figcaption>Reservations</figcaption>
-          </figure>
-          <figure class="screenshot-slide" data-carousel-slide>
-            <img src="assets/screenshots/poket-salle-full.png" alt="Apercu Poket Restaurants - salle" />
-            <figcaption>Salle</figcaption>
-          </figure>
-          <figure class="screenshot-slide" data-carousel-slide>
-            <img src="assets/screenshots/poket-emporte-full.png" alt="Apercu Poket Restaurants - emporte" />
-            <figcaption>Emporte</figcaption>
-          </figure>
-            </div>
-          </div>
-          <button class="carousel-arrow carousel-arrow-next" type="button" data-carousel-next aria-label="Capture suivante">&#8250;</button>
-          <div class="carousel-dots" aria-label="Choisir une capture">
-            <button class="carousel-dot is-active" type="button" data-carousel-dot="0" aria-label="Afficher Reservations" aria-current="true"></button>
-            <button class="carousel-dot" type="button" data-carousel-dot="1" aria-label="Afficher Salle"></button>
-            <button class="carousel-dot" type="button" data-carousel-dot="2" aria-label="Afficher Emporte"></button>
-          </div>
-        </div>
-      </div>
-    </section>
-    <div class="hero-grain" aria-hidden="true"></div>
-    <noscript>
-      <style>
-        .hero-title .word-inner, .hero-sub, .hero-showcase { transform: none !important; opacity: 1 !important; }
-      </style>
-    </noscript>
+    </div>
   </header>
 
   <main>
-    <section id="produit" class="products">
-      <h2>En service aujourd'hui</h2>
-      <p>
-        Poket Restaurants gere les reservations, le plan de salle, la vente a emporter
-        et l'impression cuisine, deja utilise par des restaurateurs.
-      </p>
-
-      <a class="single-product single-product-link" href="poket-restaurants.html" aria-label="Ouvrir la page Poket Restaurants">
-        <img src="poket-restaurants-logo.png" alt="Poket Restaurants by Poksol" />
-        <div>
-          <span class="status-pill status-pill-live">En production</span>
-          <h3>Poket Restaurants</h3>
-          <p>
-            Systeme de caisse, prise de commandes et impressions cuisine depuis votre tablette Android
-            ou votre telephone portable.
-          </p>
-          <span class="product-link-cta">Ouvrir la fiche produit</span>
-          <div class="features-list">
-            <span>Prise de commandes</span>
-            <span>Impression cuisine</span>
-            <span>Multi-appareils</span>
-            <span>Statistiques en temps reel</span>
-          </div>
+    <section class="rf-section" id="produit">
+      <div class="rf-wrap rf-split">
+        <div class="rf-copy">
+          <p class="rf-status rf-status--live">En production</p>
+          <h2>Poket Restaurants</h2>
+          <p>Caisse, prise de commandes et impression cuisine depuis une tablette Android ou un téléphone, déjà utilisés par des restaurateurs.</p>
+          <a class="rf-link" href="poket-restaurants.html">Ouvrir la fiche produit</a>
         </div>
-      </a>
-    </section>
-
-    <section class="upcoming">
-      <h2>Ensuite chez Poksol</h2>
-      <p>
-        La meme plateforme s'etend a d'autres metiers, avec des applications mobiles
-        simples et adaptees au terrain.
-      </p>
-      <div class="upcoming-cards">
-        <article class="upcoming-card">
-          <h3>Poket Retail</h3>
-          <p>Vente en boutique et gestion de stock</p>
-          <span class="status-pill status-pill-soon">Bientot disponible</span>
-        </article>
-        <article class="upcoming-card">
-          <h3>Poket Services</h3>
-          <p>Rendez-vous et suivi client</p>
-          <span class="status-pill status-pill-soon">Bientot disponible</span>
-        </article>
-        <article class="upcoming-card">
-          <h3>Poket Booking</h3>
-          <p>Reservation et billetterie en ligne</p>
-          <span class="status-pill status-pill-soon">Bientot disponible</span>
-        </article>
+        <ul class="rf-rows">
+          <li><div><strong>Réservations</strong><span>L'agenda du service, avec les demandes reçues en ligne.</span></div></li>
+          <li><div><strong>Salle</strong><span>Le plan de salle et les tables en cours, d'un coup d'œil.</span></div></li>
+          <li><div><strong>À emporter</strong><span>Les commandes de la prise au retrait.</span></div></li>
+          <li><div><strong>Cuisine</strong><span>Les tickets partent directement à l'imprimante cuisine.</span></div></li>
+          <li><div><strong>Plusieurs appareils</strong><span>Tablette en salle, téléphone au comptoir, même service.</span></div></li>
+        </ul>
       </div>
     </section>
 
-    <section class="platform-section contact-platform-section" id="contact">
-      <div class="platform-card contact-platform-card">
-        <div>
-          <h2>Parlons de votre business</h2>
-          <p>
-            Vous voulez tester Poket Restaurants, preparer une page restaurant
-            ou discuter d'une future solution Poksol ? Envoyez un message.
-          </p>
+    <section class="rf-band" id="vtc">
+      <div class="rf-band-copy">
+        <p class="rf-status rf-status--soon">Bientôt disponible</p>
+        <h2>VTC HERO</h2>
+        <p>Réservations, devis, courses et factures pour les sociétés de VTC, avec le suivi du chauffeur en direct.</p>
+        <a class="rf-link" href="vtc-hero.html">Découvrir VTC HERO</a>
+      </div>
+      <div class="rf-band-media">
+        <img src="assets/vtc-hero/vtc-hero-poster.jpg" alt="Berline noire sous la pluie dans une rue de Paris, de nuit" width="1600" height="905" loading="lazy" />
+      </div>
+    </section>
+
+    <section class="rf-later">
+      <div class="rf-wrap">
+        <h2>D'autres métiers suivront</h2>
+        <ul class="rf-later-list">
+          <li><h3>Poket Retail</h3><p>Vente en boutique et gestion de stock.</p><p class="rf-status rf-status--soon">Bientôt disponible</p></li>
+          <li><h3>Poket Services</h3><p>Rendez-vous et suivi client.</p><p class="rf-status rf-status--soon">Bientôt disponible</p></li>
+          <li><h3>Poket Booking</h3><p>Réservation et billetterie en ligne.</p><p class="rf-status rf-status--soon">Bientôt disponible</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="rf-section" id="contact">
+      <div class="rf-wrap rf-split">
+        <div class="rf-copy">
+          <h2>Parlons de votre activité</h2>
+          <p>Vous voulez essayer Poket Restaurants, préparer une page restaurant ou discuter d'une future solution Poksol ? Envoyez-nous un message.</p>
         </div>
-        <form class="platform-form" data-contact-form>
-          <div class="form-grid">
-            <label>Nom<input name="name" required /></label>
-            <label>Email<input name="email" type="email" required /></label>
-            <label class="wide-field">Restaurant / entreprise<input name="company" /></label>
-            <label class="wide-field">Message<textarea name="message" rows="4" required></textarea></label>
+        <form class="rf-form" data-contact-form>
+          <div class="rf-field-pair">
+            <div class="rf-field"><label for="f-name">Nom</label><input id="f-name" name="name" autocomplete="name" required /></div>
+            <div class="rf-field"><label for="f-mail">Adresse e-mail</label><input id="f-mail" name="email" type="email" autocomplete="email" required /></div>
           </div>
-          <button class="primary-btn button-reset" type="submit">Envoyer</button>
-          <small data-form-status></small>
+          <div class="rf-field"><label for="f-co">Restaurant ou entreprise</label><input id="f-co" name="company" autocomplete="organization" /></div>
+          <div class="rf-field"><label for="f-msg">Message</label><textarea id="f-msg" name="message" rows="4" required></textarea></div>
+          <button class="rf-btn" type="submit">Envoyer le message</button>
+          <small data-form-status role="status" aria-live="polite"></small>
         </form>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div class="site-footer-inner">
-      <div class="site-footer-brand">
-        <a class="brand" href="index.html" aria-label="Poksol - accueil">
-          <img src="poksol_icon.svg" alt="" />
-          <div>
-            <strong>POK<span>SOL</span></strong>
-            <small>Your business in your pocket</small>
-          </div>
-        </a>
-        <a class="site-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
+  <footer class="rf-footer">
+    <div class="rf-wrap">
+      <div>
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <a class="rf-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
       </div>
-      <nav class="site-footer-links" aria-label="Navigation du pied de page">
-        <a href="index.html#produit">Solutions</a>
+      <nav aria-label="Navigation du pied de page">
         <a href="poket-restaurants.html">Poket Restaurants</a>
+        <a href="vtc-hero.html">VTC HERO</a>
         <a href="account.html">Compte</a>
-        <a href="index.html#contact">Contact</a>
+        <a href="#contact">Contact</a>
       </nav>
-      <nav class="site-footer-links" aria-label="Informations légales">
+      <nav aria-label="Informations légales">
         <a href="mentions-legales.html">Mentions légales</a>
         <a href="cgu.html">CGU</a>
         <a href="politique-confidentialite.html">Politique de confidentialité</a>
       </nav>
+      <p class="rf-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
     </div>
-    <p class="site-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
   </footer>
 
-  <script src="app.js?v=20260930-1"></script>
   <script type="module" src="platform.js?v=20260930-1"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script>
-    (function () {
-      var prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      var canHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-      var isMobile = window.innerWidth < 768;
-
-      // Hero entrance: headline words rise in, then the subtitle/CTA and the
-      // screenshot showcase fade up behind them. Skipped entirely if the
-      // visitor asked for reduced motion.
-      if (window.gsap && !prefersReducedMotion) {
-        var tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-        tl.to(".hero-title .word-inner", {
-          y: "0%",
-          opacity: 1,
-          duration: isMobile ? 0.6 : 0.9,
-          stagger: isMobile ? 0.08 : 0.12,
-        }).to(
-          "[data-hero-reveal]",
-          { y: 0, opacity: 1, duration: 0.8, stagger: 0.15 },
-          "-=0.35"
-        );
-      } else {
-        document.querySelectorAll(".hero-title .word-inner, [data-hero-reveal]").forEach(function (el) {
-          el.style.transform = "none";
-          el.style.opacity = "1";
-        });
-      }
-
-      // Magnetic CTA: only on real pointer devices, per Lume's touch guidance.
-      if (window.gsap && canHover && !prefersReducedMotion) {
-        document.querySelectorAll("[data-magnetic]").forEach(function (btn) {
-          btn.addEventListener("mousemove", function (event) {
-            var rect = btn.getBoundingClientRect();
-            var x = event.clientX - rect.left - rect.width / 2;
-            var y = event.clientY - rect.top - rect.height / 2;
-            gsap.to(btn, { x: x * 0.25, y: y * 0.25, duration: 0.4, ease: "power2.out" });
-          });
-          btn.addEventListener("mouseleave", function () {
-            gsap.to(btn, { x: 0, y: 0, duration: 0.7, ease: "elastic.out(1, 0.5)" });
-          });
-        });
-      }
-    })();
-  </script>
+  <script src="refonte.js?v=20261023-1" defer></script>
 </body>
 </html>

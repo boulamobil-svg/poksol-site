@@ -11,36 +11,39 @@
   <meta property="og:description" content="Creez ou completez le profil de votre restaurant sur Poksol en quelques etapes." />
   <meta property="og:image" content="https://poksol.com/poksol_icon.svg" />
   <meta property="og:url" content="https://poksol.com/poket-access.html" />
+  <link rel="preload" href="assets/fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="style.css?v=20260930-1" />
+  <link rel="stylesheet" href="refonte.css?v=20261023-1" />
 </head>
-<body class="dark-theme">
-  <header class="access-hero">
-    <nav class="navbar">
-      <div class="brand">
-        <img src="poksol_icon.svg" alt="Poksol" />
-        <div>
-          <strong>POK<span>SOL</span></strong>
-          <small>Your business in your pocket</small>
-        </div>
+<body class="rf rf-app">
+  <header class="rf-hero rf-hero--compact">
+    <canvas class="rf-pattern" data-matrix="calm" aria-hidden="true"></canvas>
+    <div class="rf-wrap">
+        <div class="rf-header">
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <nav class="rf-nav" aria-label="Navigation principale">
+          <a href="poket-restaurants.html" aria-current="page">Poket Restaurants</a>
+          <a href="vtc-hero.html">VTC HERO</a>
+          <a href="account.html">Compte</a>
+          <a href="index.html#contact">Contact</a>
+          <a class="rf-btn rf-btn--quiet rf-btn--sm" href="poket-restaurants.html">Retour produit</a>
+        </nav>
+        <details class="rf-menu">
+          <summary>Menu</summary>
+          <nav aria-label="Navigation principale (mobile)">
+            <a href="poket-restaurants.html" aria-current="page">Poket Restaurants</a>
+            <a href="vtc-hero.html">VTC HERO</a>
+            <a href="account.html">Compte</a>
+            <a href="index.html#contact">Contact</a>
+          </nav>
+        </details>
       </div>
 
-      <div class="nav-links">
-        <a href="index.html">Accueil</a>
-        <a class="is-active" href="poket-restaurants.html" aria-current="page">Poket Restaurants</a>
-        <a href="account.html">Compte</a>
-        <a href="index.html#contact">Contact</a>
+      <div class="rf-hero-body">
+        <h1 data-access-title>Créer ou compléter votre restaurant</h1>
+        <p class="rf-lede">Connectez-vous : si un restaurant existe déjà, Poksol le charge sans le recréer. Sinon, nous vous guidons pour créer votre établissement avant d'ouvrir l'application.</p>
       </div>
-
-      <a class="demo-btn" href="poket-restaurants.html">Retour produit</a>
-    </nav>
-
-    <section class="access-hero-content">
-      <h1 data-access-title>Créer ou compléter votre restaurant</h1>
-      <p>
-        Connectez-vous : si un restaurant existe déjà, Poksol le charge sans le recréer.
-        Sinon, nous vous guidons pour créer votre établissement avant d'ouvrir l'application.
-      </p>
-    </section>
+    </div>
   </header>
 
   <main class="access-page">
@@ -242,33 +245,28 @@
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div class="site-footer-inner">
-      <div class="site-footer-brand">
-        <a class="brand" href="index.html" aria-label="Poksol - accueil">
-          <img src="poksol_icon.svg" alt="" />
-          <div>
-            <strong>POK<span>SOL</span></strong>
-            <small>Your business in your pocket</small>
-          </div>
-        </a>
-        <a class="site-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
+    <footer class="rf-footer">
+    <div class="rf-wrap">
+      <div>
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <a class="rf-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
       </div>
-      <nav class="site-footer-links" aria-label="Navigation du pied de page">
-        <a href="index.html#produit">Solutions</a>
+      <nav aria-label="Navigation du pied de page">
         <a href="poket-restaurants.html">Poket Restaurants</a>
+        <a href="vtc-hero.html">VTC HERO</a>
         <a href="account.html">Compte</a>
         <a href="index.html#contact">Contact</a>
       </nav>
-      <nav class="site-footer-links" aria-label="Informations légales">
+      <nav aria-label="Informations légales">
         <a href="mentions-legales.html">Mentions légales</a>
         <a href="cgu.html">CGU</a>
         <a href="politique-confidentialite.html">Politique de confidentialité</a>
       </nav>
+      <p class="rf-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
     </div>
-    <p class="site-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
   </footer>
 
   <script type="module" src="poket-access.js?v=20260930-1"></script>
+  <script src="refonte.js?v=20261023-1" defer></script>
 </body>
 </html>

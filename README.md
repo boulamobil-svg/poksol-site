@@ -18,6 +18,8 @@ Google, Firestore et Storage (projet `restaurantpos-7a4f0d11`).
 | Chemin | Rôle |
 |---|---|
 | `index.html`, `poket-restaurants.html` | Vitrine Poksol et fiche produit |
+| `refonte.css`, `refonte.js`, `assets/fonts/` | Charte commune des pages publiques (polices hébergées, motifs animés du hero). `account.html` et `poket-access.html` la chargent après `style.css` |
+| `vtc-hero.html`, `assets/vtc-hero/` | Fiche produit VTC HERO ; l'application vit sur son propre hébergement Firebase (projet VTC HERO), pas dans ce dépôt |
 | `account.html`, `admin.html` | Portail client et dashboard restaurant (`admin.html` reste le nom historique) |
 | `poket-access.html` / `poket-access.js` | Création, rattachement et invitation d'un restaurant |
 | `restaurants/` | Pages publiques des restaurants (page, menu, réservation) |

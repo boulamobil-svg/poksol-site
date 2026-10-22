@@ -4,185 +4,148 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Poket Restaurants | Poksol</title>
-  <meta name="description" content="Poket Restaurants : caisse, prise de commandes et impression cuisine pour restaurateurs, sur Android, Windows et navigateur. Gerez votre service a la tablette." />
+  <meta name="description" content="Poket Restaurants : caisse, prise de commandes et impression cuisine pour restaurateurs, sur Android, Windows et navigateur. Gérez votre service à la tablette." />
   <link rel="icon" href="poksol_icon.svg" type="image/svg+xml" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Poket Restaurants | Poksol" />
   <meta property="og:description" content="Caisse, prise de commandes et impression cuisine pour restaurateurs, sur Android, Windows et navigateur." />
   <meta property="og:image" content="https://poksol.com/poksol_icon.svg" />
   <meta property="og:url" content="https://poksol.com/poket-restaurants.html" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=optional" />
-  <link rel="stylesheet" href="style.css?v=20260930-1" />
+  <link rel="preload" href="assets/fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="refonte.css?v=20261023-1" />
 </head>
-<body class="dark-theme">
-  <header class="product-hero">
-    <nav class="navbar">
-      <div class="brand">
-        <img src="poksol_icon.svg" alt="Poksol" />
-        <div>
-          <strong>POK<span>SOL</span></strong>
-          <small>Your business in your pocket</small>
-        </div>
+<body class="rf">
+  <header class="rf-hero">
+    <canvas class="rf-pattern" data-matrix aria-hidden="true"></canvas>
+    <div class="rf-wrap">
+      <div class="rf-header">
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <nav class="rf-nav" aria-label="Navigation principale">
+          <a href="poket-restaurants.html" aria-current="page">Poket Restaurants</a>
+          <a href="vtc-hero.html">VTC HERO</a>
+          <a href="account.html">Compte</a>
+          <a href="index.html#contact">Contact</a>
+          <a class="rf-btn rf-btn--quiet rf-btn--sm" href="mailto:contact@poksol.com">Demander une démo</a>
+        </nav>
+        <details class="rf-menu">
+          <summary>Menu</summary>
+          <nav aria-label="Navigation principale (mobile)">
+            <a href="poket-restaurants.html" aria-current="page">Poket Restaurants</a>
+            <a href="vtc-hero.html">VTC HERO</a>
+            <a href="account.html">Compte</a>
+            <a href="index.html#contact">Contact</a>
+          </nav>
+        </details>
       </div>
 
-      <div class="nav-links">
-        <a href="index.html">Accueil</a>
-        <a class="is-active" href="poket-restaurants.html" aria-current="page">Poket Restaurants</a>
-        <a href="account.html">Compte</a>
-        <a href="index.html#contact">Contact</a>
-      </div>
-
-      <a class="demo-btn" href="mailto:contact@poksol.com">Demander une demo</a>
-    </nav>
-
-    <section class="product-hero-content">
-      <div>
-        <span class="status-pill status-pill-live">En production</span>
+      <div class="rf-hero-body">
+        <p class="rf-status rf-status--live">En production</p>
         <h1>Poket Restaurants</h1>
-        <p>
-          Systeme de caisse, prise de commandes et impressions cuisine depuis votre tablette Android
-          ou telephone portable. Une solution mobile concue pour fluidifier le service, la caisse
-          et la communication cuisine.
-        </p>
-        <div class="actions">
-          <a class="primary-btn" href="#mon-acces-poket">Se connecter / gerer mon acces</a>
-          <a class="outline-btn" href="mailto:contact@poksol.com">Demander une demo</a>
+        <p class="rf-lede">Système de caisse, prise de commandes et impressions cuisine depuis votre tablette Android ou votre téléphone. Une solution mobile conçue pour fluidifier le service, la caisse et la communication avec la cuisine.</p>
+        <div class="rf-actions">
+          <a class="rf-btn" href="#mon-acces-poket">Se connecter ou gérer mon accès</a>
+          <a class="rf-link" href="mailto:contact@poksol.com">Demander une démo</a>
+        </div>
+
+        <div class="rf-stage" role="group" aria-label="Captures de Poket Restaurants : réservations, salle, à emporter">
+          <figure class="rf-phone rf-phone--side rf-phone-1"><img src="assets/screenshots/poket-reservations-full.png" alt="Poket Restaurants : agenda des réservations" width="1080" height="2340" /></figure>
+          <figure class="rf-phone rf-phone-2"><img src="assets/screenshots/poket-salle-full.png" alt="Poket Restaurants : plan de salle et aperçu de la caisse" width="1080" height="2340" /></figure>
+          <figure class="rf-phone rf-phone--side rf-phone-3"><img src="assets/screenshots/poket-emporte-full.png" alt="Poket Restaurants : commandes à emporter" width="1080" height="2340" /></figure>
         </div>
       </div>
-
-      <div class="product-visual">
-        <img src="poket-restaurants-logo.png" alt="Logo Poket Restaurants" />
-      </div>
-    </section>
+    </div>
   </header>
 
-  <main class="product-page">
-    <section class="product-access-panel" id="mon-acces-poket">
-      <div>
-        <h2>Mon acces Poket Restaurants</h2>
-        <p data-account-state>
-          Cette page reste publique. Connectez-vous pour enregistrer votre compte, retrouver
-          votre restaurant, modifier ses informations et ouvrir l'application.
-        </p>
-      </div>
+  <main>
+    <section class="rf-section" id="mon-acces-poket">
+      <div class="rf-wrap rf-split">
+        <div class="rf-copy">
+          <h2>Mon accès Poket Restaurants</h2>
+          <p data-account-state>Cette page reste publique. Connectez-vous pour enregistrer votre compte, retrouver votre restaurant, modifier ses informations et ouvrir l'application.</p>
 
-      <div class="product-account-card">
-        <div class="profile-card compact-profile-card">
-          <div class="profile-avatar" data-account-avatar>PK</div>
-          <div>
-            <strong data-account-name>Utilisateur Poksol</strong>
-            <span data-account-email>Connexion requise</span>
+          <div class="rf-profile">
+            <div class="rf-avatar" data-account-avatar>PK</div>
+            <div>
+              <strong data-account-name>Utilisateur Poksol</strong>
+              <span data-account-email>Connexion requise</span>
+            </div>
+          </div>
+          <div class="rf-attached">
+            <span>Restaurant rattaché</span>
+            <strong data-account-restaurant>Aucun restaurant chargé</strong>
+          </div>
+
+          <div class="rf-buttons">
+            <button class="rf-btn" type="button" data-account-login>Se connecter avec Google</button>
+            <button class="rf-btn rf-btn--outline is-hidden" type="button" data-account-logout>Se déconnecter</button>
           </div>
         </div>
-        <div class="attached-restaurant-card">
-          <span>Restaurant attache</span>
-          <strong data-account-restaurant>Aucun restaurant charge</strong>
+
+        <ul class="rf-rows">
+          <li><a href="poket-access.html"><strong>Créer ou rejoindre</strong><span>Un nouveau restaurant, ou une invitation reçue.</span></a></li>
+          <li><a href="poket-access.html?mode=edit&amp;section=address"><strong>Modifier l'adresse</strong><span>L'adresse affichée sur les tickets et la page restaurant.</span></a></li>
+          <li><a href="poket-access.html?mode=edit&amp;section=hours"><strong>Modifier les horaires</strong><span>Les horaires utilisés pour les réservations.</span></a></li>
+          <li><a href="poket-access.html?mode=public-page"><strong>Éditer la page restaurant</strong><span>La page publique que voient vos clients.</span></a></li>
+          <li><a href="poket-access.html"><strong>Application navigateur</strong><span>Ouvrir Poket Restaurants sans rien installer.</span></a></li>
+          <li><a href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+43.apk" data-release-link="android" download><strong>Android</strong><span>Télécharger l'APK pour tablette ou téléphone.</span></a></li>
+          <li><a href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+43.zip" data-release-link="windows" download><strong>Windows</strong><span>Télécharger l'archive ZIP pour ordinateur.</span></a></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="rf-section rf-section--mist" aria-live="polite">
+      <div class="rf-wrap rf-split">
+        <div class="rf-copy">
+          <h2>Disponible maintenant</h2>
+          <p>Version : <span data-release-text="version">1.0.6+42</span></p>
+        </div>
+        <div>
+          <ul class="rf-checklist" style="margin-top:0">
+            <li>Application Android (APK)</li>
+            <li>Application navigateur</li>
+            <li>Version Windows</li>
+          </ul>
+          <p class="rf-fine" data-release-text="notes">Release 1.0.6+42 : version affichée dans l'app corrigée (lisait un numéro figé au lieu du vrai) ; toute nouvelle release est désormais obligatoire et se télécharge toute seule ; formulaire client aligné sur le site (Titre, Pays). Web et Windows encore en 1.0.6+40.</p>
         </div>
       </div>
-
-      <div class="product-access-actions">
-        <button class="primary-btn button-reset" type="button" data-account-login>
-          Se connecter avec Google
-        </button>
-        <button class="outline-dark-btn button-reset is-hidden" type="button" data-account-logout>
-          Se deconnecter
-        </button>
-        <a class="product-action" href="poket-access.html">Creer ou rejoindre un restaurant</a>
-        <a class="product-action" href="poket-access.html?mode=edit&section=address">Modifier adresse</a>
-        <a class="product-action" href="poket-access.html?mode=edit&section=hours">Modifier horaires</a>
-        <a class="product-action" href="poket-access.html?mode=public-page">Editer la page restaurant</a>
-        <a class="product-action" href="poket-access.html">Ouvrir l'application navigateur</a>
-        <a class="product-action" href="/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+43.apk" data-release-link="android" download>Telecharger APK Android</a>
-        <a class="product-action windows" href="/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+43.zip" data-release-link="windows" download>Telecharger Windows</a>
-      </div>
     </section>
 
-    <section class="coming-soon release-ready" aria-live="polite">
-      <h3>Disponible maintenant</h3>
-      <p>
-        Version : <span data-release-text="version">1.0.6+42</span><br />
-        Android APK disponible<br />
-        Application navigateur disponible<br />
-        Version Windows disponible<br />
-        <span data-release-text="notes">Release 1.0.6+42 : version affichee dans l'app corrigee (lisait un numero fige au lieu du vrai) ; toute nouvelle release est desormais obligatoire et se telecharge toute seule ; formulaire client aligne sur le site (Titre, Pays). Web et Windows encore en 1.0.6+40.</span><br />
-      </p>
-    </section>
-
-    <section class="future-version" aria-labelledby="future-version-title">
-      <div class="future-version-header">
-        <h2 id="future-version-title">Compte, restaurant et acces</h2>
-        <p>
-          Connectez-vous avec Google pour retrouver votre restaurant, gerer son equipe,
-          ses clients et ses reservations, et telecharger les applications.
-        </p>
-      </div>
-
-      <div class="future-grid">
-        <a class="future-card future-card-link" href="account.html">
-          <h3>Connexion utilisateur</h3>
-          <p>Un compte Google identifie chaque membre autorise de votre restaurant.</p>
-        </a>
-
-        <a class="future-card future-card-link" href="account.html">
-          <h3>Appareil autorise</h3>
-          <p>A venir : limiter un utilisateur standard a un seul appareil actif, avec validation admin.</p>
-          <span class="status-pill status-pill-soon">A venir</span>
-        </a>
-
-        <a class="future-card future-card-link" href="admin.html">
-          <h3>Dashboard restaurant</h3>
-          <p>Les owners et admins gerent l'equipe, les clients, les reservations et la page publique.</p>
-        </a>
-      </div>
-
-      <div class="future-note">
-        <strong>POKSOL reste la plateforme.</strong>
-        <span>
-          Poket Restaurants est le premier produit Poksol. D'autres solutions pour d'autres types
-          de business seront ajoutees progressivement.
-        </span>
+    <section class="rf-section" aria-labelledby="compte-titre">
+      <div class="rf-wrap">
+        <h2 id="compte-titre">Compte, restaurant et accès</h2>
+        <p style="margin-top:20px;color:var(--rf-muted)">Connectez-vous avec Google pour retrouver votre restaurant, gérer son équipe, ses clients et ses réservations, et télécharger les applications.</p>
+        <ul class="rf-rows rf-rows--wide" style="margin-top:48px">
+          <li><a href="account.html"><strong>Connexion utilisateur</strong><span>Un compte Google identifie chaque membre autorisé de votre restaurant.</span></a></li>
+          <li><a href="account.html"><strong>Appareil autorisé</strong><span>À venir : limiter un utilisateur standard à un seul appareil actif, avec validation d'un administrateur.</span></a></li>
+          <li><a href="admin.html"><strong>Dashboard restaurant</strong><span>Les propriétaires et administrateurs gèrent l'équipe, les clients, les réservations et la page publique.</span></a></li>
+        </ul>
+        <p class="rf-note"><strong>Poksol reste la plateforme.</strong> Poket Restaurants est le premier produit Poksol. D'autres solutions pour d'autres types de business seront ajoutées progressivement.</p>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div class="site-footer-inner">
-      <div class="site-footer-brand">
-        <a class="brand" href="index.html" aria-label="Poksol - accueil">
-          <img src="poksol_icon.svg" alt="" />
-          <div>
-            <strong>POK<span>SOL</span></strong>
-            <small>Your business in your pocket</small>
-          </div>
-        </a>
-        <a class="site-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
+  <footer class="rf-footer">
+    <div class="rf-wrap">
+      <div>
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <a class="rf-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
       </div>
-      <nav class="site-footer-links" aria-label="Navigation du pied de page">
-        <a href="index.html#produit">Solutions</a>
+      <nav aria-label="Navigation du pied de page">
         <a href="poket-restaurants.html">Poket Restaurants</a>
+        <a href="vtc-hero.html">VTC HERO</a>
         <a href="account.html">Compte</a>
         <a href="index.html#contact">Contact</a>
       </nav>
-      <nav class="site-footer-links" aria-label="Informations légales">
+      <nav aria-label="Informations légales">
         <a href="mentions-legales.html">Mentions légales</a>
         <a href="cgu.html">CGU</a>
         <a href="politique-confidentialite.html">Politique de confidentialité</a>
       </nav>
+      <p class="rf-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
     </div>
-    <p class="site-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
   </footer>
 
   <script src="app.js?v=20260930-1"></script>
+  <script src="refonte.js?v=20261023-1" defer></script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-

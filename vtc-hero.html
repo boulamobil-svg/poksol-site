@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VTC HERO | Poksol</title>
+  <meta name="description" content="VTC HERO : réservations, devis, courses, factures et suivi du chauffeur en direct pour les sociétés de VTC, sur téléphone et navigateur." />
+  <link rel="icon" href="poksol_icon.svg" type="image/svg+xml" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="VTC HERO | Poksol" />
+  <meta property="og:description" content="Réservations, devis, courses, factures et suivi du chauffeur en direct pour les sociétés de VTC." />
+  <meta property="og:image" content="https://poksol.com/assets/vtc-hero/vtc-hero-og.jpg" />
+  <meta property="og:url" content="https://poksol.com/vtc-hero.html" />
+  <link rel="preload" href="assets/fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="refonte.css?v=20261023-1" />
+</head>
+<body class="rf">
+  <header class="rf-hero rf-hero--compact">
+    <svg class="rf-pattern rf-route" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="rgba(238,242,246,0.07)" stroke-width="1">
+        <path d="M0 80H1200M0 160H1200M0 240H1200M0 320H1200M0 400H1200M0 480H1200M0 560H1200" />
+        <path d="M80 0V640M160 0V640M240 0V640M320 0V640M400 0V640M480 0V640M560 0V640M640 0V640M720 0V640M800 0V640M880 0V640M960 0V640M1040 0V640M1120 0V640" />
+      </g>
+      <g fill="none" stroke="rgba(238,242,246,0.1)" stroke-width="2">
+        <path d="M180 640L660 0" />
+        <path d="M520 640L1040 40" />
+      </g>
+      <path id="vtc-route" d="M700 660V480Q700 440 740 440H900Q940 440 940 400V260Q940 220 980 220H1090" fill="none" stroke="rgba(127,176,255,0.3)" stroke-width="3" stroke-linecap="round" />
+      <path class="flow" d="M700 660V480Q700 440 740 440H900Q940 440 940 400V260Q940 220 980 220H1090" fill="none" stroke="#7FB0FF" stroke-width="3" stroke-linecap="round" />
+      <circle cx="1090" cy="220" r="6" fill="#5FD38D" />
+      <circle cx="1090" cy="220" r="6" fill="none" stroke="#5FD38D" stroke-width="2">
+        <animate attributeName="r" values="6;26" dur="2.4s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.7;0" dur="2.4s" repeatCount="indefinite" />
+      </circle>
+      <circle r="5" fill="#fff">
+        <animateMotion dur="9s" repeatCount="indefinite" rotate="auto"><mpath href="#vtc-route" /></animateMotion>
+      </circle>
+    </svg>
+
+    <div class="rf-wrap">
+      <div class="rf-header">
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <nav class="rf-nav" aria-label="Navigation principale">
+          <a href="poket-restaurants.html">Poket Restaurants</a>
+          <a href="vtc-hero.html" aria-current="page">VTC HERO</a>
+          <a href="account.html">Compte</a>
+          <a href="index.html#contact">Contact</a>
+          <a class="rf-btn rf-btn--quiet rf-btn--sm" href="mailto:contact@poksol.com?subject=Acc%C3%A8s%20VTC%20HERO">Demander un accès</a>
+        </nav>
+        <details class="rf-menu">
+          <summary>Menu</summary>
+          <nav aria-label="Navigation principale (mobile)">
+            <a href="poket-restaurants.html">Poket Restaurants</a>
+            <a href="vtc-hero.html" aria-current="page">VTC HERO</a>
+            <a href="account.html">Compte</a>
+            <a href="index.html#contact">Contact</a>
+          </nav>
+        </details>
+      </div>
+
+      <div class="rf-hero-body rf-vtc-grid">
+        <div>
+          <p class="rf-status rf-status--soon">Bientôt disponible</p>
+          <h1>VTC HERO</h1>
+          <p class="rf-lede">Réservations, devis, courses, factures et suivi du chauffeur pour les sociétés de VTC, dans une seule application, sur téléphone et navigateur.</p>
+          <div class="rf-actions">
+            <a class="rf-btn" href="mailto:contact@poksol.com?subject=Acc%C3%A8s%20VTC%20HERO">Demander un accès anticipé</a>
+            <a class="rf-link" href="https://vtc-hero-prod.web.app/login">Se connecter</a>
+          </div>
+        </div>
+
+        <figure class="rf-frame">
+          <video poster="assets/vtc-hero/vtc-hero-poster.jpg" muted playsinline preload="metadata" aria-label="Berline noire sous la pluie dans une rue de Paris, de nuit" data-vtc-intro>
+            <source src="assets/vtc-hero/vtc-hero-intro.mp4" type="video/mp4" />
+          </video>
+          <figcaption>Illustration</figcaption>
+        </figure>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="rf-section" aria-labelledby="vtc-features-title">
+      <div class="rf-wrap">
+        <h2 id="vtc-features-title">Ce que fait VTC HERO</h2>
+        <p style="margin-top:20px;color:var(--rf-muted)">De la demande du client à la facture, une société de VTC garde tout au même endroit.</p>
+        <ul class="rf-rows rf-rows--wide" style="margin-top:48px">
+          <li><div><strong>Réservation à votre nom</strong><span>Un formulaire public à l'adresse de votre société : le client indique son trajet, sa date et ses coordonnées. Distance et durée sont calculées pour vous.</span></div></li>
+          <li><div><strong>Devis par lien sécurisé</strong><span>Vous fixez le prix, avec remise ou prix forfaitaire, puis envoyez le devis par e-mail ou WhatsApp. Quand le client l'accepte, la course est confirmée.</span></div></li>
+          <li><div><strong>Suivi du chauffeur en direct</strong><span>Le client voit la voiture arriver sur une carte, avec l'arrivée estimée. La position n'est partagée qu'avec l'accord du chauffeur et n'est pas conservée. Formules Pro et Flotte.</span></div></li>
+          <li><div><strong>Factures et avoirs conformes</strong><span>Numérotation continue sans trou, mentions légales vérifiées avant l'émission (SIRET, REVTC, TVA), avoirs et PDF.</span></div></li>
+          <li><div><strong>Agenda et courses</strong><span>Les courses sont classées par étape, avec des onglets que vous réorganisez. Le chauffeur clôture chaque course depuis son espace.</span></div></li>
+          <li><div><strong>Cinq langues, installable</strong><span>Français, anglais, allemand, turc et arabe (de droite à gauche). L'application s'installe sur l'écran d'accueil du téléphone.</span></div></li>
+        </ul>
+        <p class="rf-note"><strong>VTC HERO est en cours de mise en ligne.</strong> Les fonctions décrites sont celles de la version qui sera ouverte aux sociétés de VTC.</p>
+      </div>
+    </section>
+
+    <section class="rf-section rf-section--mist" aria-labelledby="vtc-flow-title">
+      <div class="rf-wrap rf-split">
+        <div class="rf-copy">
+          <h2 id="vtc-flow-title">De la demande à la facture</h2>
+          <p>Six étapes, du premier message du client au paiement.</p>
+        </div>
+        <ol class="rf-steps">
+          <li>Le client demande une course depuis votre formulaire</li>
+          <li>Vous envoyez un devis par lien sécurisé</li>
+          <li>Le client accepte : la course est confirmée</li>
+          <li>Le chauffeur est en route, arrivé, puis le client est à bord</li>
+          <li>La course est terminée : la facture est émise</li>
+          <li>Le paiement est noté, un avoir reste possible</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="rf-section" aria-labelledby="vtc-plans-title">
+      <div class="rf-wrap rf-split">
+        <div class="rf-copy">
+          <h2 id="vtc-plans-title">Formules et tarifs</h2>
+          <p>Des formules Essentiel, Pro et Flotte, de l'indépendant à la petite flotte, avec un essai de 30 jours. Les tarifs seront publiés avec les conditions générales de vente. D'ici là, écrivez-nous.</p>
+        </div>
+        <div class="rf-copy">
+          <h3>Une question sur VTC HERO ?</h3>
+          <p>Dites-nous comment vous travaillez : nous vous répondons et vous ouvrons un accès dès que possible.</p>
+          <div class="rf-buttons">
+            <a class="rf-btn" href="mailto:contact@poksol.com?subject=Acc%C3%A8s%20VTC%20HERO">Écrire à contact@poksol.com</a>
+            <a class="rf-btn rf-btn--outline" href="https://vtc-hero-prod.web.app/login">Ouvrir l'application</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="rf-footer">
+    <div class="rf-wrap">
+      <div>
+        <a class="rf-brand" href="index.html" aria-label="Poksol, accueil"><img src="poksol_icon.svg" alt="" /><span>Poksol</span></a>
+        <a class="rf-footer-mail" href="mailto:contact@poksol.com">contact@poksol.com</a>
+      </div>
+      <nav aria-label="Navigation du pied de page">
+        <a href="poket-restaurants.html">Poket Restaurants</a>
+        <a href="vtc-hero.html">VTC HERO</a>
+        <a href="account.html">Compte</a>
+        <a href="index.html#contact">Contact</a>
+      </nav>
+      <nav aria-label="Informations légales">
+        <a href="mentions-legales.html">Mentions légales</a>
+        <a href="cgu.html">CGU</a>
+        <a href="politique-confidentialite.html">Politique de confidentialité</a>
+      </nav>
+      <p class="rf-footer-copy">© 2026 Poksol. Tous droits réservés.</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var video = document.querySelector("[data-vtc-intro]");
+      if (!video || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      video.play().catch(function () {});
+    })();
+  </script>
+  <script src="refonte.js?v=20261023-1" defer></script>
+</body>
+</html>
