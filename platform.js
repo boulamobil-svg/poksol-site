@@ -288,9 +288,35 @@ async function listUserRestaurants(uid) {
   return restaurants;
 }
 
+// Les regles Firestore ne laissent un compte lire que SES restaurants : lire restaurants/<slug>
+// (meme libre) ou interroger restaurants par « slug » est refuse. On ne peut donc pas tester le
+// slug en lisant les restaurants des autres. On verifie ce qui est lisible : la page publique, les
+// fiches staff et les restaurants de ce compte (pour ne jamais « recreer » par-dessus l'un d'eux).
+// Un restaurant PRIVE d'un autre compte est detecte plus bas, au refus de l'ecriture.
+async function isSlugTakenForUser(services, slug, user) {
+  const { collection, doc, getDoc, getDocs, limit, query, where } = services.firestoreModule;
+  if (await getPublicRestaurantBySlug(slug)) return true;
+  const publicBySlug = await getDocs(query(
+    collection(services.db, "publicRestaurants"),
+    where("slug", "==", slug),
+    where("publicPageEnabled", "==", true),
+    limit(1)
+  )).catch(() => null);
+  if (publicBySlug && !publicBySlug.empty) return true;
+  for (const staffCollection of ["staff", "staff_users"]) {
+    const own = await getDoc(doc(services.db, "restaurants", slug, staffCollection, user.uid)).catch(() => null);
+    if (own?.exists()) return true;
+  }
+  for (const field of ["ownerUid", "createdBy"]) {
+    const owned = await getDocs(query(collection(services.db, "restaurants"), where(field, "==", user.uid))).catch(() => null);
+    if (owned?.docs.some((snap) => snap.id === slug || snap.data().slug === slug)) return true;
+  }
+  return false;
+}
+
 async function createRestaurantFromForm(form, user) {
   const services = await getServices();
-  const { arrayUnion, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } = services.firestoreModule;
+  const { arrayUnion, doc, serverTimestamp, setDoc } = services.firestoreModule;
   const data = new FormData(form);
   const name = text(data, "name");
   const slug = normalizeSlug(text(data, "slug") || name);
@@ -300,13 +326,7 @@ async function createRestaurantFromForm(form, user) {
   }
 
   const restaurantRef = doc(services.db, "restaurants", slug);
-  const existingById = await getDoc(restaurantRef);
-  const existingBySlug = await getDocs(query(
-    collection(services.db, "restaurants"),
-    where("slug", "==", slug),
-    limit(1)
-  ));
-  if (existingById.exists() || !existingBySlug.empty) {
+  if (await isSlugTakenForUser(services, slug, user)) {
     throw new Error("Ce slug est deja utilise.");
   }
 
@@ -341,7 +361,14 @@ async function createRestaurantFromForm(form, user) {
     updatedAt: serverTimestamp()
   };
 
-  await setDoc(restaurantRef, restaurant);
+  try {
+    await setDoc(restaurantRef, restaurant);
+  } catch (error) {
+    // Le slug appartient deja a un restaurant PRIVE d'un autre compte : l'ecriture sur un document
+    // existant est une mise a jour, que les regles refusent a un non-admin.
+    if (error?.code === "permission-denied") throw new Error("Ce slug est deja utilise.");
+    throw error;
+  }
   // Meme modele que l'application : une fiche staff « admin » pour le createur.
   await setDoc(doc(services.db, "restaurants", slug, "staff", user.uid), {
     uid: user.uid,
