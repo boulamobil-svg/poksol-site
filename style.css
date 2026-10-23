@@ -7462,3 +7462,21 @@ body.dark-theme a.ghost-action {
 body.dark-theme .platform-card > a.ghost-action {
   margin-top: 16px;
 }
+
+/* Fraunces (serif des pages publiques de restaurant), hebergee ici: plus aucune requete vers Google Fonts.
+   Meme graisses qu'avant (500, 600, italique 600), sous-ensemble latin. Licence SIL OFL 1.1. */
+@font-face {
+  font-family: "Fraunces";
+  src: url("assets/fonts/fraunces-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Fraunces";
+  src: url("assets/fonts/fraunces-italic-latin.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+}
