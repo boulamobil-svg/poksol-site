@@ -43,7 +43,7 @@ body.rf {
   -webkit-font-smoothing: antialiased;
 }
 
-body.rf-app {
+body.rf-shell {
   background: var(--rf-mist);
 }
 
@@ -228,8 +228,8 @@ body.rf-app {
 .rf .prepared-notice.is-visible { display: block; }
 
 /* ---------- Functional pages (account, poket-access) ---------- */
-body.rf-app .portal-page, body.rf-app .access-page { padding-top: 56px; }
-body.rf-app .platform-section { padding-inline: 8%; }
+body.rf-shell .portal-page, body.rf-shell .access-page { padding-top: 56px; }
+body.rf-shell .platform-section { padding-inline: 8%; }
 
 @media (max-width: 900px) {
   .rf-section { padding-block: 88px; }
