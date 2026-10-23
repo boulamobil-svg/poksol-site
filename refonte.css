@@ -284,3 +284,22 @@ body.rf .platform-card > a.ghost-action { margin-top: 16px; }
 @media (max-width: 900px) {
   .rf-app { grid-template-columns: 1fr; gap: 24px; }
 }
+
+/* ---------- Legal pages (prose) ---------- */
+.rf-prose { max-width: 72ch; }
+.rf-prose h2 { margin: 56px 0 0; font-size: clamp(22px, 2.4vw, 30px); line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; }
+.rf-prose h2:first-child { margin-top: 0; }
+.rf-prose p, .rf-prose ul { margin: 16px 0 0; max-width: none; }
+.rf-prose ul { padding-left: 1.2em; }
+.rf-prose li { margin-top: 8px; }
+.rf-prose a { color: var(--rf-accent); text-decoration: underline; text-underline-offset: 3px; }
+.rf-defs { margin: 20px 0 0; border-top: 1px solid var(--rf-line); }
+.rf-defs > div { display: grid; grid-template-columns: 13rem 1fr; gap: 24px; padding: 14px 0; border-bottom: 1px solid var(--rf-line); }
+.rf-defs dt { font-weight: 600; }
+.rf-defs dd { margin: 0; }
+.rf-table-wrap { margin-top: 20px; overflow-x: auto; }
+.rf-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 15px; }
+.rf-table th, .rf-table td { padding: 12px 16px 12px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--rf-line); }
+.rf-table th { font-weight: 600; border-bottom-color: var(--rf-ink); }
+.rf-todo { padding: 1px 6px; border-radius: 3px; background: #FFF1B8; color: #5C4400; font-weight: 500; }
+@media (max-width: 900px) { .rf-defs > div { grid-template-columns: 1fr; gap: 4px; } }
