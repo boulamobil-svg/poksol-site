@@ -6616,7 +6616,8 @@ button.quote-row:focus-visible {
 /* --- Editorial public-restaurant look, generalized from the Chez Marwan pilot to every
    restaurant (scoped to .restaurant-public-body, present on every public restaurant page,
    so admin/onboarding/portal pages are untouched). Adds to, never edits, the shared
-   .restaurant-*/.eyebrow/.menu-item-* rules above. --- */
+   restaurant, eyebrow and menu-item rules above (no star-slash sequence in this comment: it would end it early and
+   drop the --editorial-serif rule below). --- */
 
 .restaurant-public-body {
   --editorial-serif: "Fraunces", Georgia, "Times New Roman", serif;
