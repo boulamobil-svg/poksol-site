@@ -303,3 +303,17 @@ body.rf .platform-card > a.ghost-action { margin-top: 16px; }
 .rf-table th { font-weight: 600; border-bottom-color: var(--rf-ink); }
 .rf-todo { padding: 1px 6px; border-radius: 3px; background: #FFF1B8; color: #5C4400; font-weight: 500; }
 @media (max-width: 900px) { .rf-defs > div { grid-template-columns: 1fr; gap: 4px; } }
+
+/* Skip link, focus target of the skip link, and the "start" steps of the home page. */
+.rf-skip { position: absolute; left: 16px; top: -80px; z-index: 100; padding: 12px 18px; background: #fff; color: var(--rf-ink); border-radius: 6px; font-weight: 600; text-decoration: none; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3); }
+.rf-skip:focus { top: 12px; }
+.rf main:focus { outline: none; }
+.rf-start { list-style: none; margin: 56px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; counter-reset: step; }
+.rf-start li { counter-increment: step; border-top: 2px solid var(--rf-ink); padding-top: 20px; }
+.rf-start li::before { content: counter(step); display: block; margin-bottom: 12px; font-size: 15px; font-weight: 600; color: var(--rf-accent); }
+.rf-start strong { display: block; margin-bottom: 8px; font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; }
+.rf-start span { display: block; color: var(--rf-muted); }
+.rf-start-link { margin: 40px 0 0; }
+@media (max-width: 720px) {
+  .rf-start { grid-template-columns: 1fr; gap: 32px; margin-top: 40px; }
+}
