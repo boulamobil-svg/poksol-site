@@ -218,8 +218,8 @@ function poketApp(account, release) {
   if (active) rows.push(el("li", null, el("a", { href: "poket-access.html?mode=new" }, el("strong", { text: "Ajouter un restaurant" }), el("span", { text: "Créer un deuxième établissement sur ce compte." }))));
   const android = release.downloadUrl && releasePath(release.downloadUrl);
   const windows = release.windowsDownloadUrl && releasePath(release.windowsDownloadUrl);
-  rows.push(el("li", null, el("a", { href: android || "/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+44.apk", download: true }, el("strong", { text: "Android" }), el("span", { text: "Télécharger l'APK pour tablette ou téléphone." }))));
-  rows.push(el("li", null, el("a", { href: windows || "/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+44.zip", download: true }, el("strong", { text: "Windows" }), el("span", { text: "Télécharger l'archive ZIP pour ordinateur." }))));
+  rows.push(el("li", null, el("a", { href: android || "/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+45.apk", download: true }, el("strong", { text: "Android" }), el("span", { text: "Télécharger l'APK pour tablette ou téléphone." }))));
+  rows.push(el("li", null, el("a", { href: windows || "/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+45.zip", download: true }, el("strong", { text: "Windows" }), el("span", { text: "Télécharger l'archive ZIP pour ordinateur." }))));
   return el("article", { class: "rf-app" }, head, el("ul", { class: "rf-rows" }, rows));
 }
 

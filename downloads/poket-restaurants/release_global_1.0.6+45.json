@@ -1,0 +1,21 @@
+﻿{
+    "releaseId":  "1.0.6+45",
+    "targetVersionName":  "1.0.6",
+    "targetBuildNumber":  45,
+    "minimumVersionName":  "1.0.4",
+    "minimumBuildNumber":  6,
+    "forceUpdate":  false,
+    "downloadUrl":  "https://poksol.com/downloads/poket-restaurants/android/chez_marwan_pos_1.0.6+45.apk",
+    "apkSha256":  "857b43b5800038d14289ba8a6a5e6c421839f0e3b278dc0f21702cef5fb4dd01",
+    "apkFileSize":  91106041,
+    "webUrl":  "https://poksol.com/apps/poket-restaurants/",
+    "notes":  "Release 1.0.6+45 : mise en page paysage, Z de caisse, retrait/livraison, menu des lignes, corrections.",
+    "publishedAt":  "2026-10-27T01:06:16Z",
+    "updatedAt":  "2026-10-27T01:06:16Z",
+    "webDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/web/poket_restaurants_web_1.0.6+45.zip",
+    "webSha256":  "7442c98165cbf2fd8d6af48e5de4ca27576aad30c793c5b754b0dee953ba5cc1",
+    "webFileSize":  15110933,
+    "windowsDownloadUrl":  "https://poksol.com/downloads/poket-restaurants/windows/poket_restaurants_windows_1.0.6+45.zip",
+    "windowsSha256":  "ffe798d81f73c5537684486e6676fa3e7a5842d6a35078f937306b14c6580660",
+    "windowsFileSize":  22293056
+}
