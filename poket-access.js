@@ -1,7 +1,7 @@
 const ACCESS_SESSION_KEY = "poksolAccessSession";
 const RESTAURANT_PROFILE_KEY = "poksolRestaurantProfile";
 const RESTAURANT_CONTEXT_KEY = "poksolRestaurantContext";
-const APP_URL = "/apps/poket-restaurants/";
+const APP_URL = "https://porest.poksol.com/";
 const INVITE_COLLECTION = "restaurant_invites";
 const DAYS = [
   ["monday", "Lundi"],
