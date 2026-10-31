@@ -24,7 +24,7 @@ const APP_STATUS = {
   pending: { label: "Demande en cours", tone: "soon" },
   suspended: { label: "Suspendu", tone: "soon" }
 };
-const VTC_LOGIN_URL = "https://vtc-hero-prod.web.app/login";
+const VTC_LOGIN_URL = "https://vtc.poksol.com/login";
 const ACCESS_MAIL = "mailto:contact@poksol.com?subject=Acc%C3%A8s%20VTC%20HERO";
 
 const root = document.querySelector("[data-compte]");
