@@ -158,6 +158,19 @@ function getServices() {
   return servicesPromise;
 }
 
+// Pages publiques (menu, restaurant) : lecture Firestore seule, sans charger Auth ni Storage.
+let publicDbPromise = null;
+function getPublicDb() {
+  publicDbPromise ||= Promise.all([
+    import("https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js")
+  ]).then(([appModule, firestoreModule]) => {
+    const app = appModule.getApps().length ? appModule.getApp() : appModule.initializeApp(firebaseConfig);
+    return { db: firestoreModule.getFirestore(app), firestoreModule };
+  });
+  return publicDbPromise;
+}
+
 async function signIn() {
   const services = await getServices();
   const provider = new services.authModule.GoogleAuthProvider();
@@ -217,19 +230,19 @@ async function getRestaurant(id) {
 async function getPublicRestaurantBySlug(slug) {
   const cleanSlug = normalizeSlug(slug);
   if (!cleanSlug) return null;
-  const services = await getServices();
-  const { doc, getDoc } = services.firestoreModule;
+  const { db, firestoreModule } = await getPublicDb();
+  const { doc, getDoc } = firestoreModule;
   const candidates = uniqueValues([
     cleanSlug,
     legacyRestaurantIdFromSlug(cleanSlug),
     cleanSlug.replace(/-/g, "_"),
     cleanSlug.toUpperCase()
   ]);
-  for (const id of candidates) {
-    const snap = await getDoc(doc(services.db, "publicRestaurants", id)).catch(() => null);
-    if (snap?.exists()) return normalizeRestaurant(snap.id, snap.data());
-  }
-  return null;
+  // Lectures en parallele (l'ordre des candidats reste la priorite) : avant, chaque
+  // identifiant absent coutait un aller-retour reseau complet avant de tester le suivant.
+  const snaps = await Promise.all(candidates.map((id) => getDoc(doc(db, "publicRestaurants", id)).catch(() => null)));
+  const snap = snaps.find((candidate) => candidate?.exists());
+  return snap ? normalizeRestaurant(snap.id, snap.data()) : null;
 }
 
 async function getRestaurantBySlug(slug) {
@@ -738,14 +751,31 @@ async function saveCatalogCategoryOrder(restaurantId, form) {
   await syncPublicRestaurant(restaurantId);
 }
 
+// Une photo de telephone pese plusieurs Mo et le menu public en affiche des dizaines :
+// on la reduit (1200 px max, WebP) avant l'envoi. Le fichier d'origine est garde si
+// le navigateur ne sait pas la convertir ou si le resultat n'est pas plus leger.
+async function shrinkImageForUpload(file) {
+  if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) return file;
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return file;
+  const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+  return blob?.type === "image/webp" && blob.size < file.size ? blob : file;
+}
+
 async function uploadCatalogItemImage(restaurantId, categoryId, itemId, file) {
   validateImageUpload(file);
+  const upload = await shrinkImageForUpload(file);
   const services = await getServices();
   const { getDownloadURL, ref, uploadBytes } = services.storageModule;
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const extension = upload.type === "image/webp" ? "webp" : file.name.split(".").pop()?.toLowerCase() || "jpg";
   const path = `restaurants/${restaurantId}/catalog/${categoryId}/${itemId}.${extension}`;
   const imageRef = ref(services.storage, path);
-  await uploadBytes(imageRef, file, { contentType: file.type || "application/octet-stream" });
+  await uploadBytes(imageRef, upload, { contentType: upload.type || "application/octet-stream" });
   return getDownloadURL(imageRef);
 }
 
@@ -1309,6 +1339,8 @@ function initDashboardPage() {
     }
     const copyButton = event.target.closest("[data-copy]");
     if (copyButton) navigator.clipboard?.writeText(copyButton.dataset.copy);
+    const qrDownload = event.target.closest("[data-qr-download]");
+    if (qrDownload) downloadQrCode(qrDownload);
     const columnToggle = event.target.closest("[data-client-col-toggle]");
     if (columnToggle) {
       event.preventDefault();
@@ -1601,12 +1633,12 @@ function initDashboardPage() {
         const code = await createInvitation(restaurantId, form, currentUser);
         form.code.value = code;
         const inviteUrl = `${window.location.origin}/poket-access.html?invite=${encodeURIComponent(code)}`;
-        const inviteQr = `https://quickchart.io/qr?size=160&text=${encodeURIComponent(inviteUrl)}`;
         status.innerHTML = `
           Invitation creee : <strong>${escapeHtml(code)}</strong><br>
           <a href="${escapeAttr(inviteUrl)}">${escapeHtml(inviteUrl)}</a><br>
-          <img class="inline-qr" src="${inviteQr}" alt="QR invitation" loading="lazy" />
+          <span class="inline-qr" role="img" aria-label="QR invitation" data-qr-url="${escapeAttr(inviteUrl)}"></span>
         `;
+        hydrateQrCodes(status);
         return;
       }
       status.textContent = "Enregistre.";
@@ -1823,6 +1855,7 @@ async function renderDashboard(root, user, restaurantId, activeTab = "overview")
   root.quoteClients = (Array.isArray(customerAccounts) ? customerAccounts : customerAccounts.customers || []).map(normalizeCustomerAccount);
   root.innerHTML = dashboardHtml(restaurant, role, reservations, customerAccounts, members, dashboardMenu, activeTab, account, accessRequests, quotes, quoteDrafts, invoices, invoiceDrafts);
   applyClientTools(root);
+  hydrateQrCodes(root);
 }
 
 async function autoSaveCatalogField(root, field, options = {}) {
@@ -2699,6 +2732,52 @@ function hoursFormHtml(restaurant, canEdit) {
   `;
 }
 
+// QR code genere dans le navigateur : l'adresse encodee ne part chez aucun service tiers.
+// La bibliotheque (vendor/) n'est chargee qu'au premier QR affiche.
+async function qrSvgMarkup(text) {
+  const { qrcode } = await import("./vendor/qrcode-generator.mjs");
+  const qr = qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  return qr.createSvgTag({ cellSize: 4, margin: 16, scalable: true });
+}
+
+function hydrateQrCodes(scope) {
+  scope.querySelectorAll("[data-qr-url]").forEach(async (element) => {
+    try {
+      element.innerHTML = await qrSvgMarkup(element.dataset.qrUrl);
+    } catch (error) {
+      element.textContent = "QR indisponible";
+      console.error(error);
+    }
+  });
+}
+
+async function downloadQrCode(button) {
+  const url = button.closest(".qr-menu-preview")?.querySelector("[data-qr-url]")?.dataset.qrUrl;
+  if (!url) return;
+  const name = button.dataset.qrName || "qr-menu";
+  const svg = await qrSvgMarkup(url);
+  const save = (blob, extension) => {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${name}.${extension}`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  };
+  // L'export SVG n'a pas de taille fixe : l'imprimeur choisit. Le PNG fait 1200 px, net jusqu'au A5.
+  if (button.dataset.qrDownload === "svg") return save(new Blob([svg], { type: "image/svg+xml" }), "svg");
+  const image = new Image();
+  image.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1200;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0, 1200, 1200);
+    canvas.toBlob((blob) => blob && save(blob, "png"), "image/png");
+  };
+  image.src = URL.createObjectURL(new Blob([svg.replace("<svg ", '<svg width="1200" height="1200" ')], { type: "image/svg+xml" }));
+}
+
 function switchFieldHtml(label, inputName, checked, canEdit, extraAttrs = "") {
   return `
     <label class="switch-field">
@@ -2744,16 +2823,20 @@ function publicSettingsHtml(restaurant, publicUrl, canEdit) {
 
 function menuFormHtml(restaurant, menu, canEdit) {
   const qrUrl = publicMenuUrl(restaurant);
-  const qrImage = `https://quickchart.io/qr?size=180&text=${encodeURIComponent(qrUrl)}`;
+  const qrFileName = `qr-menu-${normalizeSlug(restaurant.slug || restaurant.id) || "restaurant"}`;
   const hasCatalog = Array.isArray(menu?.categories) && menu.categories.length > 0;
   return `
     <form class="platform-form" data-dashboard-menu-form>
       <div class="qr-menu-preview">
         <div>
           <p class="alert-note">Destination QR : ${escapeHtml(qrUrl)}</p>
-          <button class="ghost-action" type="button" data-copy="${escapeAttr(qrUrl)}">Copier le lien QR menu</button>
+          <div class="quick-links">
+            <button class="ghost-action" type="button" data-copy="${escapeAttr(qrUrl)}">Copier le lien QR menu</button>
+            <button class="ghost-action" type="button" data-qr-download="png" data-qr-name="${escapeAttr(qrFileName)}">Telecharger le QR (PNG)</button>
+            <button class="ghost-action" type="button" data-qr-download="svg" data-qr-name="${escapeAttr(qrFileName)}">Telecharger le QR (SVG)</button>
+          </div>
         </div>
-        <img src="${qrImage}" alt="QR menu" loading="lazy" />
+        <div class="qr-menu-code" role="img" aria-label="QR menu" data-qr-url="${escapeAttr(qrUrl)}"></div>
       </div>
       <input type="hidden" name="title" value="${escapeAttr(menu?.title || "Menu")}" />
       <input type="hidden" name="type" value="catalog" />
