@@ -26,6 +26,9 @@ const APP_STATUS = {
 };
 const VTC_LOGIN_URL = "https://vtc.poksol.com/login";
 const VTC_SIGNUP_URL = "https://vtc.poksol.com/inscription";
+// le dashboard et la page publique vivent sur ce site (vtc-dashboard.html, vtc/), comme ceux d'un restaurant de Poket
+const VTC_DASHBOARD_URL = "vtc-dashboard.html";
+const VTC_PAGE_URL = "vtc/?s=";
 // VTC HERO checks the Google token of this site and answers for the address of the person: { vtc: { status, plan, since, trialEndsAt } | null }
 const VTC_ACCOUNT_URL = "https://europe-west9-vtc-hero-prod.cloudfunctions.net/poksolAccount";
 
@@ -238,6 +241,19 @@ function vtcApp(userData) {
     const detail = appDetails(entry);
     if (detail) rows.push(el("li", null, el("div", null, el("strong", { text: "Abonnement" }), el("span", { text: detail }))));
     if (entry.status === "active" || entry.status === "trial") {
+      // comme un restaurant de Poket : la société, son dashboard et sa page publique (tous deux sur ce site)
+      if (entry.companyName) {
+        rows.push(el("li", null, el("div", null,
+          el("strong", { text: entry.companyName }),
+          el("span", { class: "rf-restaurant-meta" },
+            el("span", { text: ROLE_LABELS.admin }),
+            el("span", { class: "rf-inline-links" },
+              link("Dashboard", VTC_DASHBOARD_URL),
+              entry.publicSlug ? link("Page publique", `${VTC_PAGE_URL}${encodeURIComponent(entry.publicSlug)}`) : null
+            )
+          )
+        )));
+      }
       rows.push(el("li", null, el("a", { href: VTC_LOGIN_URL }, el("strong", { text: "Ouvrir l'application" }), el("span", { text: "Connectez-vous avec l'adresse utilisée pour VTC HERO." }))));
     }
   } else {

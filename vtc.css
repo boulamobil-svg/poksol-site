@@ -1,0 +1,87 @@
+/* VTC HERO sur poksol.com : le tableau de bord (vtc-dashboard.html) et la page publique d'une société (vtc/). Les cartes, onglets,
+   tableaux et fenêtres viennent de style.css (la coque de Poket) ; ici seulement ce qui leur manque. */
+
+.vtc-money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vtc-muted { color: var(--text-muted); }
+.vtc-row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.vtc-row-actions button, .vtc-inline-btn {
+  padding: 7px 12px; border-radius: 10px; border: 1px solid #d3e5ff; background: #f5f9ff; color: var(--poksol-navy);
+  font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.vtc-row-actions button:hover, .vtc-inline-btn:hover { background: #e4efff; }
+.vtc-row-actions button.is-danger { border-color: #f3c9c9; background: #fff2f2; color: #9b1c1c; }
+.vtc-table .table-row { grid-template-columns: 1.1fr 1.6fr 1fr 0.9fr 1.3fr; }
+.vtc-table.vtc-clients .table-row { grid-template-columns: 1.4fr 1.3fr 0.5fr 1fr 1fr 1fr; }
+.vtc-table.vtc-team .table-row { grid-template-columns: 1.6fr 1.6fr 1fr 0.8fr; }
+.vtc-table .table-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vtc-table .table-row > span.vtc-money { overflow: visible; }
+.vtc-state { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 800; background: #eef1f5; color: var(--text-muted); }
+.vtc-state.is-live { background: #e6f7ed; color: #0f7b47; }
+.vtc-state.is-warn { background: #fff4e0; color: #9a5b00; }
+.vtc-state.is-bad { background: #fff2f2; color: #9b1c1c; }
+.vtc-state.is-test { background: #f3e8ff; color: #6b21a8; }
+
+/* L'éditeur de lignes d'un devis ou d'une facture de prestation */
+.vtc-lines { display: grid; gap: 8px; margin: 10px 0; }
+.vtc-line { display: grid; grid-template-columns: 2.2fr 0.7fr 0.9fr 0.8fr 0.9fr 36px; gap: 8px; align-items: center; }
+.vtc-line input, .vtc-line select { width: 100%; padding: 9px 10px; border-radius: 10px; border: 1px solid #d3e5ff; font: inherit; }
+.vtc-line .vtc-line-total { text-align: right; font-weight: 800; }
+.vtc-lines-head { font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.vtc-totals { margin: 12px 0 0; display: grid; justify-content: end; gap: 4px; text-align: right; }
+.vtc-totals strong { font-size: 20px; color: var(--poksol-navy); }
+.vtc-form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.vtc-form-actions .primary-btn { margin: 0; }
+.vtc-error { margin: 12px 0 0; padding: 10px 14px; border-radius: 12px; background: #fff2f2; color: #9b1c1c; font-weight: 700; }
+.vtc-ok { margin: 12px 0 0; padding: 10px 14px; border-radius: 12px; background: #e6f7ed; color: #0f7b47; font-weight: 700; }
+.vtc-note { margin: 10px 0 0; font-size: 14px; color: var(--text-muted); }
+
+/* La page publique (vtc/) */
+.vtc-public { max-width: 980px; margin: 0 auto; padding: 0 16px 60px; }
+.vtc-cover { position: relative; height: 280px; border-radius: 0 0 24px 24px; background: linear-gradient(135deg, var(--vtc-accent, #1976f3), #0b2a5c); background-size: cover; background-position: center; }
+.vtc-cover .vtc-edit-cover { position: absolute; right: 16px; bottom: 16px; }
+.vtc-head { display: flex; align-items: flex-end; gap: 18px; padding: 0 8px; flex-wrap: wrap; }
+/* seul le logo mord sur la couverture : le nom reste sous elle, lisible */
+.vtc-head .vtc-logo { margin-top: -56px; }
+.vtc-logo { width: 112px; height: 112px; border-radius: 24px; background: #fff; border: 4px solid #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); object-fit: cover; display: grid; place-items: center; font-weight: 900; font-size: 36px; color: var(--vtc-accent, #1976f3); }
+.vtc-head h1 { margin: 0; font-size: 32px; color: var(--poksol-navy); }
+.vtc-head .vtc-headline { margin: 4px 0 0; font-size: 17px; color: var(--text-muted); }
+.vtc-head-actions { margin-left: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.vtc-rating { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: #9a5b00; }
+.vtc-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; margin-top: 24px; }
+.vtc-card { background: #fff; border: 1px solid #e3e9f2; border-radius: 20px; padding: 20px; position: relative; }
+.vtc-card h2 { margin: 0 0 10px; font-size: 18px; color: var(--poksol-navy); }
+.vtc-card p { margin: 0; white-space: pre-line; line-height: 1.55; }
+.vtc-card .vtc-pencil { position: absolute; top: 14px; right: 14px; }
+.vtc-pencil { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #d3e5ff; background: #f5f9ff; cursor: pointer; display: inline-grid; place-items: center; font-size: 16px; }
+.vtc-pencil:hover { background: #e4efff; }
+.vtc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.vtc-chip { padding: 6px 12px; border-radius: 999px; background: #f5f9ff; border: 1px solid #d3e5ff; font-weight: 700; font-size: 14px; }
+.vtc-hours { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
+.vtc-hours dt { font-weight: 800; color: var(--poksol-navy); }
+.vtc-hours dd { margin: 0; }
+.vtc-posts { display: grid; gap: 16px; margin-top: 24px; }
+.vtc-post img { width: 100%; max-height: 420px; object-fit: cover; border-radius: 14px; margin: 12px 0 0; }
+.vtc-post time { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+.vtc-post h3 { margin: 0 0 6px; font-size: 18px; color: var(--poksol-navy); }
+.vtc-editor { display: grid; gap: 10px; margin-top: 10px; }
+.vtc-editor input, .vtc-editor textarea, .vtc-editor select { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #d3e5ff; font: inherit; }
+.vtc-editor textarea { min-height: 120px; resize: vertical; }
+.vtc-editor label { display: grid; gap: 4px; font-weight: 700; font-size: 14px; }
+.vtc-editor .vtc-check { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.vtc-editor .vtc-check input { width: auto; }
+.vtc-admin-bar { position: sticky; top: 0; z-index: 5; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: #0b2a5c; color: #fff; }
+.vtc-admin-bar strong { margin-right: auto; }
+.vtc-admin-bar button { padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.4); background: transparent; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.vtc-admin-bar button.is-primary { background: #fff; color: #0b2a5c; }
+.vtc-reserve { display: inline-block; padding: 14px 26px; border-radius: 14px; background: var(--vtc-accent, #1872ec); color: #fff; font-weight: 800; text-decoration: none; font-size: 17px; }
+.vtc-reserve:hover { filter: brightness(.92); }
+.vtc-empty { padding: 40px 16px; text-align: center; color: var(--text-muted); }
+@media (max-width: 760px) {
+  .vtc-grid { grid-template-columns: 1fr; }
+  .vtc-cover { height: 200px; }
+  .vtc-logo { width: 84px; height: 84px; font-size: 28px; }
+  .vtc-head h1 { font-size: 24px; }
+  .vtc-line { grid-template-columns: 1fr 1fr; }
+  .vtc-lines-head { display: none; }
+  .vtc-table .table-row, .vtc-table.vtc-clients .table-row, .vtc-table.vtc-team .table-row { grid-template-columns: 1fr; }
+}
