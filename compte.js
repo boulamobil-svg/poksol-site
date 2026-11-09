@@ -25,7 +25,9 @@ const APP_STATUS = {
   suspended: { label: "Suspendu", tone: "soon" }
 };
 const VTC_LOGIN_URL = "https://vtc.poksol.com/login";
-const ACCESS_MAIL = "mailto:contact@poksol.com?subject=Acc%C3%A8s%20VTC%20HERO";
+const VTC_SIGNUP_URL = "https://vtc.poksol.com/inscription";
+// VTC HERO checks the Google token of this site and answers for the address of the person: { vtc: { status, plan, since, trialEndsAt } | null }
+const VTC_ACCOUNT_URL = "https://europe-west9-vtc-hero-prod.cloudfunctions.net/poksolAccount";
 
 const root = document.querySelector("[data-compte]");
 const loginButtons = document.querySelectorAll("[data-compte-login]");
@@ -239,7 +241,7 @@ function vtcApp(userData) {
       rows.push(el("li", null, el("a", { href: VTC_LOGIN_URL }, el("strong", { text: "Ouvrir l'application" }), el("span", { text: "Connectez-vous avec l'adresse utilisée pour VTC HERO." }))));
     }
   } else {
-    rows.push(el("li", null, el("a", { href: ACCESS_MAIL }, el("strong", { text: "Demander un accès" }), el("span", { text: "Nous vous ouvrons VTC HERO dès que possible." }))));
+    rows.push(el("li", null, el("a", { href: VTC_SIGNUP_URL }, el("strong", { text: "Demander un accès" }), el("span", { text: "Nous vous ouvrons VTC HERO dès que possible." }))));
   }
   rows.push(el("li", null, el("a", { href: "vtc-hero.html" }, el("strong", { text: "Découvrir VTC HERO" }), el("span", { text: "Fonctions, déroulé d'une course, formules." }))));
   return el("article", { class: "rf-app" }, head, el("ul", { class: "rf-rows" }, rows));
@@ -309,6 +311,20 @@ function bindButtons() {
   });
 }
 
+/* What VTC HERO says of this person wins over users/{uid}.apps. When it cannot be reached (offline, a slow answer) the card stays as the
+   Poksol account says: it is never an error on this page. */
+async function withVtc(user, userData) {
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch(VTC_ACCOUNT_URL, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return userData;
+    const { vtc } = await response.json();
+    return vtc ? { ...userData, apps: { ...userData.apps, "vtc-hero": vtc } } : userData;
+  } catch {
+    return userData;
+  }
+}
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     setHeroState(false);
@@ -318,5 +334,6 @@ onAuthStateChanged(auth, async (user) => {
   setHeroState(true);
   render(el("section", { class: "rf-section" }, el("div", { class: "rf-wrap" }, el("p", { class: "rf-fine", role: "status", text: "Chargement de votre compte…" }))));
   const [account, release] = await Promise.all([loadAccount(user), loadRelease()]);
+  account.userData = await withVtc(user, account.userData);
   render(infoSection(user, account.userData), appsSection(account, release));
 });
