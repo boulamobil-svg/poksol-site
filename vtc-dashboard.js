@@ -27,6 +27,7 @@ const STATUS = {
 };
 const ROLE = { admin: "Administrateur", admin_driver: "Administrateur et chauffeur", driver: "Chauffeur" };
 const SERVICE = { ride: "Course", disposal: "Mise à disposition", service: "Prestation" };
+const PLAN = { basic: "Essentiel", pro: "Pro", enterprise: "Flotte" };
 const PAY = { carte: "Carte", especes: "Espèces", virement: "Virement", cheque: "Chèque", autre: "Autre" };
 
 const root = document.querySelector("[data-vtc-dashboard]");
@@ -116,7 +117,7 @@ const PANELS = {
       ${card("Informations légales", info([["Nom commercial", p.name], ["Raison sociale", p.legalName], ["Forme", p.legalForm], ["SIRET", p.siret], ["N° REVTC", p.revtcNumber], ["N° TVA", p.vatNumber], ["Capital", p.shareCapital], ["RCS", p.rcsCity], ["TVA par défaut", `${p.defaultVatRate} %`]]), "Société")}
       ${card("Coordonnées", info([["Adresse", p.address], ["Téléphone", p.phone], ["E-mail", p.email], ["Site", p.website]]))}
       ${card("Règlement", info([["Titulaire du compte", d.bank.holder], ["IBAN", d.bank.ibanEnd], ["Lien de paiement", d.bank.hasPaymentLink ? "Oui" : "Non"]]) + `<p class="vtc-note">Ces informations figurent sur vos devis et factures. Elles se modifient dans l'application, protégées par votre mot de passe.</p><div class="quick-links"><a href="${VTC}/settings/company" target="_blank" rel="noopener">Modifier dans l'application</a>${d.publicSlug ? `<a href="${VTC}/reserve/${encodeURIComponent(d.publicSlug)}" target="_blank" rel="noopener">Mon formulaire de réservation</a>` : ""}</div>`)}
-      ${card("Abonnement", info([["État", { active: "Actif", trial: "Essai", trial_ended: "Essai terminé", suspended: "Suspendu", deleted: "Fermé" }[d.state] || d.state], ["Formule", d.rights.planId], ["Fin de période", day(d.currentPeriodEnd)], ["Chauffeurs maximum", d.rights.maxDrivers], ["Demandes par mois", d.rights.maxRequestsPerMonth]]))}`;
+      ${card("Abonnement", info([["État", { active: "Actif", trial: "Essai", trial_ended: "Essai terminé", suspended: "Suspendu", deleted: "Fermé" }[d.state] || d.state], ["Formule", PLAN[d.rights.planId] || d.rights.planId], ["Fin de période", day(d.currentPeriodEnd)], ["Chauffeurs maximum", d.rights.maxDrivers], ["Demandes par mois", d.rights.maxRequestsPerMonth]]))}`;
   },
 
   async clients() {

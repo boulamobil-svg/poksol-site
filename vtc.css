@@ -23,7 +23,7 @@
 
 /* L'éditeur de lignes d'un devis ou d'une facture de prestation */
 .vtc-lines { display: grid; gap: 8px; margin: 10px 0; }
-.vtc-line { display: grid; grid-template-columns: 2.2fr 0.7fr 0.9fr 0.8fr 0.9fr 36px; gap: 8px; align-items: center; }
+.vtc-line { display: grid; grid-template-columns: 2.2fr 0.7fr 0.9fr 1.3fr 1fr 36px; gap: 8px; align-items: center; }
 .vtc-line input, .vtc-line select { width: 100%; padding: 9px 10px; border-radius: 10px; border: 1px solid #d3e5ff; font: inherit; }
 .vtc-line .vtc-line-total { text-align: right; font-weight: 800; }
 .vtc-lines-head { font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
